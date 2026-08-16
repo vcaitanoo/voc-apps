@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/schema/manifest.schema.json",
+  "title": "voc apps catalog manifest",
+  "type": "object",
+  "required": ["schemaVersion", "catalogId", "catalogName", "updatedAt", "apps"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "minimum": 1 },
+    "catalogId": { "type": "string", "minLength": 1 },
+    "catalogName": { "type": "string", "minLength": 1 },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "apps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "packageName",
+          "category",
+          "description",
+          "status",
+          "versionCode",
+          "versionName",
+          "minSdk",
+          "apkUrl",
+          "sha256",
+          "signatureSha256",
+          "iconUrl",
+          "changelog",
+          "mandatory"
+        ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "name": { "type": "string", "minLength": 1 },
+          "packageName": { "type": "string", "minLength": 3 },
+          "category": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["published", "coming_soon", "disabled"]
+          },
+          "versionCode": { "type": "integer", "minimum": 0 },
+          "versionName": { "type": "string" },
+          "minSdk": { "type": "integer", "minimum": 21 },
+          "apkUrl": { "type": ["string", "null"], "format": "uri" },
+          "sha256": {
+            "type": ["string", "null"],
+            "pattern": "^[A-Fa-f0-9]{64}$"
+          },
+          "signatureSha256": {
+            "type": ["string", "null"],
+            "pattern": "^[A-Fa-f0-9]{64}$"
+          },
+          "iconUrl": { "type": ["string", "null"], "format": "uri" },
+          "changelog": { "type": "string" },
+          "mandatory": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
