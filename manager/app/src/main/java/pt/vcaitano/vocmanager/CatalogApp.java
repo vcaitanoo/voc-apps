@@ -4,6 +4,10 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 final class CatalogApp {
+    static final String BILLING_FREE = "free";
+    static final String BILLING_ONE_TIME = "one_time";
+    static final String BILLING_SUBSCRIPTION = "subscription";
+
     final String id;
     final String name;
     final String packageName;
@@ -19,6 +23,12 @@ final class CatalogApp {
     final String iconUrl;
     final String changelog;
     final boolean mandatory;
+    final String billingType;
+    final int priceCents;
+    final String currency;
+    final String billingPeriod;
+    final int trialDays;
+    final String billingProvider;
 
     private CatalogApp(
             String id,
@@ -35,7 +45,13 @@ final class CatalogApp {
             String signatureSha256,
             String iconUrl,
             String changelog,
-            boolean mandatory
+            boolean mandatory,
+            String billingType,
+            int priceCents,
+            String currency,
+            String billingPeriod,
+            int trialDays,
+            String billingProvider
     ) {
         this.id = id;
         this.name = name;
@@ -52,9 +68,37 @@ final class CatalogApp {
         this.iconUrl = iconUrl;
         this.changelog = changelog;
         this.mandatory = mandatory;
+        this.billingType = billingType;
+        this.priceCents = Math.max(0, priceCents);
+        this.currency = currency;
+        this.billingPeriod = billingPeriod;
+        this.trialDays = Math.max(0, trialDays);
+        this.billingProvider = billingProvider;
     }
 
     static CatalogApp fromJson(JSONObject o) throws JSONException {
+        JSONObject monetization = o.optJSONObject("monetization");
+        String billingType = BILLING_FREE;
+        int priceCents = 0;
+        String currency = "EUR";
+        String billingPeriod = null;
+        int trialDays = 0;
+        String billingProvider = "none";
+
+        if (monetization != null) {
+            billingType = monetization.optString("type", BILLING_FREE);
+            if (!BILLING_FREE.equals(billingType)
+                    && !BILLING_ONE_TIME.equals(billingType)
+                    && !BILLING_SUBSCRIPTION.equals(billingType)) {
+                billingType = BILLING_FREE;
+            }
+            priceCents = Math.max(0, monetization.optInt("priceCents", 0));
+            currency = monetization.optString("currency", "EUR");
+            billingPeriod = nullable(monetization, "period");
+            trialDays = Math.max(0, monetization.optInt("trialDays", 0));
+            billingProvider = monetization.optString("provider", "none");
+        }
+
         return new CatalogApp(
                 o.getString("id"),
                 o.getString("name"),
@@ -70,8 +114,26 @@ final class CatalogApp {
                 nullable(o, "signatureSha256"),
                 nullable(o, "iconUrl"),
                 o.optString("changelog", ""),
-                o.optBoolean("mandatory", false)
+                o.optBoolean("mandatory", false),
+                billingType,
+                priceCents,
+                currency,
+                billingPeriod,
+                trialDays,
+                billingProvider
         );
+    }
+
+    boolean isSubscription() {
+        return BILLING_SUBSCRIPTION.equals(billingType);
+    }
+
+    boolean isOneTimePurchase() {
+        return BILLING_ONE_TIME.equals(billingType);
+    }
+
+    boolean isFree() {
+        return BILLING_FREE.equals(billingType);
     }
 
     private static String nullable(JSONObject o, String key) {
