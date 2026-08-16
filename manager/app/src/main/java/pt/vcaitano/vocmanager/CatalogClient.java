@@ -38,7 +38,9 @@ final class CatalogClient {
                 output.write(buffer, 0, read);
             }
 
-            JSONObject root = new JSONObject(output.toString(StandardCharsets.UTF_8));
+            JSONObject root = new JSONObject(
+                    new String(output.toByteArray(), StandardCharsets.UTF_8)
+            );
             if (root.optInt("schemaVersion", -1) != 1) {
                 throw new IllegalStateException("Versão de catálogo não suportada");
             }
