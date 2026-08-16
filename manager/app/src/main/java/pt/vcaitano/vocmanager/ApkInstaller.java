@@ -24,16 +24,17 @@ final class ApkInstaller {
         }
 
         int sessionId = installer.createSession(params);
-        try (PackageInstaller.Session session = installer.openSession(sessionId);
-             FileInputStream input = new FileInputStream(apk);
-             OutputStream output = session.openWrite("base.apk", 0, apk.length())) {
-
-            byte[] buffer = new byte[64 * 1024];
-            int read;
-            while ((read = input.read(buffer)) != -1) {
-                output.write(buffer, 0, read);
+        try (PackageInstaller.Session session = installer.openSession(sessionId)) {
+            try (FileInputStream input = new FileInputStream(apk);
+                 OutputStream output = session.openWrite("base.apk", 0, apk.length())) {
+                byte[] buffer = new byte[64 * 1024];
+                int read;
+                while ((read = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, read);
+                }
+                output.flush();
+                session.fsync(output);
             }
-            session.fsync(output);
 
             Intent resultIntent = new Intent(context, InstallResultReceiver.class)
                     .setAction(InstallResultReceiver.ACTION_INSTALL_STATUS)
