@@ -33,7 +33,15 @@ final class CatalogClient {
             + "\"signatureSha256\":null,"
             + "\"iconUrl\":null,"
             + "\"changelog\":\"Primeira versão do voc Manager em preparação.\","
-            + "\"mandatory\":false"
+            + "\"mandatory\":false,"
+            + "\"monetization\":{"
+            + "\"type\":\"free\","
+            + "\"priceCents\":0,"
+            + "\"currency\":\"EUR\","
+            + "\"period\":null,"
+            + "\"trialDays\":0,"
+            + "\"provider\":\"none\""
+            + "}"
             + "},"
             + "{"
             + "\"id\":\"voc-tv\","
@@ -50,7 +58,15 @@ final class CatalogClient {
             + "\"signatureSha256\":\"629c7b0942460a5d484ec938cc3e0a4e32a6a489572cd179fb94e43cefa05b2e\","
             + "\"iconUrl\":null,"
             + "\"changelog\":\"voc TV v0.14 em preparação.\","
-            + "\"mandatory\":false"
+            + "\"mandatory\":false,"
+            + "\"monetization\":{"
+            + "\"type\":\"subscription\","
+            + "\"priceCents\":150,"
+            + "\"currency\":\"EUR\","
+            + "\"period\":\"P1M\","
+            + "\"trialDays\":0,"
+            + "\"provider\":\"pending\""
+            + "}"
             + "}"
             + "]"
             + "}";
@@ -73,7 +89,7 @@ final class CatalogClient {
         connection.setInstanceFollowRedirects(true);
         connection.setRequestProperty("Accept", "application/json");
         connection.setRequestProperty("Cache-Control", "no-cache");
-        connection.setRequestProperty("User-Agent", "voc-Manager/1.0");
+        connection.setRequestProperty("User-Agent", "voc-Manager/1.1");
 
         int code = connection.getResponseCode();
         if (code < 200 || code >= 300) {
