@@ -1,5 +1,6 @@
 package pt.vcaitano.vocmanager;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 final class CatalogApp {
@@ -53,7 +54,7 @@ final class CatalogApp {
         this.mandatory = mandatory;
     }
 
-    static CatalogApp fromJson(JSONObject o) {
+    static CatalogApp fromJson(JSONObject o) throws JSONException {
         return new CatalogApp(
                 o.getString("id"),
                 o.getString("name"),
@@ -63,7 +64,7 @@ final class CatalogApp {
                 o.optString("status", "disabled"),
                 o.optLong("versionCode", 0),
                 o.optString("versionName", ""),
-                o.optInt("minSdk", 26),
+                o.optInt("minSdk", 28),
                 nullable(o, "apkUrl"),
                 nullable(o, "sha256"),
                 nullable(o, "signatureSha256"),
