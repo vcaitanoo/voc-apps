@@ -1,0 +1,65 @@
+name: Validate voc apps catalog
+
+on:
+  push:
+    paths:
+      - 'manifest.json'
+      - 'schema/**'
+      - '.github/workflows/validate-catalog.yml'
+  pull_request:
+    paths:
+      - 'manifest.json'
+      - 'schema/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate JSON and catalog invariants
+        shell: python
+        run: |
+          import json
+          import re
+          from pathlib import Path
+          from urllib.parse import urlparse
+
+          manifest = json.loads(Path('manifest.json').read_text(encoding='utf-8'))
+          json.loads(Path('schema/manifest.schema.json').read_text(encoding='utf-8'))
+
+          assert manifest.get('schemaVersion') == 1, 'schemaVersion must be 1'
+          apps = manifest.get('apps')
+          assert isinstance(apps, list), 'apps must be a list'
+
+          ids = set()
+          packages = set()
+          sha_re = re.compile(r'^[0-9a-fA-F]{64}$')
+
+          for app in apps:
+              app_id = app['id']
+              package = app['packageName']
+              assert app_id not in ids, f'duplicate app id: {app_id}'
+              assert package not in packages, f'duplicate package: {package}'
+              ids.add(app_id)
+              packages.add(package)
+
+              assert app['status'] in {'published', 'coming_soon', 'disabled'}
+              assert isinstance(app['versionCode'], int) and app['versionCode'] >= 0
+              assert isinstance(app['mandatory'], bool)
+
+              if app['status'] == 'published':
+                  assert app['versionCode'] > 0, f'{app_id}: published app needs versionCode > 0'
+                  assert app['versionName'], f'{app_id}: published app needs versionName'
+                  assert app['apkUrl'], f'{app_id}: published app needs apkUrl'
+                  assert app['sha256'] and sha_re.fullmatch(app['sha256']), f'{app_id}: invalid sha256'
+                  assert app['signatureSha256'] and sha_re.fullmatch(app['signatureSha256']), f'{app_id}: invalid signatureSha256'
+
+              for field in ('apkUrl', 'iconUrl'):
+                  value = app.get(field)
+                  if value:
+                      parsed = urlparse(value)
+                      assert parsed.scheme == 'https' and parsed.netloc, f'{app_id}: {field} must be HTTPS'
+
+          print(f'Catalog valid: {len(apps)} app(s)')
