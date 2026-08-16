@@ -1,0 +1,166 @@
+name: Release voc Manager
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag
+        required: true
+        default: voc-manager-v1.0.0
+
+permissions:
+  contents: write
+
+env:
+  EXPECTED_MANAGER_SIGNER_SHA256: 918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Require signing secrets
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.VOC_MANAGER_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.VOC_MANAGER_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_B64" || { echo "Missing VOC_MANAGER_KEYSTORE_B64"; exit 1; }
+          test -n "$KEYSTORE_PASSWORD" || { echo "Missing VOC_MANAGER_KEYSTORE_PASSWORD"; exit 1; }
+
+      - name: Restore private signing key
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.VOC_MANAGER_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          KEYSTORE_PATH="$RUNNER_TEMP/voc-manager-release.jks"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+          echo "VOC_MANAGER_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+
+      - name: Build signed release APK
+        env:
+          VOC_MANAGER_STORE_PASSWORD: ${{ secrets.VOC_MANAGER_KEYSTORE_PASSWORD }}
+          VOC_MANAGER_KEY_ALIAS: voc-manager-release
+          VOC_MANAGER_KEY_PASSWORD: ${{ secrets.VOC_MANAGER_KEYSTORE_PASSWORD }}
+        run: gradle -p manager clean testDebugUnitTest assembleRelease --stacktrace
+
+      - name: Verify signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_APK="manager/app/build/outputs/apk/release/app-release.apk"
+          FINAL_APK="voc-Manager-v1.0.0.apk"
+          test -f "$SOURCE_APK"
+          cp "$SOURCE_APK" "$FINAL_APK"
+
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$FINAL_APK" | tee manager-release-badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$FINAL_APK" | tee manager-release-signature.txt
+          sha256sum "$FINAL_APK" | tee manager-release-sha256.txt
+
+          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='1' versionName='1.0.0'" manager-release-badging.txt
+          grep -q "application-label:'voc Manager'" manager-release-badging.txt
+
+          ACTUAL_SIGNER="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' manager-release-signature.txt | head -1 | tr '[:upper:]' '[:lower:]')"
+          test "$ACTUAL_SIGNER" = "$EXPECTED_MANAGER_SIGNER_SHA256"
+
+          APK_SHA="$(sha256sum "$FINAL_APK" | awk '{print $1}')"
+          echo "FINAL_APK=$FINAL_APK" >> "$GITHUB_ENV"
+          echo "APK_SHA256=$APK_SHA" >> "$GITHUB_ENV"
+
+      - name: Ensure tag is not already published
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; refusing to overwrite it."
+            exit 1
+          fi
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            "$FINAL_APK" \
+            manager-release-sha256.txt \
+            --title "voc Manager 1.0.0" \
+            --notes "Primeira versão do voc Manager. Instala, abre e atualiza os apps publicados no catálogo voc."
+
+      - name: Publish Manager in catalog
+        env:
+          TAG: ${{ inputs.tag }}
+        shell: python
+        run: |
+          import datetime
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path('manifest.json')
+          manifest = json.loads(path.read_text(encoding='utf-8'))
+          app = next(a for a in manifest['apps'] if a['id'] == 'voc-manager')
+          app.update({
+              'status': 'published',
+              'versionCode': 1,
+              'versionName': '1.0.0',
+              'minSdk': 28,
+              'apkUrl': f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/releases/download/{os.environ['TAG']}/voc-Manager-v1.0.0.apk",
+              'sha256': os.environ['APK_SHA256'],
+              'signatureSha256': os.environ['EXPECTED_MANAGER_SIGNER_SHA256'],
+              'changelog': 'Primeira versão do voc Manager: catálogo remoto, instalação, abertura e atualização com verificação de integridade e assinatura.',
+              'mandatory': False,
+          })
+          manifest['updatedAt'] = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z')
+          path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+      - name: Commit published catalog
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "release: publish voc Manager 1.0.0"
+          git push origin HEAD:main
+
+      - name: Upload release verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voc-manager-v1-release-evidence
+          path: |
+            voc-Manager-v1.0.0.apk
+            manager-release-badging.txt
+            manager-release-signature.txt
+            manager-release-sha256.txt
+          if-no-files-found: warn
