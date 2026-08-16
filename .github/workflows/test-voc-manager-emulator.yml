@@ -1,0 +1,132 @@
+name: Test voc Manager on Android emulator
+
+on:
+  push:
+    paths:
+      - 'manager/**'
+      - 'manifest.json'
+      - '.github/workflows/test-voc-manager-emulator.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: voc-manager-emulator-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ANDROID_AVD_HOME: ${{ github.workspace }}/.android/avd
+
+jobs:
+  emulator-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install build SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Build debug APK
+        run: gradle -p manager clean testDebugUnitTest assembleDebug --stacktrace
+
+      - name: Verify APK structure and signature
+        run: |
+          APK="manager/app/build/outputs/apk/debug/app-debug.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee manager-badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee manager-signature.txt
+          sha256sum "$APK" | tee manager-sha256.txt
+          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='1' versionName='1.0.0'" manager-badging.txt
+          grep -q "application-label:'voc Manager'" manager-badging.txt
+
+      - name: Install emulator image
+        run: |
+          set -u
+          for attempt in 1 2 3; do
+            if sdkmanager "emulator" "system-images;android-35;google_apis;x86_64"; then exit 0; fi
+            rm -rf "$ANDROID_HOME/.temp" "$ANDROID_HOME/system-images/android-35/google_apis/x86_64" "$HOME/.android/cache" || true
+            sleep $((attempt * 5))
+          done
+          exit 1
+
+      - name: Runtime catalog smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="manager/app/build/outputs/apk/debug/app-debug.apk"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "no" | avdmanager create avd -n voc_manager_test -k "system-images;android-35;google_apis;x86_64" -p "$ANDROID_AVD_HOME/voc_manager_test.avd" --force
+          sudo chmod 666 /dev/kvm 2>/dev/null || true
+          if [ -e /dev/kvm ]; then ACCEL_ARGS="-accel on"; else ACCEL_ARGS="-accel off"; fi
+          nohup "$ANDROID_HOME/emulator/emulator" -avd voc_manager_test -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect $ACCEL_ARGS > emulator.log 2>&1 &
+          EMULATOR_PID=$!
+
+          READY=0
+          for i in $(seq 1 150); do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then cat emulator.log; exit 1; fi
+            if adb devices | grep -q '^emulator-.*device$' && [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then READY=1; break; fi
+            sleep 2
+          done
+          test "$READY" = "1"
+
+          adb install -r "$APK" | tee manager-install.txt
+          grep -q "Success" manager-install.txt
+
+          adb logcat -c
+          adb shell am start -n pt.vcaitano.vocmanager/.MainActivity | tee manager-start.txt
+
+          CATALOG_READY=0
+          for i in $(seq 1 30); do
+            adb shell uiautomator dump /sdcard/manager.xml >/dev/null 2>&1 || true
+            adb pull /sdcard/manager.xml manager-ui.xml >/dev/null 2>&1 || true
+            if grep -q "2 app(s) no catálogo" manager-ui.xml 2>/dev/null && grep -q "voc TV" manager-ui.xml 2>/dev/null; then
+              CATALOG_READY=1
+              break
+            fi
+            sleep 1
+          done
+          test "$CATALOG_READY" = "1"
+          grep -q "voc Manager" manager-ui.xml
+          grep -q "voc TV" manager-ui.xml
+          grep -q "EM PREPARAÇÃO" manager-ui.xml
+
+          adb shell pidof pt.vcaitano.vocmanager | tee manager-pid.txt
+          test -s manager-pid.txt
+
+          adb logcat -d -t 1500 > manager-logcat.txt
+          if grep -q "FATAL EXCEPTION" manager-logcat.txt; then
+            grep -A40 -B10 "FATAL EXCEPTION" manager-logcat.txt
+            exit 1
+          fi
+
+      - name: Upload emulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voc-manager-v1-emulator-smoke
+          path: |
+            manager/app/build/outputs/apk/debug/app-debug.apk
+            manager-badging.txt
+            manager-signature.txt
+            manager-sha256.txt
+            manager-install.txt
+            manager-start.txt
+            manager-ui.xml
+            manager-pid.txt
+            manager-logcat.txt
+            emulator.log
+          if-no-files-found: warn
