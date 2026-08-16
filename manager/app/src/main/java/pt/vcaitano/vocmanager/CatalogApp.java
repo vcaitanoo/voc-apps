@@ -3,6 +3,8 @@ package pt.vcaitano.vocmanager;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.Locale;
+
 final class CatalogApp {
     static final String BILLING_FREE = "free";
     static final String BILLING_ONE_TIME = "one_time";
@@ -99,12 +101,21 @@ final class CatalogApp {
             billingProvider = monetization.optString("provider", "none");
         }
 
+        String baseDescription = o.optString("description", "");
+        String description = decorateDescription(
+                baseDescription,
+                billingType,
+                priceCents,
+                currency,
+                billingPeriod
+        );
+
         return new CatalogApp(
                 o.getString("id"),
                 o.getString("name"),
                 o.getString("packageName"),
                 o.optString("category", "app"),
-                o.optString("description", ""),
+                description,
                 o.optString("status", "disabled"),
                 o.optLong("versionCode", 0),
                 o.optString("versionName", ""),
@@ -134,6 +145,39 @@ final class CatalogApp {
 
     boolean isFree() {
         return BILLING_FREE.equals(billingType);
+    }
+
+    private static String decorateDescription(
+            String base,
+            String billingType,
+            int priceCents,
+            String currency,
+            String billingPeriod
+    ) {
+        String pricing;
+        if (BILLING_FREE.equals(billingType)) {
+            pricing = "GRÁTIS";
+        } else {
+            String amount;
+            if ("EUR".equalsIgnoreCase(currency)) {
+                amount = String.format(new Locale("pt", "PT"), "%.2f €", priceCents / 100.0);
+            } else {
+                amount = String.format(Locale.US, "%.2f %s", priceCents / 100.0, currency);
+            }
+
+            if (BILLING_SUBSCRIPTION.equals(billingType)) {
+                pricing = "P1M".equalsIgnoreCase(billingPeriod)
+                        ? "Premium · " + amount + "/mês"
+                        : "Premium · " + amount + " · subscrição";
+            } else if (BILLING_ONE_TIME.equals(billingType)) {
+                pricing = amount + " · compra única";
+            } else {
+                pricing = amount;
+            }
+        }
+
+        if (base == null || base.isBlank()) return pricing;
+        return base + "\n" + pricing;
     }
 
     private static String nullable(JSONObject o, String key) {
