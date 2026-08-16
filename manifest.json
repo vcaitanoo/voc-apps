@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-apps",
   "catalogName": "voc apps",
-  "updatedAt": "2026-08-16T11:14:00Z",
+  "updatedAt": "2026-08-16T11:29:00Z",
   "apps": [
     {
       "id": "voc-manager",
@@ -13,7 +13,7 @@
       "status": "coming_soon",
       "versionCode": 0,
       "versionName": "",
-      "minSdk": 26,
+      "minSdk": 28,
       "apkUrl": null,
       "sha256": null,
       "signatureSha256": null,
