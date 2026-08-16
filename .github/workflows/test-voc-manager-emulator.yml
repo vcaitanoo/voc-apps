@@ -50,7 +50,7 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee manager-badging.txt
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee manager-signature.txt
           sha256sum "$APK" | tee manager-sha256.txt
-          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='1' versionName='1.0.0'" manager-badging.txt
+          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='2' versionName='1.1.0'" manager-badging.txt
           grep -q "application-label:'voc Manager'" manager-badging.txt
 
       - name: Install emulator image
@@ -102,6 +102,8 @@ jobs:
           test "$CATALOG_READY" = "1"
           grep -q "voc Manager" manager-ui.xml
           grep -q "voc TV" manager-ui.xml
+          grep -q "GRÁTIS" manager-ui.xml
+          grep -q "1,50 €/mês" manager-ui.xml
           grep -q "EM PREPARAÇÃO" manager-ui.xml
 
           adb shell pidof pt.vcaitano.vocmanager | tee manager-pid.txt
@@ -117,7 +119,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: voc-manager-v1-emulator-smoke
+          name: voc-manager-v1.1-emulator-smoke
           path: |
             manager/app/build/outputs/apk/debug/app-debug.apk
             manager-badging.txt
