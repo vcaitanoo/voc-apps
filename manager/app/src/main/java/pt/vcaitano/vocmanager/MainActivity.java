@@ -214,7 +214,10 @@ public final class MainActivity extends Activity {
     }
 
     private void maybeStartAutomaticUpdate(List<CatalogApp> apps) {
-        if (installBusy.get() || pendingInstall != null) return;
+        if (installBusy.get() || pendingInstall != null) {
+            android.util.Log.i("vocManager", "Auto-update skipped: installer busy or permission flow pending");
+            return;
+        }
 
         for (CatalogApp app : apps) {
             if (!"published".equals(app.status)) continue;
@@ -222,12 +225,21 @@ public final class MainActivity extends Activity {
             if (app.apkUrl == null || app.sha256 == null || app.signatureSha256 == null) continue;
 
             InstalledInfo installed = getInstalledInfo(app.packageName);
-            if (installed == null || installed.versionCode >= app.versionCode) continue;
+            if (installed == null) continue;
+            android.util.Log.i(
+                    "vocManager",
+                    "Auto-update check " + app.packageName
+                            + " installed=" + installed.versionCode
+                            + " catalog=" + app.versionCode
+                            + " signerMatch=" + app.signatureSha256.equalsIgnoreCase(installed.signatureSha256)
+            );
+            if (installed.versionCode >= app.versionCode) continue;
             if (!app.signatureSha256.equalsIgnoreCase(installed.signatureSha256)) continue;
 
             String key = app.packageName + ":" + app.versionCode;
             if (!autoAttempted.add(key)) continue;
 
+            android.util.Log.i("vocManager", "Auto-update starting for " + key);
             globalStatus.setText("Atualização automática encontrada: " + app.name + " " + app.versionName);
             requestInstall(app);
             return;
@@ -312,6 +324,17 @@ public final class MainActivity extends Activity {
             return;
         }
 
+        if (getPackageName().equals(app.packageName)
+                && installed != null
+                && !"published".equals(app.status)) {
+            status.setText("ATUALIZADO");
+            status.setTextColor(Color.rgb(74, 102, 34));
+            button.setText("ABRIR");
+            button.setEnabled(true);
+            button.setOnClickListener(v -> openPackage(app.packageName));
+            return;
+        }
+
         if (Build.VERSION.SDK_INT < app.minSdk) {
             status.setText("INCOMPATÍVEL COM ESTE ANDROID");
             status.setTextColor(Color.rgb(180, 65, 65));
@@ -385,6 +408,7 @@ public final class MainActivity extends Activity {
         }
 
         if (!canInstallPackages()) {
+            android.util.Log.w("vocManager", "Install permission missing for " + app.packageName);
             pendingInstall = app;
             Intent settings = new Intent(
                     Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
@@ -399,6 +423,7 @@ public final class MainActivity extends Activity {
             return;
         }
 
+        android.util.Log.i("vocManager", "Install permission available for " + app.packageName);
         startDownloadAndInstall(app);
     }
 
@@ -409,6 +434,7 @@ public final class MainActivity extends Activity {
     private void startDownloadAndInstall(CatalogApp app) {
         if (!installBusy.compareAndSet(false, true)) return;
         activePackage = app.packageName;
+        android.util.Log.i("vocManager", "Downloading update for " + app.packageName + " versionCode=" + app.versionCode);
         topProgress.setVisibility(View.VISIBLE);
         globalStatus.setText("A preparar " + app.name + "…");
         renderApps(latestCatalog);
