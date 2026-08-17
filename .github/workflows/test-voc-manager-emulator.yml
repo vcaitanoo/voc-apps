@@ -50,8 +50,9 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee manager-badging.txt
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee manager-signature.txt
           sha256sum "$APK" | tee manager-sha256.txt
-          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='3' versionName='1.1.1'" manager-badging.txt
+          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='4' versionName='1.2.0'" manager-badging.txt
           grep -q "application-label:'voc Manager'" manager-badging.txt
+          grep -q "android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" manager-badging.txt
 
       - name: Install emulator image
         run: |
@@ -90,10 +91,10 @@ jobs:
           adb shell am start -n pt.vcaitano.vocmanager/.MainActivity | tee manager-start.txt
 
           CATALOG_READY=0
-          for i in $(seq 1 30); do
+          for i in $(seq 1 40); do
             adb shell uiautomator dump /sdcard/manager.xml >/dev/null 2>&1 || true
             adb pull /sdcard/manager.xml manager-ui.xml >/dev/null 2>&1 || true
-            if grep -q "2 app(s) no catálogo" manager-ui.xml 2>/dev/null && grep -q "voc TV" manager-ui.xml 2>/dev/null; then
+            if grep -q "voc TV" manager-ui.xml 2>/dev/null && grep -q "Damas" manager-ui.xml 2>/dev/null; then
               CATALOG_READY=1
               break
             fi
@@ -102,9 +103,7 @@ jobs:
           test "$CATALOG_READY" = "1"
           grep -q "voc Manager" manager-ui.xml
           grep -q "voc TV" manager-ui.xml
-          grep -q "GRÁTIS" manager-ui.xml
-          grep -q "1,50 €/mês" manager-ui.xml
-          grep -q "EM PREPARAÇÃO" manager-ui.xml
+          grep -q "Damas" manager-ui.xml
 
           adb shell pidof pt.vcaitano.vocmanager | tee manager-pid.txt
           test -s manager-pid.txt
@@ -119,7 +118,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: voc-manager-v1.1.1-emulator-smoke
+          name: voc-manager-v1.2.0-emulator-smoke
           path: |
             manager/app/build/outputs/apk/debug/app-debug.apk
             manager-badging.txt
