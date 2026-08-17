@@ -1,0 +1,48 @@
+name: Import verified Damas v1.0.3 APK
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/import-damas-v103.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download and verify exact APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --show-error --retry 3 \
+            'https://bpketfzabpbxmujyozjm.supabase.co/storage/v1/object/public/damas-releases/v1.0.3/Damas-v1.0.3.apk' \
+            -o /tmp/Damas-v1.0.3.apk
+          echo 'e8c9e4184b33a09a4ad1e1cc5aa919494d3cf12613f40c929d6824f243f4a721  /tmp/Damas-v1.0.3.apk' | sha256sum -c -
+
+      - name: Download icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --show-error --retry 3 \
+            'https://bpketfzabpbxmujyozjm.supabase.co/storage/v1/object/public/damas-releases/v1.0.3/damas.webp' \
+            -o /tmp/damas.webp
+
+      - name: Publish into voc-apps
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p apks/damas/v1.0.3 icons
+          cp /tmp/Damas-v1.0.3.apk apks/damas/v1.0.3/Damas-v1.0.3.apk
+          cp /tmp/damas.webp icons/damas.webp
+          echo 'e8c9e4184b33a09a4ad1e1cc5aa919494d3cf12613f40c929d6824f243f4a721  apks/damas/v1.0.3/Damas-v1.0.3.apk' | sha256sum -c -
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apks/damas/v1.0.3/Damas-v1.0.3.apk icons/damas.webp
+          git commit -m 'Publish verified Damas v1.0.3 APK'
+          git push
