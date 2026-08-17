@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-apps",
   "catalogName": "voc apps",
-  "updatedAt": "2026-08-17T03:02:00Z",
+  "updatedAt": "2026-08-17T03:49:00Z",
   "apps": [
     {
       "id": "voc-manager",
@@ -52,6 +52,31 @@
         "period": "P1M",
         "trialDays": 0,
         "provider": "pending"
+      }
+    },
+    {
+      "id": "damas",
+      "name": "Damas",
+      "packageName": "pt.vcaitano.damas",
+      "category": "games",
+      "description": "Jogo de damas com adversário de IA avançado e modo online para jogar contra amigos.",
+      "status": "published",
+      "versionCode": 1,
+      "versionName": "1.0.0",
+      "minSdk": 23,
+      "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/damas/v1.0/Damas-v1.0.0.apk",
+      "sha256": "45f6eb4931519bf129bff48dca266bf9ca264e0a0891f3c9295789d234f82730",
+      "signatureSha256": "07df7362d3a99e638d54ce97e35328b6ca415f44481198ff2f6cf47bbadb9269",
+      "iconUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/icons/damas.webp",
+      "changelog": "Damas v1.0.0 — primeira versão no voc Manager; IA avançada preservada, nova logo oficial e modo online preparado para convites por QR/link.",
+      "mandatory": false,
+      "monetization": {
+        "type": "free",
+        "priceCents": 0,
+        "currency": "EUR",
+        "period": null,
+        "trialDays": 0,
+        "provider": "none"
       }
     }
   ]
