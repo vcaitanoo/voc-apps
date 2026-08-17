@@ -44,7 +44,7 @@ jobs:
       - name: Build debug APK
         run: gradle -p manager clean testDebugUnitTest assembleDebug --stacktrace
 
-      - name: Verify APK structure and signature
+      - name: Verify APK structure and permissions
         run: |
           APK="manager/app/build/outputs/apk/debug/app-debug.apk"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee manager-badging.txt
@@ -52,7 +52,7 @@ jobs:
           sha256sum "$APK" | tee manager-sha256.txt
           grep -q "package: name='pt.vcaitano.vocmanager' versionCode='4' versionName='1.2.0'" manager-badging.txt
           grep -q "application-label:'voc Manager'" manager-badging.txt
-          grep -q "android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" manager-badging.txt
+          grep -q "uses-permission: name='android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION'" manager-badging.txt
 
       - name: Install emulator image
         run: |
@@ -64,11 +64,14 @@ jobs:
           done
           exit 1
 
-      - name: Runtime catalog smoke test
+      - name: Runtime automatic-update smoke test
         shell: bash
         run: |
           set -euo pipefail
           APK="manager/app/build/outputs/apk/debug/app-debug.apk"
+          OLD_TV="apks/voc-tv/v0.17/vocTV-v0.17.apk"
+          test -s "$OLD_TV"
+
           mkdir -p "$ANDROID_AVD_HOME"
           echo "no" | avdmanager create avd -n voc_manager_test -k "system-images;android-35;google_apis;x86_64" -p "$ANDROID_AVD_HOME/voc_manager_test.avd" --force
           sudo chmod 666 /dev/kvm 2>/dev/null || true
@@ -87,28 +90,47 @@ jobs:
           adb install -r "$APK" | tee manager-install.txt
           grep -q "Success" manager-install.txt
 
+          # Make the Manager the installer-of-record of voc TV v0.17, then allow
+          # unknown-package installs. No UI click is performed after this point.
+          adb install -r -i pt.vcaitano.vocmanager "$OLD_TV" | tee old-tv-install.txt
+          grep -q "Success" old-tv-install.txt
+          adb shell appops set pt.vcaitano.vocmanager REQUEST_INSTALL_PACKAGES allow
+
+          BEFORE="$(adb shell dumpsys package pt.vcaitano.iptvia | sed -n 's/.*versionCode=\([0-9]*\).*/\1/p' | head -1 | tr -d '\r')"
+          test "$BEFORE" = "17"
+
           adb logcat -c
           adb shell am start -n pt.vcaitano.vocmanager/.MainActivity | tee manager-start.txt
 
-          CATALOG_READY=0
-          for i in $(seq 1 40); do
-            adb shell uiautomator dump /sdcard/manager.xml >/dev/null 2>&1 || true
-            adb pull /sdcard/manager.xml manager-ui.xml >/dev/null 2>&1 || true
-            if grep -q "voc TV" manager-ui.xml 2>/dev/null && grep -q "Damas" manager-ui.xml 2>/dev/null; then
-              CATALOG_READY=1
+          UPDATED=0
+          for i in $(seq 1 90); do
+            CURRENT="$(adb shell dumpsys package pt.vcaitano.iptvia | sed -n 's/.*versionCode=\([0-9]*\).*/\1/p' | head -1 | tr -d '\r')"
+            if [ "$CURRENT" = "18" ]; then
+              UPDATED=1
               break
             fi
             sleep 1
           done
-          test "$CATALOG_READY" = "1"
-          grep -q "voc Manager" manager-ui.xml
-          grep -q "voc TV" manager-ui.xml
-          grep -q "Damas" manager-ui.xml
+          echo "automatic_update_result=$UPDATED" | tee auto-update-result.txt
+          test "$UPDATED" = "1"
+
+          # After the package change, the Manager refreshes its card by itself.
+          CARD_READY=0
+          for i in $(seq 1 30); do
+            adb shell uiautomator dump /sdcard/manager.xml >/dev/null 2>&1 || true
+            adb pull /sdcard/manager.xml manager-ui.xml >/dev/null 2>&1 || true
+            if grep -q "voc TV" manager-ui.xml 2>/dev/null && grep -q "ATUALIZADO" manager-ui.xml 2>/dev/null && grep -q "ABRIR" manager-ui.xml 2>/dev/null; then
+              CARD_READY=1
+              break
+            fi
+            sleep 1
+          done
+          test "$CARD_READY" = "1"
 
           adb shell pidof pt.vcaitano.vocmanager | tee manager-pid.txt
           test -s manager-pid.txt
 
-          adb logcat -d -t 1500 > manager-logcat.txt
+          adb logcat -d -t 2500 > manager-logcat.txt
           if grep -q "FATAL EXCEPTION" manager-logcat.txt; then
             grep -A40 -B10 "FATAL EXCEPTION" manager-logcat.txt
             exit 1
@@ -125,8 +147,10 @@ jobs:
             manager-signature.txt
             manager-sha256.txt
             manager-install.txt
+            old-tv-install.txt
             manager-start.txt
             manager-ui.xml
+            auto-update-result.txt
             manager-pid.txt
             manager-logcat.txt
             emulator.log
