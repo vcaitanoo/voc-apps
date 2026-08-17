@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-apps",
   "catalogName": "voc apps",
-  "updatedAt": "2026-08-17T12:05:41Z",
+  "updatedAt": "2026-08-17T12:10:30Z",
   "apps": [
     {
       "id": "voc-manager",
@@ -65,7 +65,7 @@
       "versionName": "1.0.3",
       "minSdk": 23,
       "apkUrl": "https://bpketfzabpbxmujyozjm.supabase.co/storage/v1/object/public/damas-releases/v1.0.3/Damas-v1.0.3.apk",
-      "sha256": "e8c9e453d8d8d9217207999cfbcb8f05fb324217ec91387ad60b6d0928294332",
+      "sha256": "e8c9e4184b33a09a4ad1e1cc5aa919494d3cf12613f40c929d6824f243f4a721",
       "signatureSha256": "07df7362d3a99e638d54ce97e35328b6ca415f44481198ff2f6cf47bbadb9269",
       "iconUrl": "https://bpketfzabpbxmujyozjm.supabase.co/storage/v1/object/public/damas-releases/v1.0.3/damas.webp",
       "changelog": "Damas v1.0.3 — multiplayer preservado em PeerJS/WebRTC; QR agora abre endereço público sem login da Vercel; safe area e contenção do layout mobile corrigidas; nova logo aplicada; tabuleiro, IA e motor de regras preservados.",
