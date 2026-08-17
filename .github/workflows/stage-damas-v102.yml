@@ -20,19 +20,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 3 --retry-delay 2 'https://sdmntpritalynorth.oaiusercontent.com/files/00000000-28d0-8246-8c22-44b8a16b2b53/raw?se=2026-08-17T10%3A34%3A16Z&sp=r&sv=2026-02-06&sr=b&scid=eecb075a-c4f3-5267-8951-3b53efc988fc&skoid=b32d65cd-c8f1-46fb-90df-c208671889d4&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-17T09%3A22%3A57Z&ske=2026-08-18T09%3A22%3A57Z&sks=b&skv=2026-02-06&sig=bT6M29j2pGuQ%2BubRH9V5qT4YN0rwvEsYOTy8tvrnfBY%3D' -o /tmp/damas-v102.zip
+          curl -fL --retry 3 --retry-delay 2 'https://sdmntprnortheu.oaiusercontent.com/files/00000000-177c-81f4-a63d-ecf5881c8786/raw?se=2026-08-17T10%3A41%3A50Z&sp=r&sv=2026-02-06&sr=b&scid=e362a4b9-138a-5b35-8aa4-b041b41e4296&skoid=b32d65cd-c8f1-46fb-90df-c208671889d4&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-17T07%3A49%3A03Z&ske=2026-08-18T07%3A49%3A03Z&sks=b&skv=2026-02-06&sig=cna%2BjJnotI9vdNnnoUVHUHwPGxsBY9wIBPp3MEHKJGg%3D' -o /tmp/damas-v102.zip
           rm -rf /tmp/damas-v102
           mkdir -p /tmp/damas-v102
           unzip -q /tmp/damas-v102.zip -d /tmp/damas-v102
           test -f /tmp/damas-v102/Damas-v1.0.2.apk
           test -f /tmp/damas-v102/verification.txt
           test -f /tmp/damas-v102/Damas-v1.0.2-web/index.html
-          echo 'a16eadf3103910e22498ee69ebad60ea8a1c85601fcd2a6e9958f4002c0e1b05  /tmp/damas-v102/Damas-v1.0.2.apk' | sha256sum -c -
+          echo 'dcc426a668f3ee68f7c0f2a0839362b57a23ad1f370dfd96a7fef0aef712fcbf  /tmp/damas-v102/Damas-v1.0.2.apk' | sha256sum -c -
           grep -q '^packageName=pt.vcaitano.damas$' /tmp/damas-v102/verification.txt
           grep -q '^versionCode=3$' /tmp/damas-v102/verification.txt
           grep -q '^versionName=1.0.2$' /tmp/damas-v102/verification.txt
           grep -q '^signatureSha256=07df7362d3a99e638d54ce97e35328b6ca415f44481198ff2f6cf47bbadb9269$' /tmp/damas-v102/verification.txt
-          grep -q '^publicMultiplayerUrl=https://damas-ache-aquis-projects.vercel.app$' /tmp/damas-v102/verification.txt
+          grep -q '^publicMultiplayerUrl=https://damas-online-ache-aquis-projects.vercel.app$' /tmp/damas-v102/verification.txt
 
       - name: Stage exact APK and web output without changing catalog
         shell: bash
@@ -43,8 +43,9 @@ jobs:
           cp /tmp/damas-v102/Damas-v1.0.2.apk apks/damas/v1.0.2/Damas-v1.0.2.apk
           cp /tmp/damas-v102/Damas-icon.webp icons/damas.webp
           cp -a /tmp/damas-v102/Damas-v1.0.2-web/. web/damas-v1.0.2/
-          echo 'a16eadf3103910e22498ee69ebad60ea8a1c85601fcd2a6e9958f4002c0e1b05  apks/damas/v1.0.2/Damas-v1.0.2.apk' | sha256sum -c -
-          grep -R -Fq 'https://damas-ache-aquis-projects.vercel.app' web/damas-v1.0.2
+          echo 'dcc426a668f3ee68f7c0f2a0839362b57a23ad1f370dfd96a7fef0aef712fcbf  apks/damas/v1.0.2/Damas-v1.0.2.apk' | sha256sum -c -
+          grep -R -Fq 'https://damas-online-ache-aquis-projects.vercel.app' web/damas-v1.0.2
+          ! grep -R -Fq 'https://damas-ache-aquis-projects.vercel.app' web/damas-v1.0.2
           grep -R -Fq '#eaf4ff' web/damas-v1.0.2
 
       - name: Commit staged candidate
@@ -54,5 +55,5 @@ jobs:
           git config user.name 'vcaitanoo'
           git config user.email '162039938+vcaitanoo@users.noreply.github.com'
           git add apks/damas/v1.0.2 web/damas-v1.0.2 icons/damas.webp
-          git commit -m 'stage: Damas v1.0.2 verified test candidate'
+          git commit -m 'stage: final Damas v1.0.2 static-online candidate'
           git push origin HEAD:main
