@@ -1,7 +1,10 @@
 package pt.vcaitano.vocmanager;
 
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.Signature;
@@ -27,8 +30,10 @@ import java.io.FileOutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -36,11 +41,32 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class MainActivity extends Activity {
     private final ExecutorService executor = Executors.newFixedThreadPool(3);
     private final AtomicBoolean installBusy = new AtomicBoolean(false);
+    private final Set<String> autoAttempted = new HashSet<>();
+    private final BroadcastReceiver installFinishedReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            int status = intent.getIntExtra(
+                    InstallResultReceiver.EXTRA_STATUS,
+                    android.content.pm.PackageInstaller.STATUS_FAILURE
+            );
+            String packageName = intent.getStringExtra(InstallResultReceiver.EXTRA_PACKAGE);
+            installBusy.set(false);
+            activePackage = null;
+            if (status == android.content.pm.PackageInstaller.STATUS_SUCCESS) {
+                globalStatus.setText("Atualização instalada" + (packageName == null ? "" : ": " + packageName));
+            } else {
+                globalStatus.setText("A instalação não foi concluída");
+            }
+            loadCatalog();
+        }
+    };
 
     private LinearLayout appList;
     private TextView globalStatus;
     private ProgressBar topProgress;
     private CatalogApp pendingInstall;
+    private List<CatalogApp> latestCatalog = java.util.Collections.emptyList();
+    private String activePackage;
     private long lastCatalogLoad;
 
     @Override
@@ -51,6 +77,7 @@ public final class MainActivity extends Activity {
             getWindow().getDecorView().setSystemUiVisibility(0);
         }
         setContentView(buildUi());
+        registerInstallReceiver();
         loadCatalog();
     }
 
@@ -63,15 +90,30 @@ public final class MainActivity extends Activity {
             startDownloadAndInstall(app);
             return;
         }
-        if (lastCatalogLoad > 0 && System.currentTimeMillis() - lastCatalogLoad > 2_000) {
+        if (lastCatalogLoad > 0) {
             loadCatalog();
         }
     }
 
     @Override
     protected void onDestroy() {
+        try {
+            unregisterReceiver(installFinishedReceiver);
+        } catch (IllegalArgumentException ignored) {
+            // Receiver already unregistered.
+        }
         executor.shutdownNow();
         super.onDestroy();
+    }
+
+    private void registerInstallReceiver() {
+        IntentFilter filter = new IntentFilter(InstallResultReceiver.ACTION_INSTALL_FINISHED);
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(installFinishedReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            //noinspection UnspecifiedRegisterReceiverFlag
+            registerReceiver(installFinishedReceiver, filter);
+        }
     }
 
     private View buildUi() {
@@ -151,7 +193,9 @@ public final class MainActivity extends Activity {
                     lastCatalogLoad = System.currentTimeMillis();
                     topProgress.setVisibility(View.GONE);
                     globalStatus.setText(apps.size() + " app(s) no catálogo");
+                    latestCatalog = apps;
                     renderApps(apps);
+                    maybeStartAutomaticUpdate(apps);
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
@@ -166,6 +210,39 @@ public final class MainActivity extends Activity {
         appList.removeAllViews();
         for (CatalogApp app : apps) {
             appList.addView(buildAppCard(app));
+        }
+    }
+
+    private void maybeStartAutomaticUpdate(List<CatalogApp> apps) {
+        if (installBusy.get() || pendingInstall != null) {
+            android.util.Log.i("vocManager", "Auto-update skipped: installer busy or permission flow pending");
+            return;
+        }
+
+        for (CatalogApp app : apps) {
+            if (!"published".equals(app.status)) continue;
+            if (Build.VERSION.SDK_INT < app.minSdk) continue;
+            if (app.apkUrl == null || app.sha256 == null || app.signatureSha256 == null) continue;
+
+            InstalledInfo installed = getInstalledInfo(app.packageName);
+            if (installed == null) continue;
+            android.util.Log.i(
+                    "vocManager",
+                    "Auto-update check " + app.packageName
+                            + " installed=" + installed.versionCode
+                            + " catalog=" + app.versionCode
+                            + " signerMatch=" + app.signatureSha256.equalsIgnoreCase(installed.signatureSha256)
+            );
+            if (installed.versionCode >= app.versionCode) continue;
+            if (!app.signatureSha256.equalsIgnoreCase(installed.signatureSha256)) continue;
+
+            String key = app.packageName + ":" + app.versionCode;
+            if (!autoAttempted.add(key)) continue;
+
+            android.util.Log.i("vocManager", "Auto-update starting for " + key);
+            globalStatus.setText("Atualização automática encontrada: " + app.name + " " + app.versionName);
+            requestInstall(app);
+            return;
         }
     }
 
@@ -239,6 +316,25 @@ public final class MainActivity extends Activity {
             Button button,
             TextView status
     ) {
+        if (app.packageName.equals(activePackage)) {
+            status.setText(installed == null ? "A INSTALAR…" : "A ATUALIZAR…");
+            status.setTextColor(Color.rgb(74, 102, 34));
+            button.setText(installed == null ? "A INSTALAR…" : "A ATUALIZAR…");
+            button.setEnabled(false);
+            return;
+        }
+
+        if (getPackageName().equals(app.packageName)
+                && installed != null
+                && !"published".equals(app.status)) {
+            status.setText("ATUALIZADO");
+            status.setTextColor(Color.rgb(74, 102, 34));
+            button.setText("ABRIR");
+            button.setEnabled(true);
+            button.setOnClickListener(v -> openPackage(app.packageName));
+            return;
+        }
+
         if (Build.VERSION.SDK_INT < app.minSdk) {
             status.setText("INCOMPATÍVEL COM ESTE ANDROID");
             status.setTextColor(Color.rgb(180, 65, 65));
@@ -312,6 +408,7 @@ public final class MainActivity extends Activity {
         }
 
         if (!canInstallPackages()) {
+            android.util.Log.w("vocManager", "Install permission missing for " + app.packageName);
             pendingInstall = app;
             Intent settings = new Intent(
                     Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
@@ -326,6 +423,7 @@ public final class MainActivity extends Activity {
             return;
         }
 
+        android.util.Log.i("vocManager", "Install permission available for " + app.packageName);
         startDownloadAndInstall(app);
     }
 
@@ -335,24 +433,32 @@ public final class MainActivity extends Activity {
 
     private void startDownloadAndInstall(CatalogApp app) {
         if (!installBusy.compareAndSet(false, true)) return;
+        activePackage = app.packageName;
+        android.util.Log.i("vocManager", "Downloading update for " + app.packageName + " versionCode=" + app.versionCode);
         topProgress.setVisibility(View.VISIBLE);
         globalStatus.setText("A preparar " + app.name + "…");
+        renderApps(latestCatalog);
 
         executor.execute(() -> {
             try {
                 File apk = downloadAndVerify(app);
-                runOnUiThread(() -> globalStatus.setText("A abrir instalador do Android…"));
+                runOnUiThread(() -> globalStatus.setText("A instalar " + app.name + "…"));
                 ApkInstaller.install(this, apk, app.packageName);
             } catch (Exception e) {
-                runOnUiThread(() -> Toast.makeText(
-                        this,
-                        "Não foi possível instalar: " + shortMessage(e),
-                        Toast.LENGTH_LONG
-                ).show());
-            } finally {
                 installBusy.set(false);
-                runOnUiThread(() -> topProgress.setVisibility(View.GONE));
+                activePackage = null;
+                runOnUiThread(() -> {
+                    topProgress.setVisibility(View.GONE);
+                    renderApps(latestCatalog);
+                    Toast.makeText(
+                            this,
+                            "Não foi possível instalar: " + shortMessage(e),
+                            Toast.LENGTH_LONG
+                    ).show();
+                });
+                return;
             }
+            runOnUiThread(() -> topProgress.setVisibility(View.GONE));
         });
     }
 

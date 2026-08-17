@@ -15,6 +15,9 @@ final class CatalogClient {
     static final String CATALOG_URL =
             "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/manifest.json";
 
+    // Last known-good public catalog snapshot. It is intentionally usable when GitHub Raw
+    // has a transient DNS/TLS/network failure so the Manager never falls back to the old
+    // v0.14/coming-soon state. The live catalog remains authoritative whenever reachable.
     private static final String FALLBACK_CATALOG = "{"
             + "\"schemaVersion\":1,"
             + "\"apps\":["
@@ -25,14 +28,14 @@ final class CatalogClient {
             + "\"category\":\"system\","
             + "\"description\":\"Instala, abre e atualiza os apps voc.\","
             + "\"status\":\"coming_soon\","
-            + "\"versionCode\":0,"
-            + "\"versionName\":\"\","
+            + "\"versionCode\":4,"
+            + "\"versionName\":\"1.2.0\","
             + "\"minSdk\":28,"
             + "\"apkUrl\":null,"
             + "\"sha256\":null,"
-            + "\"signatureSha256\":null,"
+            + "\"signatureSha256\":\"918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8\","
             + "\"iconUrl\":null,"
-            + "\"changelog\":\"Primeira versão do voc Manager em preparação.\","
+            + "\"changelog\":\"voc Manager 1.2.0.\","
             + "\"mandatory\":false,"
             + "\"monetization\":{"
             + "\"type\":\"free\","
@@ -48,16 +51,16 @@ final class CatalogClient {
             + "\"name\":\"voc TV\","
             + "\"packageName\":\"pt.vcaitano.iptvia\","
             + "\"category\":\"entertainment\","
-            + "\"description\":\"Pesquisa e reprodução de conteúdo com assistência de IA.\","
-            + "\"status\":\"coming_soon\","
-            + "\"versionCode\":14,"
-            + "\"versionName\":\"0.14.0\","
+            + "\"description\":\"Pesquisa inteligente e reprodução de filmes, séries, TV ao vivo e vídeos públicos com assistência de IA.\","
+            + "\"status\":\"published\","
+            + "\"versionCode\":18,"
+            + "\"versionName\":\"0.18.0\","
             + "\"minSdk\":26,"
-            + "\"apkUrl\":null,"
-            + "\"sha256\":null,"
+            + "\"apkUrl\":\"https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-tv/v0.18/vocTV-v0.18.apk\","
+            + "\"sha256\":\"2ca9767b0466286fb6aeb04ac7859c3b89f773dd3a7df9773ca8f238d99619f2\","
             + "\"signatureSha256\":\"629c7b0942460a5d484ec938cc3e0a4e32a6a489572cd179fb94e43cefa05b2e\","
-            + "\"iconUrl\":null,"
-            + "\"changelog\":\"voc TV v0.14 em preparação.\","
+            + "\"iconUrl\":\"https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/icons/voc-tv.webp\","
+            + "\"changelog\":\"voc TV v0.18.\","
             + "\"mandatory\":false,"
             + "\"monetization\":{"
             + "\"type\":\"subscription\","
@@ -67,19 +70,59 @@ final class CatalogClient {
             + "\"trialDays\":0,"
             + "\"provider\":\"pending\""
             + "}"
+            + "},"
+            + "{"
+            + "\"id\":\"damas\","
+            + "\"name\":\"Damas\","
+            + "\"packageName\":\"pt.vcaitano.damas\","
+            + "\"category\":\"games\","
+            + "\"description\":\"Jogo de damas com adversário de IA avançado e modo online para jogar contra amigos.\","
+            + "\"status\":\"published\","
+            + "\"versionCode\":1,"
+            + "\"versionName\":\"1.0.0\","
+            + "\"minSdk\":23,"
+            + "\"apkUrl\":\"https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/damas/v1.0/Damas-v1.0.0.apk\","
+            + "\"sha256\":\"45f6eb4931519bf129bff48dca266bf9ca264e0a0891f3c9295789d234f82730\","
+            + "\"signatureSha256\":\"07df7362d3a99e638d54ce97e35328b6ca415f44481198ff2f6cf47bbadb9269\","
+            + "\"iconUrl\":\"https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/icons/damas.webp\","
+            + "\"changelog\":\"Damas v1.0.0.\","
+            + "\"mandatory\":false,"
+            + "\"monetization\":{"
+            + "\"type\":\"free\","
+            + "\"priceCents\":0,"
+            + "\"currency\":\"EUR\","
+            + "\"period\":null,"
+            + "\"trialDays\":0,"
+            + "\"provider\":\"none\""
+            + "}"
             + "}"
             + "]"
             + "}";
 
     List<CatalogApp> load() throws Exception {
-        try {
-            return loadRemote();
-        } catch (Exception remoteFailure) {
-            // Keep the Manager usable during temporary DNS/network outages.
-            // The bundled catalog never contains private credentials and is refreshed
-            // whenever the application itself is updated.
-            return parseCatalog(FALLBACK_CATALOG);
+        Exception lastFailure = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                return loadRemote();
+            } catch (Exception remoteFailure) {
+                lastFailure = remoteFailure;
+                if (attempt < 2) {
+                    try {
+                        Thread.sleep(250L * (attempt + 1));
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
         }
+
+        // Keep the Manager useful during temporary catalog/network failures.
+        // A last-known-good snapshot is safer than the previous obsolete v0.14 snapshot.
+        if (lastFailure != null) {
+            android.util.Log.w("vocManager", "Using fallback catalog: " + lastFailure.getClass().getSimpleName());
+        }
+        return parseCatalog(FALLBACK_CATALOG);
     }
 
     private List<CatalogApp> loadRemote() throws Exception {
@@ -87,9 +130,11 @@ final class CatalogClient {
         connection.setConnectTimeout(8_000);
         connection.setReadTimeout(8_000);
         connection.setInstanceFollowRedirects(true);
+        connection.setUseCaches(false);
         connection.setRequestProperty("Accept", "application/json");
-        connection.setRequestProperty("Cache-Control", "no-cache");
-        connection.setRequestProperty("User-Agent", "voc-Manager/1.1");
+        connection.setRequestProperty("Cache-Control", "no-cache, no-store");
+        connection.setRequestProperty("Pragma", "no-cache");
+        connection.setRequestProperty("User-Agent", "voc-Manager/1.2");
 
         int code = connection.getResponseCode();
         if (code < 200 || code >= 300) {

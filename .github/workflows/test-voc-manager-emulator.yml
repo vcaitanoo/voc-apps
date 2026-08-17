@@ -44,14 +44,15 @@ jobs:
       - name: Build debug APK
         run: gradle -p manager clean testDebugUnitTest assembleDebug --stacktrace
 
-      - name: Verify APK structure and signature
+      - name: Verify APK structure and permissions
         run: |
           APK="manager/app/build/outputs/apk/debug/app-debug.apk"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee manager-badging.txt
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee manager-signature.txt
           sha256sum "$APK" | tee manager-sha256.txt
-          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='3' versionName='1.1.1'" manager-badging.txt
+          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='4' versionName='1.2.0'" manager-badging.txt
           grep -q "application-label:'voc Manager'" manager-badging.txt
+          grep -q "uses-permission: name='android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION'" manager-badging.txt
 
       - name: Install emulator image
         run: |
@@ -63,11 +64,14 @@ jobs:
           done
           exit 1
 
-      - name: Runtime catalog smoke test
+      - name: Runtime automatic-update smoke test
         shell: bash
         run: |
           set -euo pipefail
           APK="manager/app/build/outputs/apk/debug/app-debug.apk"
+          OLD_TV="apks/voc-tv/v0.17/vocTV-v0.17.apk"
+          test -s "$OLD_TV"
+
           mkdir -p "$ANDROID_AVD_HOME"
           echo "no" | avdmanager create avd -n voc_manager_test -k "system-images;android-35;google_apis;x86_64" -p "$ANDROID_AVD_HOME/voc_manager_test.avd" --force
           sudo chmod 666 /dev/kvm 2>/dev/null || true
@@ -86,30 +90,58 @@ jobs:
           adb install -r "$APK" | tee manager-install.txt
           grep -q "Success" manager-install.txt
 
+          # Make the Manager installer-of-record for voc TV v0.17 and grant its
+          # unknown-source app-op. No Manager UI click is performed after launch.
+          adb install -r -i pt.vcaitano.vocmanager "$OLD_TV" | tee old-tv-install.txt
+          grep -q "Success" old-tv-install.txt
+          adb shell appops set pt.vcaitano.vocmanager REQUEST_INSTALL_PACKAGES allow
+          adb shell appops get pt.vcaitano.vocmanager REQUEST_INSTALL_PACKAGES | tee manager-install-appop.txt
+          adb shell dumpsys package pt.vcaitano.iptvia | grep -E 'versionCode=|installerPackageName|installSource|initiatingPackageName|originatingPackageName' | tee old-tv-package-source.txt || true
+
+          BEFORE="$(adb shell dumpsys package pt.vcaitano.iptvia | sed -n 's/.*versionCode=\([0-9]*\).*/\1/p' | head -1 | tr -d '\r')"
+          test "$BEFORE" = "17"
+
           adb logcat -c
           adb shell am start -n pt.vcaitano.vocmanager/.MainActivity | tee manager-start.txt
 
-          CATALOG_READY=0
-          for i in $(seq 1 30); do
-            adb shell uiautomator dump /sdcard/manager.xml >/dev/null 2>&1 || true
-            adb pull /sdcard/manager.xml manager-ui.xml >/dev/null 2>&1 || true
-            if grep -q "2 app(s) no catálogo" manager-ui.xml 2>/dev/null && grep -q "voc TV" manager-ui.xml 2>/dev/null; then
-              CATALOG_READY=1
+          sleep 8
+          adb shell uiautomator dump /sdcard/manager-before.xml >/dev/null 2>&1 || true
+          adb pull /sdcard/manager-before.xml manager-ui-before.xml >/dev/null 2>&1 || true
+          adb shell dumpsys activity activities > manager-activities-before.txt || true
+          adb logcat -d -t 2000 > manager-logcat-before.txt || true
+
+          UPDATED=0
+          for i in $(seq 1 90); do
+            CURRENT="$(adb shell dumpsys package pt.vcaitano.iptvia | sed -n 's/.*versionCode=\([0-9]*\).*/\1/p' | head -1 | tr -d '\r')"
+            if [ "$CURRENT" = "18" ]; then
+              UPDATED=1
               break
             fi
             sleep 1
           done
-          test "$CATALOG_READY" = "1"
-          grep -q "voc Manager" manager-ui.xml
-          grep -q "voc TV" manager-ui.xml
-          grep -q "GRÁTIS" manager-ui.xml
-          grep -q "1,50 €/mês" manager-ui.xml
-          grep -q "EM PREPARAÇÃO" manager-ui.xml
+          echo "automatic_update_result=$UPDATED" | tee auto-update-result.txt
+
+          adb shell uiautomator dump /sdcard/manager-after.xml >/dev/null 2>&1 || true
+          adb pull /sdcard/manager-after.xml manager-ui-after.xml >/dev/null 2>&1 || true
+          adb shell dumpsys activity activities > manager-activities-after.txt || true
+          adb logcat -d -t 4000 > manager-logcat.txt || true
+          test "$UPDATED" = "1"
+
+          CARD_READY=0
+          for i in $(seq 1 30); do
+            adb shell uiautomator dump /sdcard/manager.xml >/dev/null 2>&1 || true
+            adb pull /sdcard/manager.xml manager-ui.xml >/dev/null 2>&1 || true
+            if grep -q "voc TV" manager-ui.xml 2>/dev/null && grep -q "ATUALIZADO" manager-ui.xml 2>/dev/null && grep -q "ABRIR" manager-ui.xml 2>/dev/null; then
+              CARD_READY=1
+              break
+            fi
+            sleep 1
+          done
+          test "$CARD_READY" = "1"
 
           adb shell pidof pt.vcaitano.vocmanager | tee manager-pid.txt
           test -s manager-pid.txt
 
-          adb logcat -d -t 1500 > manager-logcat.txt
           if grep -q "FATAL EXCEPTION" manager-logcat.txt; then
             grep -A40 -B10 "FATAL EXCEPTION" manager-logcat.txt
             exit 1
@@ -119,16 +151,25 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: voc-manager-v1.1.1-emulator-smoke
+          name: voc-manager-v1.2.0-emulator-smoke
           path: |
             manager/app/build/outputs/apk/debug/app-debug.apk
             manager-badging.txt
             manager-signature.txt
             manager-sha256.txt
             manager-install.txt
+            old-tv-install.txt
+            manager-install-appop.txt
+            old-tv-package-source.txt
             manager-start.txt
+            manager-ui-before.xml
+            manager-ui-after.xml
             manager-ui.xml
+            manager-activities-before.txt
+            manager-activities-after.txt
+            auto-update-result.txt
             manager-pid.txt
+            manager-logcat-before.txt
             manager-logcat.txt
             emulator.log
           if-no-files-found: warn
