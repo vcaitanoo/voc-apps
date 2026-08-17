@@ -1,0 +1,43 @@
+name: Import voc Manager v1.2.0 APK
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/import-manager-v120.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download exact validated signed Manager artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_URL='https://sdmntprnortheu.oaiusercontent.com/files/00000000-80e4-81f4-a052-ea1dd3886f20/raw?se=2026-08-17T04%3A44%3A35Z&sp=r&sv=2026-02-06&sr=b&scid=d1db1d61-a198-5be9-8def-1f3bc23f1c75&skoid=b32d65cd-c8f1-46fb-90df-c208671889d4&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-16T06%3A00%3A55Z&ske=2026-08-17T06%3A00%3A55Z&sks=b&skv=2026-02-06&sig=Lz9PQhzcgvcq1ObKuyGT6Rcd/oX1F0Viiwe/FpwMYCg%3D'
+          curl -fL --retry 4 --retry-delay 2 "$SOURCE_URL" -o /tmp/manager-v120.zip
+          echo '35dfeb1b427858224695c89be2d00df56977710797457c51ed5b77f5d905822a  /tmp/manager-v120.zip' | sha256sum -c -
+          rm -rf /tmp/manager-v120
+          mkdir -p /tmp/manager-v120
+          unzip -q /tmp/manager-v120.zip -d /tmp/manager-v120
+          APK='/tmp/manager-v120/manager/app/build/outputs/apk/release/app-release.apk'
+          test -s "$APK"
+          echo 'e927ffd0e32e1a4a303c787cfd7ecdbe72e4f56180d0a066b555fca30bc25077  /tmp/manager-v120/manager/app/build/outputs/apk/release/app-release.apk' | sha256sum -c -
+          mkdir -p apks/voc-manager/v1.2
+          cp "$APK" apks/voc-manager/v1.2/voc-Manager-v1.2.0.apk
+
+      - name: Commit exact APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'voc Manager Bot'
+          git config user.email '162039938+vcaitanoo@users.noreply.github.com'
+          git add apks/voc-manager/v1.2/voc-Manager-v1.2.0.apk
+          git commit -m 'release: voc Manager v1.2.0'
+          git push
