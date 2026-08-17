@@ -27,7 +27,7 @@ jobs:
       - name: Install Android 36 platform
         run: |
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager 'platforms;android-36' 'build-tools;35.0.0' 'platform-tools'
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools'
 
       - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
@@ -44,14 +44,14 @@ jobs:
           test -f "$APK"
           AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)"
           "$AAPT" dump badging "$APK" | tee /tmp/badging.txt
-          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='3' versionName='1.1.1'" /tmp/badging.txt
+          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='4' versionName='1.2.0'" /tmp/badging.txt
           grep -q "application-label:'voc Manager'" /tmp/badging.txt
           sha256sum "$APK" | tee manager/app/build/outputs/apk/debug/apk-sha256.txt
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: voc-manager-v1.1.1-debug
+          name: voc-manager-v1.2.0-debug
           path: |
             manager/app/build/outputs/apk/debug/app-debug.apk
             manager/app/build/outputs/apk/debug/apk-sha256.txt
