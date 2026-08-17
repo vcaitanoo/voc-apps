@@ -1,0 +1,84 @@
+name: Manager v1.2.0 release candidate
+
+on:
+  push:
+    branches: [ feat/manager-v120-auto-update ]
+    paths:
+      - '.github/workflows/manager-v120-release-candidate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_MANAGER_SIGNER_SHA256: 918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8
+
+jobs:
+  release-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/manager-v120-auto-update
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Restore stable signing key
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.VOC_MANAGER_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.VOC_MANAGER_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_B64"
+          test -n "$KEYSTORE_PASSWORD"
+          KEYSTORE_PATH="$RUNNER_TEMP/voc-manager-release.jks"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+          echo "VOC_MANAGER_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+
+      - name: Build signed release
+        env:
+          VOC_MANAGER_STORE_PASSWORD: ${{ secrets.VOC_MANAGER_KEYSTORE_PASSWORD }}
+          VOC_MANAGER_KEY_ALIAS: voc-manager-release
+          VOC_MANAGER_KEY_PASSWORD: ${{ secrets.VOC_MANAGER_KEYSTORE_PASSWORD }}
+        run: gradle -p manager clean testDebugUnitTest assembleRelease --stacktrace
+
+      - name: Verify release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK='manager/app/build/outputs/apk/release/app-release.apk'
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee manager-release-badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee manager-release-signature.txt
+          sha256sum "$APK" | tee manager-release-sha256.txt
+          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='4' versionName='1.2.0'" manager-release-badging.txt
+          grep -q "application-label:'voc Manager'" manager-release-badging.txt
+          grep -q "Signer #1 certificate SHA-256 digest: $EXPECTED_MANAGER_SIGNER_SHA256" manager-release-signature.txt
+
+      - name: Upload signed candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: voc-manager-v1.2.0-release-candidate
+          path: |
+            manager/app/build/outputs/apk/release/app-release.apk
+            manager-release-badging.txt
+            manager-release-signature.txt
+            manager-release-sha256.txt
+          if-no-files-found: error
+          retention-days: 14
