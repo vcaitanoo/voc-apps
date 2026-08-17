@@ -19,6 +19,10 @@ final class ApkInstaller {
         PackageInstaller.SessionParams params =
                 new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
         params.setAppPackageName(packageName);
+        params.setSize(apk.length());
+        if (Build.VERSION.SDK_INT >= 31) {
+            params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
+        }
         if (Build.VERSION.SDK_INT >= 33) {
             params.setPackageSource(PackageInstaller.PACKAGE_SOURCE_STORE);
         }
@@ -29,8 +33,13 @@ final class ApkInstaller {
                  OutputStream output = session.openWrite("base.apk", 0, apk.length())) {
                 byte[] buffer = new byte[64 * 1024];
                 int read;
+                long written = 0;
                 while ((read = input.read(buffer)) != -1) {
                     output.write(buffer, 0, read);
+                    written += read;
+                    if (apk.length() > 0) {
+                        session.setStagingProgress(Math.min(1f, written / (float) apk.length()));
+                    }
                 }
                 output.flush();
                 session.fsync(output);
