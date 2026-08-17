@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-apps",
   "catalogName": "voc apps",
-  "updatedAt": "2026-08-17T04:41:00Z",
+  "updatedAt": "2026-08-17T09:37:59Z",
   "apps": [
     {
       "id": "voc-manager",
@@ -61,14 +61,14 @@
       "category": "games",
       "description": "Jogo de damas com adversário de IA avançado e modo online para jogar contra amigos.",
       "status": "published",
-      "versionCode": 1,
-      "versionName": "1.0.0",
+      "versionCode": 2,
+      "versionName": "1.0.1",
       "minSdk": 23,
-      "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/damas/v1.0/Damas-v1.0.0.apk",
-      "sha256": "45f6eb4931519bf129bff48dca266bf9ca264e0a0891f3c9295789d234f82730",
+      "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/damas/v1.0.1/Damas-v1.0.1.apk",
+      "sha256": "7f6cd2a9b356992e9b0dcb3b5207f4a407c18d54d0f407e5727b435be7666ab3",
       "signatureSha256": "07df7362d3a99e638d54ce97e35328b6ca415f44481198ff2f6cf47bbadb9269",
       "iconUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/icons/damas.webp",
-      "changelog": "Damas v1.0.0 — primeira versão no voc Manager; IA avançada preservada, nova logo oficial e modo online preparado para convites por QR/link.",
+      "changelog": "Damas v1.0.1 — versão de teste para validação no Android; IA Mestre preservada; multiplayer por QR/link corrigido com PeerJS/WebRTC e endereço público; nova logo aplicada.",
       "mandatory": false,
       "monetization": {
         "type": "free",
