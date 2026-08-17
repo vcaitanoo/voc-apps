@@ -1,0 +1,44 @@
+name: Import Damas Web Bundle
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/import-damas-web.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout public distribution repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download and verify self-contained Damas web bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            'https://sdmntprnortheu.oaiusercontent.com/files/00000000-6380-81f4-95dd-bc33908d2ce2/raw?se=2026-08-17T04%3A00%3A58Z&sp=r&sv=2026-02-06&sr=b&scid=0a2f3676-0a4a-51af-9d76-1b64e10abb21&skoid=b32d65cd-c8f1-46fb-90df-c208671889d4&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-17T03%3A52%3A31Z&ske=2026-08-18T03%3A52%3A31Z&sks=b&skv=2026-02-06&sig=DMNfUC1BpIRjtU2zq4MkySEr6wI%2BPdENTWtkiaAV5Pg%3D' \
+            --output /tmp/damas-web.zip
+          rm -rf /tmp/damas-web
+          mkdir -p /tmp/damas-web
+          unzip -q /tmp/damas-web.zip -d /tmp/damas-web
+          test -f /tmp/damas-web/Damas-web.html
+          test "$(sha256sum /tmp/damas-web/Damas-web.html | cut -d' ' -f1)" = 'f932b612ddae22aa9f634cdac01f93470fc290cd25126635a27b0bc8c2ab13c7'
+          mkdir -p web/damas
+          cp /tmp/damas-web/Damas-web.html web/damas/index.html
+
+      - name: Commit public web bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/damas/index.html
+          git commit -m 'web: publish self-contained Damas bundle'
+          git push origin HEAD:main
