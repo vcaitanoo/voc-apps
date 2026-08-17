@@ -90,17 +90,25 @@ jobs:
           adb install -r "$APK" | tee manager-install.txt
           grep -q "Success" manager-install.txt
 
-          # Make the Manager the installer-of-record of voc TV v0.17, then allow
-          # unknown-package installs. No UI click is performed after this point.
+          # Make the Manager installer-of-record for voc TV v0.17 and grant its
+          # unknown-source app-op. No Manager UI click is performed after launch.
           adb install -r -i pt.vcaitano.vocmanager "$OLD_TV" | tee old-tv-install.txt
           grep -q "Success" old-tv-install.txt
           adb shell appops set pt.vcaitano.vocmanager REQUEST_INSTALL_PACKAGES allow
+          adb shell appops get pt.vcaitano.vocmanager REQUEST_INSTALL_PACKAGES | tee manager-install-appop.txt
+          adb shell dumpsys package pt.vcaitano.iptvia | grep -E 'versionCode=|installerPackageName|installSource|initiatingPackageName|originatingPackageName' | tee old-tv-package-source.txt || true
 
           BEFORE="$(adb shell dumpsys package pt.vcaitano.iptvia | sed -n 's/.*versionCode=\([0-9]*\).*/\1/p' | head -1 | tr -d '\r')"
           test "$BEFORE" = "17"
 
           adb logcat -c
           adb shell am start -n pt.vcaitano.vocmanager/.MainActivity | tee manager-start.txt
+
+          sleep 8
+          adb shell uiautomator dump /sdcard/manager-before.xml >/dev/null 2>&1 || true
+          adb pull /sdcard/manager-before.xml manager-ui-before.xml >/dev/null 2>&1 || true
+          adb shell dumpsys activity activities > manager-activities-before.txt || true
+          adb logcat -d -t 2000 > manager-logcat-before.txt || true
 
           UPDATED=0
           for i in $(seq 1 90); do
@@ -112,9 +120,13 @@ jobs:
             sleep 1
           done
           echo "automatic_update_result=$UPDATED" | tee auto-update-result.txt
+
+          adb shell uiautomator dump /sdcard/manager-after.xml >/dev/null 2>&1 || true
+          adb pull /sdcard/manager-after.xml manager-ui-after.xml >/dev/null 2>&1 || true
+          adb shell dumpsys activity activities > manager-activities-after.txt || true
+          adb logcat -d -t 4000 > manager-logcat.txt || true
           test "$UPDATED" = "1"
 
-          # After the package change, the Manager refreshes its card by itself.
           CARD_READY=0
           for i in $(seq 1 30); do
             adb shell uiautomator dump /sdcard/manager.xml >/dev/null 2>&1 || true
@@ -130,7 +142,6 @@ jobs:
           adb shell pidof pt.vcaitano.vocmanager | tee manager-pid.txt
           test -s manager-pid.txt
 
-          adb logcat -d -t 2500 > manager-logcat.txt
           if grep -q "FATAL EXCEPTION" manager-logcat.txt; then
             grep -A40 -B10 "FATAL EXCEPTION" manager-logcat.txt
             exit 1
@@ -148,10 +159,17 @@ jobs:
             manager-sha256.txt
             manager-install.txt
             old-tv-install.txt
+            manager-install-appop.txt
+            old-tv-package-source.txt
             manager-start.txt
+            manager-ui-before.xml
+            manager-ui-after.xml
             manager-ui.xml
+            manager-activities-before.txt
+            manager-activities-after.txt
             auto-update-result.txt
             manager-pid.txt
+            manager-logcat-before.txt
             manager-logcat.txt
             emulator.log
           if-no-files-found: warn
