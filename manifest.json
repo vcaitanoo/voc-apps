@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-apps",
   "catalogName": "voc apps",
-  "updatedAt": "2026-08-17T02:03:39Z",
+  "updatedAt": "2026-08-17T03:02:00Z",
   "apps": [
     {
       "id": "voc-manager",
@@ -36,14 +36,14 @@
       "category": "entertainment",
       "description": "Pesquisa inteligente e reprodução de filmes, séries, TV ao vivo e vídeos públicos com assistência de IA.",
       "status": "published",
-      "versionCode": 16,
-      "versionName": "0.16.0",
+      "versionCode": 17,
+      "versionName": "0.17.0",
       "minSdk": 26,
-      "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-tv/v0.16/vocTV-v0.16.apk",
-      "sha256": "1b366f6ba0337489216e09cf4d90a7942be8b5787ec79e49b3607831394e2e6c",
+      "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-tv/v0.17/vocTV-v0.17.apk",
+      "sha256": "4935e435f2ece103121aac55d2f55fe3839c6adf06bb8fc4e45b5ac05e4dc4d4",
       "signatureSha256": "629c7b0942460a5d484ec938cc3e0a4e32a6a489572cd179fb94e43cefa05b2e",
       "iconUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/icons/voc-tv.webp",
-      "changelog": "voc TV v0.16 — busca organizada em Filmes, Séries, TV ao vivo e YouTube; pesquisa multi-source mais profunda com validação, recência e menos duplicados; Minha Lista/favoritos; séries por temporadas e episódios em ordem; próximo episódio automático e continuar assistindo; YouTube integrado; Cast/espelhamento com Ajustar/Preencher também em tela cheia; TV pública com cache e fallback; novo ícone voc TV; APIs privadas preservadas.",
+      "changelog": "voc TV v0.17 — YouTube respeita a barra de status e ganhou controlos voc TV sempre acessíveis de Voltar, Ajustar/Preencher, TV, Espelhar e Tela cheia; player normal padronizado no fullscreen; busca prioriza Filmes e Séries em vez de trailers, filtra ruído promocional do YouTube, refina melhor as consultas e separa catálogo identificado de reprodução real; resolução de episódios reforçada e cacheada; buffer estável preservado.",
       "mandatory": false,
       "monetization": {
         "type": "subscription",
