@@ -1,0 +1,17 @@
+{
+  "name": "Damas Online",
+  "short_name": "Damas",
+  "description": "Jogue damas contra o mestre ou contra amigos online.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
