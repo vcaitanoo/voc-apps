@@ -5,6 +5,10 @@ on:
     paths:
       - 'manager/**'
       - '.github/workflows/build-voc-manager.yml'
+  pull_request:
+    paths:
+      - 'manager/**'
+      - '.github/workflows/build-voc-manager.yml'
   workflow_dispatch:
 
 jobs:
