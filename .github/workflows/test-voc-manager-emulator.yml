@@ -6,6 +6,11 @@ on:
       - 'manager/**'
       - 'manifest.json'
       - '.github/workflows/test-voc-manager-emulator.yml'
+  pull_request:
+    paths:
+      - 'manager/**'
+      - 'manifest.json'
+      - '.github/workflows/test-voc-manager-emulator.yml'
   workflow_dispatch:
 
 concurrency:
