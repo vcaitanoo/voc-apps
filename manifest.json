@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-apps",
   "catalogName": "voc apps",
-  "updatedAt": "2026-08-18T01:30:00Z",
+  "updatedAt": "2026-08-18T01:52:00Z",
   "apps": [
     {
       "id": "voc-manager",
@@ -61,14 +61,14 @@
       "category": "games",
       "description": "Jogo de damas com adversário de IA avançado e modo online para jogar contra amigos.",
       "status": "published",
-      "versionCode": 6,
-      "versionName": "1.0.5",
+      "versionCode": 7,
+      "versionName": "1.0.6",
       "minSdk": 23,
-      "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/damas/v1.0.5/Damas-v1.0.5.apk",
-      "sha256": "5b1eb03872e70d110e1af31c078271070e655591e95d97f08d899127e6687ee6",
+      "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/damas/v1.0.6/Damas-v1.0.6.apk",
+      "sha256": "a94e90f33007892dc5c176dcb9a9d631bfa0690503737af39022c9f1c8b1493b",
       "signatureSha256": "07df7362d3a99e638d54ce97e35328b6ca415f44481198ff2f6cf47bbadb9269",
       "iconUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/icons/damas.webp",
-      "changelog": "Damas v1.0.5 — corrige o problema da 1.0.4 que ocultava os anúncios quando não havia largura lateral suficiente. Usa um banner AdMob 320x50 real no fundo, separado do jogo; se o primeiro bloco não tiver preenchimento, tenta o segundo. Jogo, tabuleiro, IA, multiplayer e assets web permanecem byte a byte iguais à base 1.0.3 confirmada.",
+      "changelog": "Damas v1.0.6 — o botão do modo online agora mostra ‘Jogar com amigo’ em vez de ‘2 Telemóveis’. Mantém o banner AdMob da 1.0.5 e preserva tabuleiro, IA, multiplayer, QR e regras.",
       "mandatory": false,
       "monetization": {
         "type": "free",
