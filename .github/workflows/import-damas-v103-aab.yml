@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   import-aab:
@@ -33,3 +33,18 @@ jobs:
           path: |
             Damas-v1.0.3.aab
             aab-sha256.txt
+      - name: Record delivery run
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p delivery
+          {
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "sha256=$(cut -d' ' -f1 aab-sha256.txt)"
+            echo "size=$(stat -c%s Damas-v1.0.3.aab)"
+          } > delivery/damas-v103-aab-run.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add delivery/damas-v103-aab-run.txt
+          git commit -m 'Record Damas v1.0.3 AAB delivery run'
+          git push
