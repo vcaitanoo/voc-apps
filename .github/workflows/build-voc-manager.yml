@@ -44,14 +44,14 @@ jobs:
           test -f "$APK"
           AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)"
           "$AAPT" dump badging "$APK" | tee /tmp/badging.txt
-          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='4' versionName='1.2.0'" /tmp/badging.txt
+          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='5' versionName='1.2.1'" /tmp/badging.txt
           grep -q "application-label:'voc Manager'" /tmp/badging.txt
           sha256sum "$APK" | tee manager/app/build/outputs/apk/debug/apk-sha256.txt
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: voc-manager-v1.2.0-debug
+          name: voc-manager-v1.2.1-debug
           path: |
             manager/app/build/outputs/apk/debug/app-debug.apk
             manager/app/build/outputs/apk/debug/apk-sha256.txt
