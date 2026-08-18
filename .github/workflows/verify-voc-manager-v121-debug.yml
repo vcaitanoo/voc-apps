@@ -89,15 +89,31 @@ jobs:
           echo "version_after_open_without_click=$STILL_OLD" | tee no-auto-update-result.txt
           test "$STILL_OLD" = "17"
 
+          # First prove that the card reports an update while the installed app
+          # remains untouched. On the small emulator viewport the update button
+          # is initially below the fold, so scroll until it is visible.
           adb shell uiautomator dump /sdcard/manager-before.xml >/dev/null 2>&1
           adb pull /sdcard/manager-before.xml manager-ui-before.xml >/dev/null 2>&1
           grep -q "ATUALIZAÇÃO DISPONÍVEL" manager-ui-before.xml
-          grep -q "ATUALIZAR PARA 0.18.0" manager-ui-before.xml
+
+          BUTTON_VISIBLE=0
+          for i in $(seq 1 5); do
+            adb shell uiautomator dump /sdcard/manager-action.xml >/dev/null 2>&1
+            adb pull /sdcard/manager-action.xml manager-ui-action.xml >/dev/null 2>&1
+            if grep -q "ATUALIZAR PARA 0.18.0" manager-ui-action.xml; then
+              BUTTON_VISIBLE=1
+              break
+            fi
+            adb shell input swipe 160 575 160 300 350
+            sleep 1
+          done
+          echo "manual_button_visible=$BUTTON_VISIBLE" | tee manual-button-result.txt
+          test "$BUTTON_VISIBLE" = "1"
 
           read TAP_X TAP_Y < <(python3 - <<'PY'
           import re
           import xml.etree.ElementTree as ET
-          root = ET.parse('manager-ui-before.xml').getroot()
+          root = ET.parse('manager-ui-action.xml').getroot()
           for node in root.iter('node'):
               if node.attrib.get('text') == 'ATUALIZAR PARA 0.18.0':
                   m = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', node.attrib.get('bounds', ''))
@@ -110,6 +126,7 @@ jobs:
               raise SystemExit('update button not found')
           PY
           )
+          echo "manual_button_tap=$TAP_X,$TAP_Y" | tee manual-button-tap.txt
           adb shell input tap "$TAP_X" "$TAP_Y"
 
           UPDATED=0
@@ -140,7 +157,10 @@ jobs:
             old-tv-install.txt
             manager-start.txt
             manager-ui-before.xml
+            manager-ui-action.xml
             no-auto-update-result.txt
+            manual-button-result.txt
+            manual-button-tap.txt
             manual-update-result.txt
             manager-logcat.txt
             emulator.log
