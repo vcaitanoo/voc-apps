@@ -1,0 +1,35 @@
+name: Import Damas v1.0.3 AAB for delivery
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/import-damas-v103-aab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  import-aab:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download generated AAB
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --show-error --retry 3 'https://bpketfzabpbxmujyozjm.supabase.co/storage/v1/object/public/damas-releases/v1.0.3/Damas-v1.0.3.aab' -o Damas-v1.0.3.aab
+          test "$(stat -c%s Damas-v1.0.3.aab)" = '3213372'
+          sha256sum Damas-v1.0.3.aab | tee aab-sha256.txt
+          unzip -l Damas-v1.0.3.aab | grep -q 'base/manifest/AndroidManifest.xml'
+          unzip -l Damas-v1.0.3.aab | grep -q 'base/dex/classes.dex'
+          unzip -l Damas-v1.0.3.aab | grep -q 'base/resources.pb'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Damas-v1.0.3-AAB-delivery
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            Damas-v1.0.3.aab
+            aab-sha256.txt
