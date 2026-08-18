@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-apps",
   "catalogName": "voc apps",
-  "updatedAt": "2026-08-18T01:00:00Z",
+  "updatedAt": "2026-08-18T01:30:00Z",
   "apps": [
     {
       "id": "voc-manager",
@@ -61,14 +61,14 @@
       "category": "games",
       "description": "Jogo de damas com adversário de IA avançado e modo online para jogar contra amigos.",
       "status": "published",
-      "versionCode": 5,
-      "versionName": "1.0.4",
+      "versionCode": 6,
+      "versionName": "1.0.5",
       "minSdk": 23,
-      "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/damas/v1.0.4/Damas-v1.0.4.apk",
-      "sha256": "9f165a0148a58f3692f8ea237f8fed39c360824ca1d897e329a04ccdeda65759",
+      "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/damas/v1.0.5/Damas-v1.0.5.apk",
+      "sha256": "5b1eb03872e70d110e1af31c078271070e655591e95d97f08d899127e6687ee6",
       "signatureSha256": "07df7362d3a99e638d54ce97e35328b6ca415f44481198ff2f6cf47bbadb9269",
       "iconUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/icons/damas.webp",
-      "changelog": "Damas v1.0.4 — anúncios AdMob nas áreas laterais vazias, com consentimento UMP; quando não existe espaço lateral suficiente os anúncios não aparecem. Jogo, tabuleiro, IA, multiplayer e assets web da 1.0.3 preservados.",
+      "changelog": "Damas v1.0.5 — corrige o problema da 1.0.4 que ocultava os anúncios quando não havia largura lateral suficiente. Usa um banner AdMob 320x50 real no fundo, separado do jogo; se o primeiro bloco não tiver preenchimento, tenta o segundo. Jogo, tabuleiro, IA, multiplayer e assets web permanecem byte a byte iguais à base 1.0.3 confirmada.",
       "mandatory": false,
       "monetization": {
         "type": "free",
