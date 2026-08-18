@@ -1,2 +1,3 @@
 Trigger de validação do voc Manager 1.2.1.
 Objetivo: confirmar no emulador que abrir o Manager não inicia atualização e que o toque em ATUALIZAR inicia a atualização manual.
+Execução segura: workflow pull_request_target faz checkout explícito da base main e não executa código do PR.
