@@ -1,0 +1,2 @@
+Trigger técnico de validação do voc Manager 1.2.1.
+Nenhum código do app é alterado neste PR.
