@@ -50,7 +50,7 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee manager-badging.txt
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee manager-signature.txt
           sha256sum "$APK" | tee manager-sha256.txt
-          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='4' versionName='1.2.0'" manager-badging.txt
+          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='5' versionName='1.2.1'" manager-badging.txt
           grep -q "application-label:'voc Manager'" manager-badging.txt
           grep -q "uses-permission: name='android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION'" manager-badging.txt
 
@@ -64,7 +64,7 @@ jobs:
           done
           exit 1
 
-      - name: Runtime automatic-update smoke test
+      - name: Runtime manual-update smoke test
         shell: bash
         run: |
           set -euo pipefail
@@ -91,7 +91,7 @@ jobs:
           grep -q "Success" manager-install.txt
 
           # Make the Manager installer-of-record for voc TV v0.17 and grant its
-          # unknown-source app-op. No Manager UI click is performed after launch.
+          # unknown-source app-op. No Manager update button is clicked yet.
           adb install -r -i pt.vcaitano.vocmanager "$OLD_TV" | tee old-tv-install.txt
           grep -q "Success" old-tv-install.txt
           adb shell appops set pt.vcaitano.vocmanager REQUEST_INSTALL_PACKAGES allow
@@ -104,11 +104,38 @@ jobs:
           adb logcat -c
           adb shell am start -n pt.vcaitano.vocmanager/.MainActivity | tee manager-start.txt
 
-          sleep 8
-          adb shell uiautomator dump /sdcard/manager-before.xml >/dev/null 2>&1 || true
-          adb pull /sdcard/manager-before.xml manager-ui-before.xml >/dev/null 2>&1 || true
-          adb shell dumpsys activity activities > manager-activities-before.txt || true
-          adb logcat -d -t 2000 > manager-logcat-before.txt || true
+          # Opening the Manager must NOT start the update on its own.
+          sleep 12
+          STILL_OLD="$(adb shell dumpsys package pt.vcaitano.iptvia | sed -n 's/.*versionCode=\([0-9]*\).*/\1/p' | head -1 | tr -d '\r')"
+          echo "version_after_open_without_click=$STILL_OLD" | tee no-auto-update-result.txt
+          test "$STILL_OLD" = "17"
+
+          adb shell uiautomator dump /sdcard/manager-before.xml >/dev/null 2>&1
+          adb pull /sdcard/manager-before.xml manager-ui-before.xml >/dev/null 2>&1
+          grep -q "voc TV" manager-ui-before.xml
+          grep -q "ATUALIZAÇÃO DISPONÍVEL" manager-ui-before.xml
+          grep -q "ATUALIZAR PARA 0.18.0" manager-ui-before.xml
+
+          read TAP_X TAP_Y < <(python3 - <<'PY'
+          import re
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse('manager-ui-before.xml').getroot()
+          for node in root.iter('node'):
+              if node.attrib.get('text') == 'ATUALIZAR PARA 0.18.0':
+                  bounds = node.attrib.get('bounds', '')
+                  match = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', bounds)
+                  if not match:
+                      raise SystemExit('button bounds not found')
+                  x1, y1, x2, y2 = map(int, match.groups())
+                  print((x1 + x2) // 2, (y1 + y2) // 2)
+                  break
+          else:
+              raise SystemExit('update button not found')
+          PY
+          )
+          echo "tap_update_button=$TAP_X,$TAP_Y" | tee update-tap.txt
+          adb shell input tap "$TAP_X" "$TAP_Y"
 
           UPDATED=0
           for i in $(seq 1 90); do
@@ -119,19 +146,14 @@ jobs:
             fi
             sleep 1
           done
-          echo "automatic_update_result=$UPDATED" | tee auto-update-result.txt
-
-          adb shell uiautomator dump /sdcard/manager-after.xml >/dev/null 2>&1 || true
-          adb pull /sdcard/manager-after.xml manager-ui-after.xml >/dev/null 2>&1 || true
-          adb shell dumpsys activity activities > manager-activities-after.txt || true
-          adb logcat -d -t 4000 > manager-logcat.txt || true
+          echo "manual_update_result=$UPDATED" | tee manual-update-result.txt
           test "$UPDATED" = "1"
 
           CARD_READY=0
           for i in $(seq 1 30); do
-            adb shell uiautomator dump /sdcard/manager.xml >/dev/null 2>&1 || true
-            adb pull /sdcard/manager.xml manager-ui.xml >/dev/null 2>&1 || true
-            if grep -q "voc TV" manager-ui.xml 2>/dev/null && grep -q "ATUALIZADO" manager-ui.xml 2>/dev/null && grep -q "ABRIR" manager-ui.xml 2>/dev/null; then
+            adb shell uiautomator dump /sdcard/manager-after.xml >/dev/null 2>&1 || true
+            adb pull /sdcard/manager-after.xml manager-ui-after.xml >/dev/null 2>&1 || true
+            if grep -q "voc TV" manager-ui-after.xml 2>/dev/null && grep -q "ATUALIZADO" manager-ui-after.xml 2>/dev/null && grep -q "ABRIR" manager-ui-after.xml 2>/dev/null; then
               CARD_READY=1
               break
             fi
@@ -139,6 +161,8 @@ jobs:
           done
           test "$CARD_READY" = "1"
 
+          adb shell dumpsys activity activities > manager-activities-after.txt || true
+          adb logcat -d -t 4000 > manager-logcat.txt || true
           adb shell pidof pt.vcaitano.vocmanager | tee manager-pid.txt
           test -s manager-pid.txt
 
@@ -151,7 +175,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: voc-manager-v1.2.0-emulator-smoke
+          name: voc-manager-v1.2.1-emulator-smoke
           path: |
             manager/app/build/outputs/apk/debug/app-debug.apk
             manager-badging.txt
@@ -164,12 +188,11 @@ jobs:
             manager-start.txt
             manager-ui-before.xml
             manager-ui-after.xml
-            manager-ui.xml
-            manager-activities-before.txt
+            no-auto-update-result.txt
+            update-tap.txt
+            manual-update-result.txt
             manager-activities-after.txt
-            auto-update-result.txt
             manager-pid.txt
-            manager-logcat-before.txt
             manager-logcat.txt
             emulator.log
           if-no-files-found: warn
