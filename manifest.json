@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-apps",
   "catalogName": "voc apps",
-  "updatedAt": "2026-08-17T12:19:00Z",
+  "updatedAt": "2026-08-18T01:00:00Z",
   "apps": [
     {
       "id": "voc-manager",
@@ -61,14 +61,14 @@
       "category": "games",
       "description": "Jogo de damas com adversário de IA avançado e modo online para jogar contra amigos.",
       "status": "published",
-      "versionCode": 4,
-      "versionName": "1.0.3",
+      "versionCode": 5,
+      "versionName": "1.0.4",
       "minSdk": 23,
-      "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/damas/v1.0.3/Damas-v1.0.3.apk",
-      "sha256": "e8c9e4184b33a09a4ad1e1cc5aa919494d3cf12613f40c929d6824f243f4a721",
+      "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/damas/v1.0.4/Damas-v1.0.4.apk",
+      "sha256": "9f165a0148a58f3692f8ea237f8fed39c360824ca1d897e329a04ccdeda65759",
       "signatureSha256": "07df7362d3a99e638d54ce97e35328b6ca415f44481198ff2f6cf47bbadb9269",
       "iconUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/icons/damas.webp",
-      "changelog": "Damas v1.0.3 — multiplayer preservado em PeerJS/WebRTC; QR agora abre endereço público sem login da Vercel; safe area e contenção do layout mobile corrigidas; nova logo aplicada; tabuleiro, IA e motor de regras preservados.",
+      "changelog": "Damas v1.0.4 — anúncios AdMob nas áreas laterais vazias, com consentimento UMP; quando não existe espaço lateral suficiente os anúncios não aparecem. Jogo, tabuleiro, IA, multiplayer e assets web da 1.0.3 preservados.",
       "mandatory": false,
       "monetization": {
         "type": "free",
