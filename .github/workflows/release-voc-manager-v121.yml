@@ -1,11 +1,9 @@
 name: Verify voc Manager 1.2.1 release
 
 on:
-  pull_request:
+  pull_request_target:
     paths:
       - 'delivery/voc-manager-v121-trigger.txt'
-      - 'manager/**'
-      - '.github/workflows/release-voc-manager-v121.yml'
   workflow_dispatch:
 
 permissions:
@@ -21,8 +19,10 @@ jobs:
     timeout-minutes: 40
 
     steps:
-      - name: Checkout
+      - name: Checkout trusted main source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
 
       - name: Java 17
         uses: actions/setup-java@v4
