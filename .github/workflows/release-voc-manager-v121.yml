@@ -1,29 +1,28 @@
-name: Release voc Manager 1.2.1
+name: Verify voc Manager 1.2.1 release
 
 on:
-  push:
-    branches:
-      - main
+  pull_request:
     paths:
+      - 'delivery/voc-manager-v121-trigger.txt'
+      - 'manager/**'
       - '.github/workflows/release-voc-manager-v121.yml'
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   EXPECTED_MANAGER_SIGNER_SHA256: 918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8
   ANDROID_AVD_HOME: ${{ github.workspace }}/.android/avd
 
 jobs:
-  release:
+  verify-release:
     runs-on: ubuntu-latest
     timeout-minutes: 40
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Java 17
         uses: actions/setup-java@v4
@@ -173,63 +172,7 @@ jobs:
             exit 1
           fi
 
-      - name: Publish verified APK and catalog entry
-        shell: bash
-        run: |
-          set -euo pipefail
-          SOURCE_APK="manager/app/build/outputs/apk/release/app-release.apk"
-          DEST_DIR="apks/voc-manager/v1.2.1"
-          DEST_APK="$DEST_DIR/voc-Manager-v1.2.1.apk"
-          mkdir -p "$DEST_DIR"
-          cp "$SOURCE_APK" "$DEST_APK"
-          APK_SHA="$(sha256sum "$DEST_APK" | awk '{print $1}')"
-          export APK_SHA
-          python3 - <<'PY'
-          import datetime
-          import json
-          import os
-          from pathlib import Path
-
-          path = Path('manifest.json')
-          manifest = json.loads(path.read_text(encoding='utf-8'))
-          app = next(a for a in manifest['apps'] if a['id'] == 'voc-manager')
-          app.update({
-              'status': 'published',
-              'versionCode': 5,
-              'versionName': '1.2.1',
-              'minSdk': 28,
-              'apkUrl': 'https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-manager/v1.2.1/voc-Manager-v1.2.1.apk',
-              'sha256': os.environ['APK_SHA'],
-              'signatureSha256': os.environ['EXPECTED_MANAGER_SIGNER_SHA256'],
-              'changelog': 'voc Manager 1.2.1 — atualizações deixam de iniciar automaticamente ao abrir o Manager. Quando existe versão nova, o cartão mostra ATUALIZAÇÃO DISPONÍVEL e a instalação só começa depois de tocar em ATUALIZAR.',
-              'mandatory': False,
-          })
-          manifest['updatedAt'] = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z')
-          path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-          PY
-          {
-            echo "voc Manager 1.2.1"
-            echo "package=pt.vcaitano.vocmanager"
-            echo "versionCode=5"
-            echo "versionName=1.2.1"
-            echo "apkSha256=$APK_SHA"
-            echo "signatureSha256=$EXPECTED_MANAGER_SIGNER_SHA256"
-            cat no-auto-update-result.txt
-            cat manual-update-result.txt
-          } > delivery/voc-manager-v121-release.txt
-
-      - name: Commit verified release and remove one-off workflow
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/release-voc-manager-v121.yml
-          git add manifest.json apks/voc-manager/v1.2.1/voc-Manager-v1.2.1.apk delivery/voc-manager-v121-release.txt
-          git commit -m "release(manager): publish voc Manager 1.2.1 manual updates"
-          git push origin HEAD:main
-
-      - name: Upload verification evidence
+      - name: Upload signed APK and verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
