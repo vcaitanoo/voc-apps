@@ -30,10 +30,8 @@ import java.io.FileOutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -41,7 +39,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class MainActivity extends Activity {
     private final ExecutorService executor = Executors.newFixedThreadPool(3);
     private final AtomicBoolean installBusy = new AtomicBoolean(false);
-    private final Set<String> autoAttempted = new HashSet<>();
     private final BroadcastReceiver installFinishedReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -195,7 +192,6 @@ public final class MainActivity extends Activity {
                     globalStatus.setText(apps.size() + " app(s) no catálogo");
                     latestCatalog = apps;
                     renderApps(apps);
-                    maybeStartAutomaticUpdate(apps);
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
@@ -210,39 +206,6 @@ public final class MainActivity extends Activity {
         appList.removeAllViews();
         for (CatalogApp app : apps) {
             appList.addView(buildAppCard(app));
-        }
-    }
-
-    private void maybeStartAutomaticUpdate(List<CatalogApp> apps) {
-        if (installBusy.get() || pendingInstall != null) {
-            android.util.Log.i("vocManager", "Auto-update skipped: installer busy or permission flow pending");
-            return;
-        }
-
-        for (CatalogApp app : apps) {
-            if (!"published".equals(app.status)) continue;
-            if (Build.VERSION.SDK_INT < app.minSdk) continue;
-            if (app.apkUrl == null || app.sha256 == null || app.signatureSha256 == null) continue;
-
-            InstalledInfo installed = getInstalledInfo(app.packageName);
-            if (installed == null) continue;
-            android.util.Log.i(
-                    "vocManager",
-                    "Auto-update check " + app.packageName
-                            + " installed=" + installed.versionCode
-                            + " catalog=" + app.versionCode
-                            + " signerMatch=" + app.signatureSha256.equalsIgnoreCase(installed.signatureSha256)
-            );
-            if (installed.versionCode >= app.versionCode) continue;
-            if (!app.signatureSha256.equalsIgnoreCase(installed.signatureSha256)) continue;
-
-            String key = app.packageName + ":" + app.versionCode;
-            if (!autoAttempted.add(key)) continue;
-
-            android.util.Log.i("vocManager", "Auto-update starting for " + key);
-            globalStatus.setText("Atualização automática encontrada: " + app.name + " " + app.versionName);
-            requestInstall(app);
-            return;
         }
     }
 
