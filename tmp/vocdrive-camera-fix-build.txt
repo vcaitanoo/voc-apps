@@ -1,1 +1,2 @@
 Build VOCDriveAI 0.4.1 camera fix from source SHA-256 0f1d239513c4129ffbf1aaa8662894a936f6856b9f58971c15e2fd926f4ef533.
+Trigger: 2026-08-24T21:31Z
