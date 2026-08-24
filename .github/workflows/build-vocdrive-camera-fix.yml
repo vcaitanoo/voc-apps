@@ -1,0 +1,72 @@
+name: Build VOC Drive camera fix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/build-vocdrive-camera-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Download exact patched source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -L --fail --retry 4 --retry-delay 3 \
+            'https://drive.usercontent.google.com/download?id=1gma8KpXuu9-rb1JeG2J_ky5B41Lj95F2&export=download&confirm=t' \
+            -o /tmp/VOCDriveAI-source.zip
+          echo '0f1d239513c4129ffbf1aaa8662894a936f6856b9f58971c15e2fd926f4ef533  /tmp/VOCDriveAI-source.zip' | sha256sum -c -
+          unzip -q /tmp/VOCDriveAI-source.zip -d "$RUNNER_TEMP/vocdrive"
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd "$RUNNER_TEMP/vocdrive/VOCDriveAI"
+          chmod +x ./gradlew
+          ./gradlew --no-daemon clean assembleDebug
+
+      - name: Validate APK structure, package and signature
+        shell: bash
+        run: |
+          set -euxo pipefail
+          APK="$RUNNER_TEMP/vocdrive/VOCDriveAI/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          unzip -l "$APK" | grep -E 'AndroidManifest.xml|classes.dex|resources.arsc'
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          "$AAPT" dump badging "$APK" | tee /tmp/aapt-badging.txt
+          grep -q "package: name='pt.vcaitano.vocdriveai' versionCode='7' versionName='0.4.1'" /tmp/aapt-badging.txt
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee /tmp/apksigner.txt
+          sha256sum "$APK" | tee /tmp/apk.sha256
+          cp "$APK" "$GITHUB_WORKSPACE/VOCDriveAI-0.4.1-camera-fix-debug.apk"
+          cp /tmp/aapt-badging.txt "$GITHUB_WORKSPACE/aapt-badging.txt"
+          cp /tmp/apksigner.txt "$GITHUB_WORKSPACE/apksigner.txt"
+          cp /tmp/apk.sha256 "$GITHUB_WORKSPACE/apk.sha256"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VOCDriveAI-0.4.1-camera-fix-apk
+          path: |
+            VOCDriveAI-0.4.1-camera-fix-debug.apk
+            aapt-badging.txt
+            apksigner.txt
+            apk.sha256
+          if-no-files-found: error
+          retention-days: 7
