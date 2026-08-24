@@ -1,9 +1,10 @@
 name: Build VOC Drive camera fix
 
 on:
-  push:
+  pull_request:
+    types: [opened, synchronize, reopened]
     paths:
-      - '.github/workflows/build-vocdrive-camera-fix.yml'
+      - 'tmp/vocdrive-camera-fix-build.txt'
   workflow_dispatch:
 
 permissions:
