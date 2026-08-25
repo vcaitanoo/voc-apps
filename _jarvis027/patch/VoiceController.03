@@ -1,0 +1,208 @@
+            ?.asSequence()
+            ?.filter {
+                it.locale.language.equals("pt", ignoreCase = true) &&
+                    it.locale.country.equals("BR", ignoreCase = true)
+            }
+            ?.filter { isMale(it.name) && !isFemale(it.name) }
+            ?.sortedWith(
+                compareByDescending<android.speech.tts.Voice> { it.quality }
+                    .thenBy { it.isNetworkConnectionRequired }
+            )
+            ?.firstOrNull()
+            ?: return false
+
+        engine.voice = maleVoice
+        return true
+    }
+
+    private fun speakWithMaleOnlyLocalFallback(text: String) {
+        if (!voiceOutputEnabled || destroyed) {
+            finishSpeaking()
+            return
+        }
+        if (!configureBrazilianMaleVoice()) {
+            speaking = false
+            waitingForReply = false
+            onErrorMessage("A voz masculina da nuvem falhou e não encontrei uma voz masculina local. Não vou usar voz feminina.")
+            publishIdleOrListening()
+            return
+        }
+        tts?.setPitch(0.76f)
+        tts?.setSpeechRate(0.98f)
+        val result = tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-response")
+        if (result == null || result == TextToSpeech.ERROR) {
+            speaking = false
+            waitingForReply = false
+            onErrorMessage("Não consegui iniciar a voz masculina do Jarvis.")
+            publishIdleOrListening()
+        }
+    }
+
+    private fun finishSpeaking() {
+        speaking = false
+        waitingForReply = false
+        currentTrack = null
+        if (continuousEnabled) wakeConversationUntilMs = System.currentTimeMillis() + WAKE_WINDOW_MS
+        publishIdleOrListening()
+    }
+
+    private fun emit(state: State) {
+        onStateChanged(state)
+    }
+
+    private fun playPcm(pcm: ByteArray, sampleRate: Int): Boolean {
+        if (pcm.isEmpty()) return false
+        val minBuffer = AudioTrack.getMinBufferSize(
+            sampleRate,
+            AudioFormat.CHANNEL_OUT_MONO,
+            AudioFormat.ENCODING_PCM_16BIT
+        )
+        if (minBuffer <= 0) return false
+
+        val track = try {
+            AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build()
+                )
+                .setBufferSizeInBytes(maxOf(minBuffer, 4096))
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .build()
+        } catch (_: Throwable) {
+            return false
+        }
+
+        currentTrack = track
+        return try {
+            track.play()
+            var offset = 0
+            while (offset < pcm.size && voiceOutputEnabled && !destroyed) {
+                val written = track.write(pcm, offset, pcm.size - offset, AudioTrack.WRITE_BLOCKING)
+                if (written <= 0) break
+                offset += written
+            }
+            val totalFrames = pcm.size / 2
+            val deadline = System.currentTimeMillis() + ((totalFrames * 1000L) / sampleRate) + 2_000L
+            while (
+                voiceOutputEnabled && !destroyed &&
+                track.playState == AudioTrack.PLAYSTATE_PLAYING &&
+                track.playbackHeadPosition.toLong() < totalFrames &&
+                System.currentTimeMillis() < deadline
+            ) {
+                Thread.sleep(20L)
+            }
+            offset >= pcm.size
+        } catch (_: Throwable) {
+            false
+        } finally {
+            runCatching { track.stop() }
+            runCatching { track.flush() }
+            runCatching { track.release() }
+            if (currentTrack === track) currentTrack = null
+        }
+    }
+
+    fun isOwnerEnrolled(): Boolean = VoicePrint.isEnrolled(appContext)
+
+    /**
+     * Mantém o cadastro vocal existente para não apagar dados do usuário.
+     * A verificação de locutor não bloqueia o SpeechRecognizer nesta versão,
+     * pois o Android não fornece PCM bruto junto com a transcrição.
+     */
+    fun enrollOwner(onResult: (Boolean, String) -> Unit) {
+        Thread {
+            val previousContinuous = continuousEnabled
+            if (previousContinuous) {
+                continuousEnabled = false
+                handler.post { cancelRecognition() }
+                Thread.sleep(500L)
+            }
+
+            var success = false
+            val minBuffer = AudioRecord.getMinBufferSize(
+                SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT
+            )
+            val recorder = if (minBuffer > 0) {
+                try {
+                    AudioRecord(
+                        MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                        SAMPLE_RATE,
+                        AudioFormat.CHANNEL_IN_MONO,
+                        AudioFormat.ENCODING_PCM_16BIT,
+                        maxOf(minBuffer * 2, FRAME_SAMPLES * 4)
+                    )
+                } catch (_: Throwable) { null }
+            } else null
+
+            if (recorder != null && recorder.state == AudioRecord.STATE_INITIALIZED) {
+                try {
+                    recorder.startRecording()
+                    val targetFrames = SAMPLE_RATE * ENROLLMENT_MS / 1000
+                    val buffer = ShortArray(FRAME_SAMPLES)
+                    val out = ByteArrayOutputStream()
+                    var total = 0
+                    while (total < targetFrames && !destroyed) {
+                        val read = recorder.read(buffer, 0, buffer.size)
+                        if (read <= 0) continue
+                        for (i in 0 until read) {
+                            val value = buffer[i].toInt()
+                            out.write(value and 0xFF)
+                            out.write((value shr 8) and 0xFF)
+                        }
+                        total += read
+                    }
+                    success = total >= SAMPLE_RATE / 2 && VoicePrint.enroll(appContext, out.toByteArray())
+                } catch (_: Throwable) {
+                    success = false
+                } finally {
+                    runCatching { recorder.stop() }
+                    runCatching { recorder.release() }
+                }
+            } else {
+                runCatching { recorder?.release() }
+            }
+
+            handler.post {
+                onResult(
+                    success,
+                    if (success) "Voz cadastrada" else "Não consegui capturar sua voz. Tente de novo em local silencioso."
+                )
+                if (previousContinuous && !destroyed) {
+                    continuousEnabled = true
+                    prefs.edit().putBoolean(KEY_LISTENING_ALLOWED, true).apply()
+                    startRecognitionSoon(RESTART_DELAY_MS)
+                } else emit(State.IDLE)
+            }
+        }.apply {
+            name = "jarvis-enrollment"
+            isDaemon = true
+            start()
+        }
+    }
+
+    fun destroy() {
+        destroyed = true
+        continuousEnabled = false
+        waitingForReply = false
+        restartScheduled = false
+        handler.removeCallbacksAndMessages(null)
+        destroyRecognizerOnly()
+        runCatching { currentTrack?.stop() }
+        runCatching { currentTrack?.release() }
+        currentTrack = null
+        tts?.stop()
+        tts?.shutdown()
+        tts = null
+    }
+}
