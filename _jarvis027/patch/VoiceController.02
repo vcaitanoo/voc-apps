@@ -1,0 +1,220 @@
+        return try {
+            if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                SpeechRecognizer.isOnDeviceRecognitionAvailable(appContext)
+            ) {
+                recognizerIsOnDevice = true
+                SpeechRecognizer.createOnDeviceSpeechRecognizer(appContext)
+            } else {
+                recognizerIsOnDevice = false
+                SpeechRecognizer.createSpeechRecognizer(appContext)
+            }
+        } catch (_: Throwable) {
+            recognizerIsOnDevice = false
+            runCatching { SpeechRecognizer.createSpeechRecognizer(appContext) }.getOrNull()
+        }
+    }
+
+    private fun ensureRecognizer(): SpeechRecognizer? {
+        recognizer?.let { return it }
+        val created = createRecognizer() ?: return null
+        created.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                listening = true
+                emit(State.LISTENING)
+            }
+
+            override fun onBeginningOfSpeech() {
+                listening = true
+                emit(State.LISTENING)
+            }
+
+            override fun onRmsChanged(rmsdB: Float) = Unit
+            override fun onBufferReceived(buffer: ByteArray?) = Unit
+            override fun onEndOfSpeech() {
+                listening = false
+            }
+
+            override fun onError(error: Int) {
+                listening = false
+                onPartialText("")
+                if (destroyed || !continuousEnabled || waitingForReply || speaking) return
+
+                when (error) {
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
+                        emit(State.ERROR)
+                        onErrorMessage("O Android bloqueou o acesso ao microfone.")
+                    }
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
+                    SpeechRecognizer.ERROR_CLIENT,
+                    SpeechRecognizer.ERROR_SERVER_DISCONNECTED -> {
+                        destroyRecognizerOnly()
+                        startRecognitionSoon(BUSY_RESTART_DELAY_MS)
+                    }
+                    SpeechRecognizer.ERROR_NETWORK,
+                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> {
+                        onErrorMessage(
+                            if (recognizerIsOnDevice) "O reconhecimento de voz local falhou; vou tentar novamente."
+                            else "O serviço de reconhecimento de voz do Android ficou sem rede; vou tentar novamente."
+                        )
+                        startRecognitionSoon(BUSY_RESTART_DELAY_MS)
+                    }
+                    SpeechRecognizer.ERROR_NO_MATCH,
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> startRecognitionSoon(RESTART_DELAY_MS)
+                    else -> startRecognitionSoon(BUSY_RESTART_DELAY_MS)
+                }
+            }
+
+            override fun onResults(results: Bundle?) {
+                listening = false
+                val text = bestRecognition(results)
+                onPartialText("")
+                if (text.isBlank()) {
+                    if (continuousEnabled && !waitingForReply && !speaking) startRecognitionSoon(RESTART_DELAY_MS)
+                    return
+                }
+                routeTranscribedSpeech(text)
+            }
+
+            override fun onPartialResults(partialResults: Bundle?) {
+                val text = bestRecognition(partialResults)
+                if (text.isBlank()) return
+                val inConversation = System.currentTimeMillis() <= wakeConversationUntilMs
+                if (inConversation || WAKE_WORD.containsMatchIn(text)) {
+                    onPartialText(text)
+                }
+            }
+
+            override fun onEvent(eventType: Int, params: Bundle?) = Unit
+        })
+        recognizer = created
+        return created
+    }
+
+    private fun recognitionIntent(): Intent {
+        return Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "pt-BR")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "pt-BR")
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, recognizerIsOnDevice)
+            }
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1_750L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1_400L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 320L)
+        }
+    }
+
+    private fun startRecognitionSoon(delayMs: Long) {
+        if (destroyed || !continuousEnabled || waitingForReply || speaking || restartScheduled) return
+        restartScheduled = true
+        handler.postDelayed({
+            restartScheduled = false
+            startRecognitionNow()
+        }, delayMs)
+    }
+
+    private fun startRecognitionNow() {
+        if (destroyed || !continuousEnabled || waitingForReply || speaking) return
+        if (ContextCompat.checkSelfPermission(appContext, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            emit(State.ERROR)
+            onErrorMessage("Permissão de microfone não concedida.")
+            return
+        }
+        val r = ensureRecognizer()
+        if (r == null) {
+            emit(State.ERROR)
+            onErrorMessage("Não encontrei um serviço de reconhecimento de voz no Android.")
+            return
+        }
+        try {
+            r.cancel()
+            r.startListening(recognitionIntent())
+            listening = true
+            emit(State.LISTENING)
+        } catch (_: SecurityException) {
+            emit(State.ERROR)
+            onErrorMessage("O Android bloqueou o acesso ao microfone.")
+        } catch (_: Throwable) {
+            destroyRecognizerOnly()
+            startRecognitionSoon(BUSY_RESTART_DELAY_MS)
+        }
+    }
+
+    private fun bestRecognition(bundle: Bundle?): String {
+        val list = bundle?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: return ""
+        return list.firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+    }
+
+    private fun routeTranscribedSpeech(text: String) {
+        val clean = text.trim()
+        if (clean.isBlank()) {
+            waitingForReply = false
+            publishIdleOrListening()
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        val wakeMatch = WAKE_WORD.find(clean)
+        if (wakeMatch != null) {
+            wakeConversationUntilMs = now + WAKE_WINDOW_MS
+            val command = clean.substring(wakeMatch.range.last + 1)
+                .trim(' ', ',', '.', ':', ';', '!', '?', '-', '—')
+            waitingForReply = true
+            listening = false
+            if (command.isBlank()) onFinalText("Jarvis") else onFinalText(command)
+            return
+        }
+
+        if (now <= wakeConversationUntilMs) {
+            wakeConversationUntilMs = now + WAKE_WINDOW_MS
+            waitingForReply = true
+            listening = false
+            onFinalText(clean)
+            return
+        }
+
+        // Fala ambiente fora da janela de conversa: ignora e volta a escutar.
+        waitingForReply = false
+        onPartialText("")
+        publishIdleOrListening()
+    }
+
+    private fun publishIdleOrListening() {
+        if (continuousEnabled && !waitingForReply && !speaking) {
+            startRecognitionSoon(RESTART_DELAY_MS)
+        } else if (!speaking) {
+            listening = false
+            emit(State.IDLE)
+        }
+    }
+
+    private fun cancelRecognition() {
+        runCatching { recognizer?.cancel() }
+        listening = false
+    }
+
+    private fun destroyRecognizerOnly() {
+        val r = recognizer
+        recognizer = null
+        runCatching { r?.cancel() }
+        runCatching { r?.destroy() }
+    }
+
+    private fun configureBrazilianMaleVoice(): Boolean {
+        val engine = tts ?: return false
+        engine.language = brazilianPortuguese
+
+        fun isMale(name: String): Boolean {
+            val normalized = name.lowercase(Locale.ROOT)
+            return listOf("male", "masculino", "homem", " man ", "_man_", "-man-").any(normalized::contains)
+        }
+
+        fun isFemale(name: String): Boolean {
+            val normalized = name.lowercase(Locale.ROOT)
+            return listOf("female", "feminina", "mulher", "woman").any(normalized::contains)
+        }
+
+        val maleVoice = engine.voices
