@@ -1,0 +1,88 @@
+name: Jarvis 0.2.7 APK
+
+on:
+  push:
+    branches: [jarvis-027-build]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reconstruct Jarvis source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/jarvis-src /tmp/jarvis-parts
+          curl -fL --retry 3 https://jarvis-026-source-part00.vercel.app/source.part.00 -o /tmp/jarvis-parts/00
+          curl -fL --retry 3 https://jarvis-026-source-part01.vercel.app/source.part.01 -o /tmp/jarvis-parts/01
+          curl -fL --retry 3 https://jarvis-026-source-part02.vercel.app/source.part.02 -o /tmp/jarvis-parts/02
+          curl -fL --retry 3 https://jarvis-026-source-part03.vercel.app/source.part.03 -o /tmp/jarvis-parts/03
+          cat /tmp/jarvis-parts/00 /tmp/jarvis-parts/01 /tmp/jarvis-parts/02 /tmp/jarvis-parts/03 | base64 -d > /tmp/jarvis-source.zip
+          unzip -q /tmp/jarvis-source.zip -d /tmp/jarvis-src
+          cat _jarvis027/patch/VoiceController.01 _jarvis027/patch/VoiceController.02 _jarvis027/patch/VoiceController.03 > /tmp/jarvis-src/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt
+          cp _jarvis027/patch/VoicePrint.kt /tmp/jarvis-src/app/src/main/java/pt/vcaitano/jarvis/voice/VoicePrint.kt
+          cp _jarvis027/patch/AndroidManifest.xml /tmp/jarvis-src/app/src/main/AndroidManifest.xml
+          cp _jarvis027/patch/build.gradle.kts /tmp/jarvis-src/app/build.gradle.kts
+          grep -nE 'compileSdk|applicationId|targetSdk|versionCode|versionName' /tmp/jarvis-src/app/build.gradle.kts
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 9.5.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.1'
+
+      - name: Install Android SDK 37
+        shell: bash
+        run: |
+          set -euxo pipefail
+          SDK="$RUNNER_TEMP/android-sdk-37"
+          mkdir -p "$SDK/platforms/android-37" "$SDK/build-tools/37.0.0" "$SDK/licenses"
+          curl -fL --retry 3 https://dl.google.com/android/repository/platform-37.0_r02.zip -o "$RUNNER_TEMP/platform37.zip"
+          unzip -q "$RUNNER_TEMP/platform37.zip" -d "$RUNNER_TEMP/platform37"
+          PDIR="$(find "$RUNNER_TEMP/platform37" -type f -name android.jar -printf '%h\n' | head -n1)"
+          cp -a "$PDIR/." "$SDK/platforms/android-37/"
+          curl -fL --retry 3 https://dl.google.com/android/repository/build-tools_r37_linux.zip -o "$RUNNER_TEMP/build-tools37.zip"
+          unzip -q "$RUNNER_TEMP/build-tools37.zip" -d "$RUNNER_TEMP/build-tools37"
+          BDIR="$(find "$RUNNER_TEMP/build-tools37" -type f \( -name aapt -o -name aapt2 \) -printf '%h\n' | head -n1)"
+          cp -a "$BDIR/." "$SDK/build-tools/37.0.0/"
+          curl -fL --retry 3 https://dl.google.com/android/repository/platform-tools_r37.0.1-linux.zip -o "$RUNNER_TEMP/platform-tools.zip"
+          unzip -q "$RUNNER_TEMP/platform-tools.zip" -d "$SDK"
+          printf '%s\n' 8933bad161af4178b1185d1a37fbf41ea5269c55 d56f5187479451eabf01fb78af6dfcb131a6481e 24333f8a63b6825ea9c5514f83c2829b004d1fee > "$SDK/licenses/android-sdk-license"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          printf 'sdk.dir=%s\n' "$SDK" > /tmp/jarvis-src/local.properties
+
+      - name: Build APK
+        working-directory: /tmp/jarvis-src
+        run: gradle --no-daemon :app:assembleDebug --stacktrace
+
+      - name: Validate APK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          APK=/tmp/jarvis-src/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          sha256sum "$APK" | tee /tmp/Jarvis-0.2.7.sha256.txt
+          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" | head -n 3 | tee /tmp/Jarvis-0.2.7-info.txt
+          cp "$APK" /tmp/Jarvis-0.2.7.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jarvis-0.2.7
+          path: |
+            /tmp/Jarvis-0.2.7.apk
+            /tmp/Jarvis-0.2.7.sha256.txt
+            /tmp/Jarvis-0.2.7-info.txt
+          if-no-files-found: error
+          retention-days: 7
