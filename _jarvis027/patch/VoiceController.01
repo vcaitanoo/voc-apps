@@ -1,0 +1,220 @@
+package pt.vcaitano.jarvis.voice
+
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.AudioTrack
+import android.media.MediaRecorder
+import android.os.Build
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import androidx.core.content.ContextCompat
+import pt.vcaitano.jarvis.auth.AuthSessionStore
+import pt.vcaitano.jarvis.network.BrainClient
+import java.io.ByteArrayOutputStream
+import java.util.Locale
+
+/**
+ * Controlador de voz do Jarvis.
+ *
+ * A partir da 0.2.7 o reconhecimento principal deixa de depender da API Groq.
+ * O Android SpeechRecognizer (preferencialmente on-device) transforma a fala
+ * em texto no próprio aparelho/serviço de voz instalado. Isso evita que uma
+ * chave externa inválida deixe o Jarvis completamente surdo.
+ */
+class VoiceController(
+    context: Context,
+    private val managedByListeningService: Boolean = false,
+    private val onStateChanged: (State) -> Unit,
+    private val onPartialText: (String) -> Unit,
+    private val onFinalText: (String) -> Unit,
+    private val onErrorMessage: (String) -> Unit
+) {
+
+    enum class State { IDLE, LISTENING, SPEAKING, ERROR }
+
+    companion object {
+        private const val PREFS = "jarvis_voice_controller"
+        private const val KEY_LISTENING_ALLOWED = "continuous_listening_allowed"
+        private const val WAKE_WINDOW_MS = 20_000L
+        private const val RESTART_DELAY_MS = 450L
+        private const val BUSY_RESTART_DELAY_MS = 1_200L
+        private const val ENROLLMENT_MS = 9_000
+        private const val SAMPLE_RATE = 16_000
+        private const val FRAME_SAMPLES = 640
+        private val WAKE_WORD = Regex("(?i)\\b(?:jarvis|járvis|jervis)\\b")
+    }
+
+    private val appContext = context.applicationContext
+    private val handler = Handler(Looper.getMainLooper())
+    private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val brazilianPortuguese = Locale("pt", "BR")
+
+    @Volatile private var continuousEnabled = false
+    @Volatile private var listening = false
+    @Volatile private var speaking = false
+    @Volatile private var waitingForReply = false
+    @Volatile private var voiceOutputEnabled = true
+    @Volatile private var destroyed = false
+    @Volatile private var wakeConversationUntilMs = 0L
+
+    private var recognizer: SpeechRecognizer? = null
+    private var recognizerIsOnDevice = false
+    private var restartScheduled = false
+    private var currentTrack: AudioTrack? = null
+    private var tts: TextToSpeech? = null
+
+    init {
+        tts = TextToSpeech(appContext) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                configureBrazilianMaleVoice()
+                tts?.setSpeechRate(0.98f)
+                tts?.setPitch(0.76f)
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {
+                        handler.post {
+                            speaking = true
+                            emit(State.SPEAKING)
+                        }
+                    }
+
+                    override fun onDone(utteranceId: String?) {
+                        handler.post { finishSpeaking() }
+                    }
+
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(utteranceId: String?) {
+                        handler.post {
+                            speaking = false
+                            waitingForReply = false
+                            onErrorMessage("Não consegui reproduzir a resposta em voz alta.")
+                            publishIdleOrListening()
+                        }
+                    }
+                })
+            }
+        }
+
+        // Migração: nas versões anteriores a autorização contínua não era
+        // persistida. Se o microfone já foi autorizado e o usuário nunca marcou
+        // explicitamente “Parar de ouvir”, retomamos a escuta ao abrir o app.
+        handler.post {
+            val micGranted = ContextCompat.checkSelfPermission(
+                appContext,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+            val explicitlyConfigured = prefs.contains(KEY_LISTENING_ALLOWED)
+            val shouldResume = if (explicitlyConfigured) {
+                prefs.getBoolean(KEY_LISTENING_ALLOWED, false)
+            } else {
+                micGranted
+            }
+            if (shouldResume && micGranted && !destroyed) startContinuousListening()
+        }
+    }
+
+    fun isRecognitionAvailable(): Boolean {
+        return SpeechRecognizer.isRecognitionAvailable(appContext)
+    }
+
+    fun isContinuousEnabled(): Boolean = continuousEnabled
+
+    fun setVoiceOutputEnabled(enabled: Boolean) {
+        voiceOutputEnabled = enabled
+        if (!enabled) {
+            runCatching { currentTrack?.pause() }
+            runCatching { currentTrack?.flush() }
+            runCatching { currentTrack?.release() }
+            currentTrack = null
+            tts?.stop()
+            speaking = false
+            waitingForReply = false
+            publishIdleOrListening()
+        }
+    }
+
+    fun startContinuousListening() {
+        if (destroyed) return
+        if (ContextCompat.checkSelfPermission(appContext, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            emit(State.ERROR)
+            onErrorMessage("Permissão de microfone não concedida.")
+            return
+        }
+        continuousEnabled = true
+        prefs.edit().putBoolean(KEY_LISTENING_ALLOWED, true).apply()
+        waitingForReply = false
+        if (!managedByListeningService) JarvisListeningService.start(appContext)
+        startRecognitionSoon(0L)
+    }
+
+    fun stopContinuousListening() {
+        continuousEnabled = false
+        prefs.edit().putBoolean(KEY_LISTENING_ALLOWED, false).apply()
+        waitingForReply = false
+        listening = false
+        wakeConversationUntilMs = 0L
+        restartScheduled = false
+        handler.removeCallbacksAndMessages(null)
+        onPartialText("")
+        cancelRecognition()
+        if (!managedByListeningService) JarvisListeningService.stop(appContext)
+        if (!speaking) emit(State.IDLE)
+    }
+
+    fun pauseForResponse() {
+        waitingForReply = true
+        listening = false
+        onPartialText("")
+        cancelRecognition()
+    }
+
+    fun deliverResponse(text: String) {
+        waitingForReply = true
+        listening = false
+        onPartialText("")
+        cancelRecognition()
+
+        if (!voiceOutputEnabled || text.isBlank()) {
+            waitingForReply = false
+            publishIdleOrListening()
+            return
+        }
+
+        speaking = true
+        emit(State.SPEAKING)
+
+        Thread {
+            val token = AuthSessionStore.validAccessToken(appContext)
+            val cloudAudio = BrainClient.synthesizeSpeech(token, text)
+            if (cloudAudio != null && voiceOutputEnabled && !destroyed) {
+                val played = playPcm(cloudAudio.pcm, cloudAudio.sampleRate)
+                handler.post {
+                    if (played) finishSpeaking() else speakWithMaleOnlyLocalFallback(text)
+                }
+            } else {
+                handler.post { speakWithMaleOnlyLocalFallback(text) }
+            }
+        }.apply {
+            name = "jarvis-tts"
+            isDaemon = true
+            start()
+        }
+    }
+
+    fun resumeAfterFailedResponse() {
+        waitingForReply = false
+        publishIdleOrListening()
+    }
+
+    private fun createRecognizer(): SpeechRecognizer? {
+        if (!SpeechRecognizer.isRecognitionAvailable(appContext)) return null
