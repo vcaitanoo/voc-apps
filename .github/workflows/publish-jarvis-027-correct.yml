@@ -1,0 +1,65 @@
+name: Publish correct Jarvis 0.2.7
+
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-jarvis-027-correct.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download validated Jarvis APK
+        run: |
+          set -euo pipefail
+          URL='https://jarvis-027-permanent-release-v3.vercel.app/Jarvis-0.2.7.apk?_vercel_share=t74j5P2RtuLSWX06wosQYJf4elAzmwXe'
+          mkdir -p apks/jarvis/v0.2.7
+          curl -fL --retry 5 --retry-all-errors "$URL" -o apks/jarvis/v0.2.7/Jarvis-0.2.7.apk
+          echo '728c60526e7a7bf024134f8f656066c24406d336c98f6e2e574a0b879288bde9  apks/jarvis/v0.2.7/Jarvis-0.2.7.apk' | sha256sum -c -
+
+      - name: Update catalog metadata
+        run: |
+          python3 - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          p='manifest.json'
+          with open(p, encoding='utf-8') as f:
+              data=json.load(f)
+          for app in data['apps']:
+              if app.get('id') == 'jarvis':
+                  app['packageName']='pt.vcaitano.jarvis'
+                  app['versionCode']=9
+                  app['versionName']='0.2.7'
+                  app['apkUrl']='https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/jarvis/v0.2.7/Jarvis-0.2.7.apk'
+                  app['sha256']='728c60526e7a7bf024134f8f656066c24406d336c98f6e2e574a0b879288bde9'
+                  app['signatureSha256']='f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2'
+                  app['changelog']='Jarvis 0.2.7 — build release corrigida e assinada com a chave permanente; mantém reconhecimento de voz Android, escuta persistente e VoicePrint.'
+                  break
+          else:
+              raise SystemExit('Jarvis entry not found')
+          data['updatedAt']=datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')
+          with open(p,'w',encoding='utf-8') as f:
+              json.dump(data,f,ensure_ascii=False,indent=2)
+              f.write('\n')
+          PY
+
+      - name: Commit APK and catalog
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apks/jarvis/v0.2.7/Jarvis-0.2.7.apk manifest.json
+          if git diff --cached --quiet; then
+            echo 'Nothing to commit'
+          else
+            git commit -m 'release(jarvis): publish corrected permanent-signed 0.2.7'
+            git push origin HEAD:main
+          fi
