@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-apps",
   "catalogName": "voc apps",
-  "updatedAt": "2026-08-26T13:24:00Z",
+  "updatedAt": "2026-08-26T19:09:00Z",
   "apps": [
     {
       "id": "voc-manager",
@@ -89,11 +89,11 @@
       "versionCode": 9,
       "versionName": "0.2.7",
       "minSdk": 26,
-      "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/jarvis/v0.2.7/Jarvis-0.2.7.apk",
-      "sha256": "200e7d7882292da02b8bbd7d54d0f5bcc992e532a6e4146aee2227602cf85f9b",
-      "signatureSha256": "ba12569f844825cb434ae73b98deab84febd83694b4ccf1487b4af4dc59fd2fb",
+      "apkUrl": "https://jarvis-027-permanent-release-v3.vercel.app/Jarvis-0.2.7.apk",
+      "sha256": "728c60526e7a7bf024134f8f656066c24406d336c98f6e2e574a0b879288bde9",
+      "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
       "iconUrl": null,
-      "changelog": "Jarvis 0.2.7 — reconhecimento de voz migrado para o SpeechRecognizer do Android, com preferência por reconhecimento no dispositivo; estado de escuta persistente e correção do VoicePrint. Mantém as restantes funções da 0.2.6.",
+      "changelog": "Jarvis 0.2.7 — APK release recompilado e assinado com a chave permanente; reconhecimento de voz via SpeechRecognizer do Android, estado de escuta persistente e correção do VoicePrint.",
       "mandatory": false,
       "monetization": {
         "type": "free",
