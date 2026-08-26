@@ -1,4 +1,4 @@
-name: Import verified Damas v1.0.6 APK
+name: Import corrected Jarvis 0.2.7 APK
 
 on:
   push:
@@ -15,30 +15,48 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download and verify exact APK
+        with:
+          fetch-depth: 0
+      - name: Download and verify exact Jarvis APK
         shell: bash
         run: |
           set -euo pipefail
-          curl -L --fail --show-error --retry 3 \
-            'https://bpketfzabpbxmujyozjm.supabase.co/storage/v1/object/public/damas-releases/v1.0.6/Damas-v1.0.6.apk' \
-            -o /tmp/Damas-v1.0.6.apk
-          echo 'a94e90f33007892dc5c176dcb9a9d631bfa0690503737af39022c9f1c8b1493b  /tmp/Damas-v1.0.6.apk' | sha256sum -c -
-      - name: Download icon
-        shell: bash
-        run: |
-          curl -L --fail --show-error --retry 3 \
-            'https://bpketfzabpbxmujyozjm.supabase.co/storage/v1/object/public/damas-releases/v1.0.6/damas.webp' \
-            -o /tmp/damas.webp
-      - name: Publish into voc-apps
+          curl -L --fail --show-error --retry 5 --retry-all-errors \
+            'https://jarvis-027-permanent-release-v3.vercel.app/Jarvis-0.2.7.apk?_vercel_share=t74j5P2RtuLSWX06wosQYJf4elAzmwXe' \
+            -o /tmp/Jarvis-0.2.7.apk
+          echo '728c60526e7a7bf024134f8f656066c24406d336c98f6e2e574a0b879288bde9  /tmp/Jarvis-0.2.7.apk' | sha256sum -c -
+      - name: Publish into voc-apps and update catalog
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p apks/damas/v1.0.6 icons
-          cp /tmp/Damas-v1.0.6.apk apks/damas/v1.0.6/Damas-v1.0.6.apk
-          cp /tmp/damas.webp icons/damas.webp
-          echo 'a94e90f33007892dc5c176dcb9a9d631bfa0690503737af39022c9f1c8b1493b  apks/damas/v1.0.6/Damas-v1.0.6.apk' | sha256sum -c -
+          mkdir -p apks/jarvis/v0.2.7
+          cp /tmp/Jarvis-0.2.7.apk apks/jarvis/v0.2.7/Jarvis-0.2.7.apk
+          echo '728c60526e7a7bf024134f8f656066c24406d336c98f6e2e574a0b879288bde9  apks/jarvis/v0.2.7/Jarvis-0.2.7.apk' | sha256sum -c -
+          python3 - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          p='manifest.json'
+          with open(p, encoding='utf-8') as f:
+              data=json.load(f)
+          for app in data['apps']:
+              if app.get('id') == 'jarvis':
+                  app['packageName']='pt.vcaitano.jarvis'
+                  app['versionCode']=9
+                  app['versionName']='0.2.7'
+                  app['apkUrl']='https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/jarvis/v0.2.7/Jarvis-0.2.7.apk'
+                  app['sha256']='728c60526e7a7bf024134f8f656066c24406d336c98f6e2e574a0b879288bde9'
+                  app['signatureSha256']='f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2'
+                  app['changelog']='Jarvis 0.2.7 — build release corrigida e assinada com a chave permanente; mantém reconhecimento de voz Android, escuta persistente e VoicePrint.'
+                  break
+          else:
+              raise SystemExit('Jarvis entry not found')
+          data['updatedAt']=datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')
+          with open(p,'w',encoding='utf-8') as f:
+              json.dump(data,f,ensure_ascii=False,indent=2)
+              f.write('\n')
+          PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add apks/damas/v1.0.6/Damas-v1.0.6.apk icons/damas.webp
-          git commit -m 'Publish verified Damas v1.0.6 APK'
-          git push
+          git add apks/jarvis/v0.2.7/Jarvis-0.2.7.apk manifest.json
+          git commit -m 'release(jarvis): publish corrected permanent-signed 0.2.7'
+          git push origin HEAD:main
