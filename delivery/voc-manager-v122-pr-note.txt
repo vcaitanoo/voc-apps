@@ -1,0 +1,1 @@
+The v1.2.2 verification is triggered from a same-repository pull request so its workflow run can be observed and validated before claiming publication.
