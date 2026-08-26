@@ -1,0 +1,2 @@
+workflow trigger commit: c8c7176129428c34e25c2527654052f663ab38f9
+purpose: signed voc Manager 1.2.2 publication with Jarvis fallback
