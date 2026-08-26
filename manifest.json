@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-apps",
   "catalogName": "voc apps",
-  "updatedAt": "2026-08-26T09:42:35Z",
+  "updatedAt": "2026-08-26T13:24:00Z",
   "apps": [
     {
       "id": "voc-manager",
@@ -11,14 +11,14 @@
       "category": "system",
       "description": "Instala, abre e atualiza os apps voc.",
       "status": "published",
-      "versionCode": 4,
-      "versionName": "1.2.0",
+      "versionCode": 6,
+      "versionName": "1.2.2",
       "minSdk": 28,
-      "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-manager/v1.2/voc-Manager-v1.2.0.apk",
-      "sha256": "e927ffd0e32e1a4a303c787cfd7ecdbe72e4f56180d0a066b555fca30bc25077",
+      "apkUrl": "https://voc-manager-v122-final-now.vercel.app/voc-Manager-v1.2.2.apk",
+      "sha256": "174b46283ec1d733c46d6f0a3220eccd945e17bd2781da4009d84cdde91074da",
       "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8",
       "iconUrl": null,
-      "changelog": "voc Manager 1.2.0 — atualização automática dos apps voc já instalados quando existe versão nova; o cartão acompanha download/instalação e muda sozinho para ABRIR ao concluir; catálogo de emergência atualizado e cartão do próprio Manager corrigido.",
+      "changelog": "voc Manager 1.2.2 — adiciona o Jarvis 0.2.7 ao catálogo de emergência, preservando as funções existentes do Manager e os restantes apps do catálogo.",
       "mandatory": false,
       "monetization": {
         "type": "free",
