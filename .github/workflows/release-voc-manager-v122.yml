@@ -1,6 +1,6 @@
 name: Publish voc Manager 1.2.2
 
-# Trigger refresh 2026-08-26: no functional app change. Triggered to publish v1.2.2.
+# Trigger refresh 2026-08-26: no functional app change. Triggered to publish v1.2.2. Retry trigger.
 on:
   push:
     branches:
