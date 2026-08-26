@@ -1,1 +1,2 @@
 voc Manager 1.2.2 Jarvis fallback verification marker
+trigger=2026-08-26T12:45:00+01:00
