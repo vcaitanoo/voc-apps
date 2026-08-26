@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-apps",
   "catalogName": "voc apps",
-  "updatedAt": "2026-08-26T19:09:00Z",
+  "updatedAt": "2026-08-26T20:02:00Z",
   "apps": [
     {
       "id": "voc-manager",
@@ -86,14 +86,14 @@
       "category": "productivity",
       "description": "Assistente pessoal com voz, texto, lembretes e contexto do dispositivo.",
       "status": "published",
-      "versionCode": 9,
-      "versionName": "0.2.7",
+      "versionCode": 10,
+      "versionName": "0.2.8",
       "minSdk": 26,
-      "apkUrl": "https://jarvis-027-permanent-release-v3.vercel.app/Jarvis-0.2.7.apk",
-      "sha256": "728c60526e7a7bf024134f8f656066c24406d336c98f6e2e574a0b879288bde9",
+      "apkUrl": "https://jarvis-028-permanent-release.vercel.app/Jarvis-0.2.8.apk",
+      "sha256": "1c5170cbda9468fa73abe46341bdd995277c7d9fe74781d2371182e84f3157c7",
       "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
       "iconUrl": null,
-      "changelog": "Jarvis 0.2.7 — APK release recompilado e assinado com a chave permanente; reconhecimento de voz via SpeechRecognizer do Android, estado de escuta persistente e correção do VoicePrint.",
+      "changelog": "Jarvis 0.2.8 — build release com versionCode 10 e assinatura permanente; mantém as correções de reconhecimento de voz, escuta persistente e VoicePrint da base 0.2.7.",
       "mandatory": false,
       "monetization": {
         "type": "free",
