@@ -1,0 +1,254 @@
+name: Verify and publish voc Manager 1.2.2
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'delivery/voc-manager-v122-trigger.txt'
+
+permissions:
+  contents: write
+
+env:
+  EXPECTED_MANAGER_SIGNER_SHA256: 918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8
+  ANDROID_AVD_HOME: ${{ github.workspace }}/.android/avd
+
+jobs:
+  verify-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout trusted main source
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Require signing secrets
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.VOC_MANAGER_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.VOC_MANAGER_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_B64"
+          test -n "$KEYSTORE_PASSWORD"
+
+      - name: Restore signing key
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.VOC_MANAGER_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          KEYSTORE_PATH="$RUNNER_TEMP/voc-manager-release.jks"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+          echo "VOC_MANAGER_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+
+      - name: Verify Jarvis fallback source
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE='manager/app/src/main/java/pt/vcaitano/vocmanager/CatalogClient.java'
+          grep -q '\\"id\\":\\"jarvis\\"' "$FILE"
+          grep -q '\\"packageName\\":\\"pt.vcaitano.jarvis\\"' "$FILE"
+          grep -q '\\"versionCode\\":9' "$FILE"
+          grep -q '\\"versionName\\":\\"0.2.7\\"' "$FILE"
+          grep -q '200e7d7882292da02b8bbd7d54d0f5bcc992e532a6e4146aee2227602cf85f9b' "$FILE"
+          grep -q 'ba12569f844825cb434ae73b98deab84febd83694b4ccf1487b4af4dc59fd2fb' "$FILE"
+          test -s apks/jarvis/v0.2.7/Jarvis-0.2.7.apk
+          echo 'fallback_source_has_jarvis=1' | tee manager-v122-fallback-source.txt
+
+      - name: Build signed release APK
+        env:
+          VOC_MANAGER_STORE_PASSWORD: ${{ secrets.VOC_MANAGER_KEYSTORE_PASSWORD }}
+          VOC_MANAGER_KEY_ALIAS: voc-manager-release
+          VOC_MANAGER_KEY_PASSWORD: ${{ secrets.VOC_MANAGER_KEYSTORE_PASSWORD }}
+        run: gradle -p manager clean testDebugUnitTest assembleRelease --stacktrace
+
+      - name: Verify release APK structure and signer
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK='manager/app/build/outputs/apk/release/app-release.apk'
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee manager-v122-badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee manager-v122-signature.txt
+          sha256sum "$APK" | tee manager-v122-sha256.txt
+          grep -q "package: name='pt.vcaitano.vocmanager' versionCode='6' versionName='1.2.2'" manager-v122-badging.txt
+          grep -q "application-label:'voc Manager'" manager-v122-badging.txt
+          ACTUAL_SIGNER="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' manager-v122-signature.txt | head -1 | tr '[:upper:]' '[:lower:]')"
+          echo "release_signer=$ACTUAL_SIGNER" | tee manager-v122-signer-result.txt
+          test "$ACTUAL_SIGNER" = "$EXPECTED_MANAGER_SIGNER_SHA256"
+
+      - name: Install emulator image
+        run: |
+          set -u
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'emulator' 'system-images;android-35;google_apis;x86_64'
+
+      - name: Test signed release and force fallback catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK='manager/app/build/outputs/apk/release/app-release.apk'
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo 'no' | avdmanager create avd -n voc_manager_v122_test -k 'system-images;android-35;google_apis;x86_64' -p "$ANDROID_AVD_HOME/voc_manager_v122_test.avd" --force
+          sudo chmod 666 /dev/kvm 2>/dev/null || true
+          if [ -e /dev/kvm ]; then ACCEL_ARGS='-accel on'; else ACCEL_ARGS='-accel off'; fi
+          nohup "$ANDROID_HOME/emulator/emulator" -avd voc_manager_v122_test -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect $ACCEL_ARGS > manager-v122-emulator.log 2>&1 &
+          EMULATOR_PID=$!
+
+          READY=0
+          for i in $(seq 1 150); do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then cat manager-v122-emulator.log; exit 1; fi
+            if adb devices | grep -q '^emulator-.*device$' && [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = '1' ]; then READY=1; break; fi
+            sleep 2
+          done
+          test "$READY" = '1'
+
+          adb install -r "$APK" | tee manager-v122-install.txt
+          grep -q 'Success' manager-v122-install.txt
+
+          # Force the remote catalog request to fail so this validates the built-in fallback.
+          adb root >/dev/null 2>&1 || true
+          sleep 2
+          FALLBACK_FORCED=0
+          if adb shell iptables -I OUTPUT -p tcp -j REJECT >/dev/null 2>&1; then FALLBACK_FORCED=1; fi
+          echo "fallback_network_block=$FALLBACK_FORCED" | tee manager-v122-fallback-network.txt
+          test "$FALLBACK_FORCED" = '1'
+
+          adb logcat -c
+          adb shell am force-stop pt.vcaitano.vocmanager
+          adb shell am start -n pt.vcaitano.vocmanager/.MainActivity | tee manager-v122-start.txt
+          sleep 8
+
+          JARVIS_VISIBLE=0
+          for i in $(seq 1 10); do
+            adb shell uiautomator dump /sdcard/manager-v122-ui.xml >/dev/null 2>&1 || true
+            adb pull /sdcard/manager-v122-ui.xml manager-v122-ui.xml >/dev/null 2>&1 || true
+            if grep -q 'text="Jarvis"' manager-v122-ui.xml; then
+              JARVIS_VISIBLE=1
+              break
+            fi
+            adb shell input swipe 160 590 160 250 350
+            sleep 1
+          done
+          echo "jarvis_visible_in_forced_fallback=$JARVIS_VISIBLE" | tee manager-v122-jarvis-result.txt
+          test "$JARVIS_VISIBLE" = '1'
+
+          adb logcat -d -t 4000 > manager-v122-logcat.txt || true
+          if grep -q 'FATAL EXCEPTION' manager-v122-logcat.txt; then
+            grep -A40 -B10 'FATAL EXCEPTION' manager-v122-logcat.txt
+            exit 1
+          fi
+
+      - name: Stage verified APK and update public catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_APK='manager/app/build/outputs/apk/release/app-release.apk'
+          DEST_DIR='apks/voc-manager/v1.2.2'
+          DEST_APK="$DEST_DIR/voc-Manager-v1.2.2.apk"
+          mkdir -p "$DEST_DIR"
+          cp "$SOURCE_APK" "$DEST_APK"
+          APK_SHA="$(sha256sum "$DEST_APK" | awk '{print $1}')"
+          export APK_SHA
+          python3 - <<'PY'
+          import datetime
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path('manifest.json')
+          manifest = json.loads(path.read_text(encoding='utf-8'))
+          manager = next(a for a in manifest['apps'] if a['id'] == 'voc-manager')
+          manager.update({
+              'status': 'published',
+              'versionCode': 6,
+              'versionName': '1.2.2',
+              'minSdk': 28,
+              'apkUrl': 'https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-manager/v1.2.2/voc-Manager-v1.2.2.apk',
+              'sha256': os.environ['APK_SHA'],
+              'signatureSha256': os.environ['EXPECTED_MANAGER_SIGNER_SHA256'],
+              'changelog': 'voc Manager 1.2.2 — inclui Jarvis 0.2.7 no catálogo interno de emergência, mantendo o catálogo online e as restantes funções inalteradas.',
+              'mandatory': False,
+          })
+          jarvis = next(a for a in manifest['apps'] if a['id'] == 'jarvis')
+          assert jarvis['packageName'] == 'pt.vcaitano.jarvis'
+          assert jarvis['versionCode'] == 9
+          assert jarvis['versionName'] == '0.2.7'
+          assert jarvis['sha256'] == '200e7d7882292da02b8bbd7d54d0f5bcc992e532a6e4146aee2227602cf85f9b'
+          manifest['updatedAt'] = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z')
+          path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+          {
+            echo 'voc Manager 1.2.2'
+            echo 'package=pt.vcaitano.vocmanager'
+            echo 'versionCode=6'
+            echo 'versionName=1.2.2'
+            echo "apkSha256=$APK_SHA"
+            echo "signatureSha256=$EXPECTED_MANAGER_SIGNER_SHA256"
+            echo 'jarvisPackage=pt.vcaitano.jarvis'
+            echo 'jarvisVersionCode=9'
+            echo 'jarvisVersionName=0.2.7'
+            cat manager-v122-fallback-source.txt
+            cat manager-v122-fallback-network.txt
+            cat manager-v122-jarvis-result.txt
+          } > delivery/voc-manager-v122-release.txt
+
+      - name: Publish verified Manager 1.2.2 to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add manifest.json apks/voc-manager/v1.2.2/voc-Manager-v1.2.2.apk delivery/voc-manager-v122-release.txt
+          if git diff --cached --quiet; then
+            echo 'Nothing new to publish'
+          else
+            git commit -m 'release(manager): publish 1.2.2 with Jarvis fallback'
+            git push origin HEAD:main
+          fi
+
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voc-manager-v1.2.2-verification
+          path: |
+            manager/app/build/outputs/apk/release/app-release.apk
+            manager-v122-badging.txt
+            manager-v122-signature.txt
+            manager-v122-sha256.txt
+            manager-v122-signer-result.txt
+            manager-v122-fallback-source.txt
+            manager-v122-install.txt
+            manager-v122-start.txt
+            manager-v122-ui.xml
+            manager-v122-fallback-network.txt
+            manager-v122-jarvis-result.txt
+            manager-v122-logcat.txt
+            manager-v122-emulator.log
+          if-no-files-found: warn
