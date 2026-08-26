@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-apps",
   "catalogName": "voc apps",
-  "updatedAt": "2026-08-22T21:45:00Z",
+  "updatedAt": "2026-08-26T09:42:35Z",
   "apps": [
     {
       "id": "voc-manager",
@@ -69,6 +69,31 @@
       "signatureSha256": "07df7362d3a99e638d54ce97e35328b6ca415f44481198ff2f6cf47bbadb9269",
       "iconUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/icons/damas.webp",
       "changelog": "Damas v1.0.6 — o botão do modo online agora mostra ‘Jogar com amigo’ em vez de ‘2 Telemóveis’. Mantém o banner AdMob da 1.0.5 e preserva tabuleiro, IA, multiplayer, QR e regras.",
+      "mandatory": false,
+      "monetization": {
+        "type": "free",
+        "priceCents": 0,
+        "currency": "EUR",
+        "period": null,
+        "trialDays": 0,
+        "provider": "none"
+      }
+    },
+    {
+      "id": "jarvis",
+      "name": "Jarvis",
+      "packageName": "pt.vcaitano.jarvis",
+      "category": "productivity",
+      "description": "Assistente pessoal com voz, texto, lembretes e contexto do dispositivo.",
+      "status": "published",
+      "versionCode": 9,
+      "versionName": "0.2.7",
+      "minSdk": 26,
+      "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/jarvis/v0.2.7/Jarvis-0.2.7.apk",
+      "sha256": "200e7d7882292da02b8bbd7d54d0f5bcc992e532a6e4146aee2227602cf85f9b",
+      "signatureSha256": "ba12569f844825cb434ae73b98deab84febd83694b4ccf1487b4af4dc59fd2fb",
+      "iconUrl": null,
+      "changelog": "Jarvis 0.2.7 — reconhecimento de voz migrado para o SpeechRecognizer do Android, com preferência por reconhecimento no dispositivo; estado de escuta persistente e correção do VoicePrint. Mantém as restantes funções da 0.2.6.",
       "mandatory": false,
       "monetization": {
         "type": "free",
