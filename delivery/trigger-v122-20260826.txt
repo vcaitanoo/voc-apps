@@ -1,0 +1,1 @@
+Trigger auxiliar criado em 2026-08-26 para acompanhamento da publicação do voc Manager 1.2.2. Não altera código do aplicativo.
