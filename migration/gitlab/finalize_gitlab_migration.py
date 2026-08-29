@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, json, re
+import argparse, base64, gzip, json, re
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -12,6 +12,15 @@ def gitlab_parts(project_url: str):
     if '/' not in path:
         raise SystemExit('URL deve apontar para namespace/projeto')
     return path
+
+
+def restore_main_activity(recovered: Path):
+    main_java = recovered / 'MainActivity.java'
+    packed = recovered / 'MainActivity.java.gz.b64'
+    if not main_java.exists() and packed.exists():
+        raw = base64.b64decode(packed.read_text(encoding='ascii').strip())
+        main_java.write_bytes(gzip.decompress(raw))
+    return main_java
 
 
 def main():
@@ -57,7 +66,7 @@ def main():
         )
         catalog_java.write_text(txt, encoding='utf-8')
 
-    main_java = recovered / 'MainActivity.java'
+    main_java = restore_main_activity(recovered)
     if main_java.exists():
         txt = main_java.read_text(encoding='utf-8').replace(
             'A consultar o catálogo no GitHub…', 'A consultar o catálogo…'
