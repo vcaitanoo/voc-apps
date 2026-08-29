@@ -15,7 +15,7 @@ Catálogo recuperado: 7 apps, atualizado em 2026-08-27T04:07:00Z.
 
 ## Regra de segurança
 
-Os quatro ficheiros em `recovered-v1.2.4/` foram recuperados do ZIP fornecido e representam o núcleo observado da 1.2.4. Eles NÃO são, por si só, um projeto Android completo e não devem ser tratados como fonte compilável confirmada.
+Os três ficheiros Java em `recovered-v1.2.4/` foram recuperados do ZIP fornecido e representam o núcleo observado da 1.2.4. Eles NÃO são, por si só, um projeto Android completo e não devem ser tratados como fonte compilável confirmada.
 
 A migração final só deve gerar uma nova versão do Manager depois de recuperar/confirmar o projeto completo que produziu a 1.2.4. Não editar APK/DEX/smali para contornar a ausência da fonte.
 
