@@ -1,0 +1,230 @@
+package pt.vcaitano.vocmanager;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
+final class CatalogClient {
+    static final String CATALOG_URL =
+            "https://jarvis-027-apk-direct-final.vercel.app/manifest.json";
+
+    // Last known-good catalog snapshot. It keeps the Manager usable if the remote
+    // catalog is unavailable and must never regress known package/version metadata.
+    private static final String FALLBACK_CATALOG = """
+            {
+              "schemaVersion": 1,
+              "catalogId": "voc-apps",
+              "catalogName": "voc apps",
+              "updatedAt": "2026-08-27T03:58:00Z",
+              "apps": [
+                {
+                  "id": "voc-manager",
+                  "name": "voc Manager",
+                  "packageName": "pt.vcaitano.vocmanager",
+                  "category": "system",
+                  "description": "Instala, abre e atualiza os apps voc.",
+                  "status": "published",
+                  "versionCode": 8,
+                  "versionName": "1.2.4",
+                  "minSdk": 28,
+                  "distribution": "apk",
+                  "apkUrl": null,
+                  "sha256": null,
+                  "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8",
+                  "iconUrl": null,
+                  "changelog": "voc Manager 1.2.4 — migração única para catálogo HTTPS permanente e editável.",
+                  "mandatory": false,
+                  "monetization": {"type":"free","priceCents":0,"currency":"EUR","period":null,"trialDays":0,"provider":"none"}
+                },
+                {
+                  "id": "voc-tv",
+                  "name": "voc TV",
+                  "packageName": "pt.vcaitano.iptvia",
+                  "category": "entertainment",
+                  "description": "Pesquisa inteligente e reprodução de filmes, séries, TV ao vivo e vídeos públicos com assistência de IA.",
+                  "status": "pending_publication",
+                  "versionCode": 19,
+                  "versionName": "0.19.0",
+                  "minSdk": 26,
+                  "distribution": "apk",
+                  "apkUrl": null,
+                  "sha256": "e49d7dd74caececb594c2d773da50e5b96a0cbd8646a0774f6e53d5387e45874",
+                  "signatureSha256": "629c7b0942460a5d484ec938cc3e0a4e32a6a489572cd179fb94e43cefa05b2e",
+                  "iconUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/icons/voc-tv.webp",
+                  "changelog": "voc TV 0.19.0 — versão preservada; URL APK permanente pendente de confirmação.",
+                  "mandatory": false,
+                  "monetization": {"type":"subscription","priceCents":150,"currency":"EUR","period":"P1M","trialDays":0,"provider":"pending"}
+                },
+                {
+                  "id": "damas",
+                  "name": "Damas",
+                  "packageName": "pt.vcaitano.damas",
+                  "category": "games",
+                  "description": "Jogo de damas com adversário de IA avançado e modo online para jogar contra amigos.",
+                  "status": "pending_publication",
+                  "versionCode": 7,
+                  "versionName": "1.0.6",
+                  "minSdk": 23,
+                  "distribution": "apk",
+                  "apkUrl": null,
+                  "sha256": "a94e90f33007892dc5c176dcb9a9d631bfa0690503737af39022c9f1c8b1493b",
+                  "signatureSha256": "07df7362d3a99e638d54ce97e35328b6ca415f44481198ff2f6cf47bbadb9269",
+                  "iconUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/icons/damas.webp",
+                  "changelog": "Damas 1.0.6 — versão preservada; URL APK permanente pendente de confirmação.",
+                  "mandatory": false,
+                  "monetization": {"type":"free","priceCents":0,"currency":"EUR","period":null,"trialDays":0,"provider":"none"}
+                },
+                {
+                  "id": "jarvis",
+                  "name": "Jarvis",
+                  "packageName": "pt.vcaitano.jarvis",
+                  "category": "productivity",
+                  "description": "Assistente pessoal com palavra-chave local, voz, texto, lembretes e contexto do dispositivo.",
+                  "status": "published",
+                  "versionCode": 12,
+                  "versionName": "0.3.0",
+                  "minSdk": 26,
+                  "distribution": "apk",
+                  "apkUrl": "https://vocatalogo-9q8tfcdn.manus.space/manus-storage/Jarvis-0.3.0-RELEASE-ASSINADO-FINAL_d49c95ba.apk",
+                  "sha256": "2706ec9238e76342c9c58a504bdbac5c96e9762d0401170e7610cb1907b6c404",
+                  "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
+                  "iconUrl": null,
+                  "changelog": "Jarvis 0.3.0 — palavra-chave local “Jarvis”; a transcrição Android abre apenas para o comando, sem ciclo de bips contínuos.",
+                  "mandatory": false,
+                  "monetization": {"type":"free","priceCents":0,"currency":"EUR","period":null,"trialDays":0,"provider":"none"}
+                },
+                {
+                  "id": "teclado-tradutor",
+                  "name": "Teclado Tradutor",
+                  "packageName": "pt.caitano.tecladotradutor",
+                  "category": "productivity",
+                  "description": "Teclado para traduzir o que escreve em vários idiomas.",
+                  "status": "published",
+                  "versionCode": 15,
+                  "versionName": "1.15.0",
+                  "minSdk": 24,
+                  "distribution": "play",
+                  "playUrl": "https://play.google.com/store/apps/details?id=pt.caitano.tecladotradutor",
+                  "iconUrl": null,
+                  "changelog": "Disponível na Google Play.",
+                  "mandatory": false,
+                  "monetization": {"type":"free","priceCents":0,"currency":"EUR","period":null,"trialDays":0,"provider":"none"}
+                },
+                {
+                  "id": "simulador-led",
+                  "name": "Simulador de LED",
+                  "packageName": "pt.vitorcaitano.simuladordeled",
+                  "category": "tools",
+                  "description": "LEDs coloridos para identificar notificações no ecrã bloqueado.",
+                  "status": "published",
+                  "versionCode": 9,
+                  "versionName": "1.5",
+                  "minSdk": 28,
+                  "distribution": "play",
+                  "playUrl": "https://play.google.com/store/apps/details?id=pt.vitorcaitano.simuladordeled",
+                  "iconUrl": null,
+                  "changelog": "Disponível na Google Play.",
+                  "mandatory": false,
+                  "monetization": {"type":"free","priceCents":0,"currency":"EUR","period":null,"trialDays":0,"provider":"none"}
+                },
+                {
+                  "id": "tela-sempre-ativa",
+                  "name": "Tela Sempre Ativa",
+                  "packageName": "pt.vcaitano.telasempreativa",
+                  "category": "tools",
+                  "description": "Ecrã sempre ativo com relógio, notificações e controlos de multimédia.",
+                  "status": "pending_publication",
+                  "versionCode": 16,
+                  "versionName": "1.0.15",
+                  "minSdk": 27,
+                  "distribution": "apk",
+                  "apkUrl": null,
+                  "sha256": "d3dd814d3185c52037a9a3b3c279cec708cfafc0c149fa32b3239d4c4befc94f",
+                  "signatureSha256": "f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a",
+                  "iconUrl": null,
+                  "changelog": "APK de produção 1.0.15 validado localmente; alojamento HTTPS permanente pendente.",
+                  "mandatory": false,
+                  "monetization": {"type":"free","priceCents":0,"currency":"EUR","period":null,"trialDays":0,"provider":"none"}
+                }
+              ]
+            }
+            """;
+
+    List<CatalogApp> load() throws Exception {
+        Exception lastFailure = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                return loadRemote();
+            } catch (Exception remoteFailure) {
+                lastFailure = remoteFailure;
+                if (attempt < 2) {
+                    try {
+                        Thread.sleep(250L * (attempt + 1));
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (lastFailure != null) {
+            android.util.Log.w("vocManager", "Using fallback catalog: " + lastFailure.getClass().getSimpleName());
+        }
+        return parseCatalog(FALLBACK_CATALOG);
+    }
+
+    private List<CatalogApp> loadRemote() throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL(CATALOG_URL).openConnection();
+        connection.setConnectTimeout(8_000);
+        connection.setReadTimeout(8_000);
+        connection.setInstanceFollowRedirects(true);
+        connection.setUseCaches(false);
+        connection.setRequestProperty("Accept", "application/json");
+        connection.setRequestProperty("Cache-Control", "no-cache, no-store");
+        connection.setRequestProperty("Pragma", "no-cache");
+        connection.setRequestProperty("User-Agent", "voc-Manager/1.2");
+
+        int code = connection.getResponseCode();
+        if (code < 200 || code >= 300) {
+            connection.disconnect();
+            throw new IllegalStateException("Catálogo HTTP " + code);
+        }
+
+        try (BufferedInputStream input = new BufferedInputStream(connection.getInputStream());
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[16 * 1024];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+            }
+            return parseCatalog(new String(output.toByteArray(), StandardCharsets.UTF_8));
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private static List<CatalogApp> parseCatalog(String json) throws Exception {
+        JSONObject root = new JSONObject(json);
+        if (root.optInt("schemaVersion", -1) != 1) {
+            throw new IllegalStateException("Versão de catálogo não suportada");
+        }
+
+        JSONArray apps = root.getJSONArray("apps");
+        List<CatalogApp> result = new ArrayList<>();
+        for (int i = 0; i < apps.length(); i++) {
+            CatalogApp app = CatalogApp.fromJson(apps.getJSONObject(i));
+            if (!"disabled".equals(app.status)) {
+                result.add(app);
+            }
+        }
+        return result;
+    }
+}
