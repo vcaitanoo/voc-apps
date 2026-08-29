@@ -1,0 +1,53 @@
+stages:
+  - validate
+
+validate_catalog:
+  stage: validate
+  image: python:3.12-alpine
+  script:
+    - python - <<'PY'
+      import json, re
+      from pathlib import Path
+
+      p = Path('manifest.json')
+      d = json.loads(p.read_text(encoding='utf-8'))
+      assert d.get('schemaVersion') == 1, 'schemaVersion deve ser 1'
+      apps = d.get('apps')
+      assert isinstance(apps, list) and apps, 'apps deve ser lista não vazia'
+
+      ids, pkgs = set(), set()
+      hex64 = re.compile(r'^[0-9a-fA-F]{64}$')
+      allowed_status = {'published', 'pending_publication', 'coming_soon', 'disabled'}
+
+      for app in apps:
+          app_id = app['id']
+          pkg = app['packageName']
+          assert app_id not in ids, f'id duplicado: {app_id}'
+          assert pkg not in pkgs, f'package duplicado: {pkg}'
+          ids.add(app_id); pkgs.add(pkg)
+          assert app.get('status') in allowed_status, f'status inválido em {app_id}'
+          assert int(app.get('versionCode', 0)) > 0, f'versionCode inválido em {app_id}'
+          assert app.get('versionName'), f'versionName ausente em {app_id}'
+
+          distribution = app.get('distribution', 'apk')
+          assert distribution in {'apk', 'play'}, f'distribution inválida em {app_id}'
+
+          if distribution == 'play' and app.get('status') == 'published':
+              url = app.get('playUrl') or ''
+              assert url.startswith('https://play.google.com/store/apps/details?id='), f'playUrl inválido em {app_id}'
+
+          if distribution == 'apk':
+              sha = app.get('sha256')
+              sig = app.get('signatureSha256')
+              if sha is not None:
+                  assert hex64.fullmatch(sha), f'sha256 inválido em {app_id}'
+              if sig is not None:
+                  assert hex64.fullmatch(sig), f'signatureSha256 inválido em {app_id}'
+              if app.get('status') == 'published':
+                  url = app.get('apkUrl') or ''
+                  assert url.startswith('https://'), f'apkUrl HTTPS obrigatório em {app_id}'
+                  assert sha and hex64.fullmatch(sha), f'sha256 obrigatório em {app_id}'
+                  assert sig and hex64.fullmatch(sig), f'assinatura obrigatória em {app_id}'
+
+      print(f'Catálogo válido: {len(apps)} apps')
+      PY
