@@ -1,0 +1,72 @@
+name: Build Tela Sempre Ativa V28 Teste
+
+on:
+  push:
+    branches:
+      - tmp-tsa-v26-build-20260830
+    paths:
+      - '.github/workflows/build-tsa-v28-test.yml'
+      - 'tmpbuild/tsa28/v28-text-overlay.tar.xz'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp-tsa-v26-build-20260830
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Download exact V27 base
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/tsa/src
+          curl -fL --retry 4 --retry-delay 2 'https://drive.usercontent.google.com/download?id=1s7L-iEQo3GSE2xVPvyDyQKl17ePD_RFz&export=download&confirm=t' -o /tmp/tsa/v27-source.tar.xz
+          echo '45d532a8621f6156b59f0fd47bdf79d05f35fdcdf19dac16a409456eb3178b3d  /tmp/tsa/v27-source.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/tsa/v27-source.tar.xz -C /tmp/tsa/src
+      - name: Apply V28 requested changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '64944a805ce8f663b4f49d8fa16af68ad13ff9e82702298c7a5bebd5e587de15  tmpbuild/tsa28/v28-text-overlay.tar.xz' | sha256sum -c -
+          tar -xJf tmpbuild/tsa28/v28-text-overlay.tar.xz -C /tmp/tsa/src
+          grep -q 'versionCode 28' /tmp/tsa/src/app/build.gradle
+          grep -q "versionName '1.0.23'" /tmp/tsa/src/app/build.gradle
+      - uses: android-actions/setup-android@v3
+      - name: Install API 36 SDK
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Build debug APK
+        shell: bash
+        working-directory: /tmp/tsa/src
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon clean assembleDebug
+      - name: Verify APK
+        shell: bash
+        run: |
+          APK=/tmp/tsa/src/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          $ANDROID_HOME/build-tools/36.0.0/aapt dump badging "$APK" | tee /tmp/tsa/APK_BADGING.txt
+          grep -q "package: name='pt.vcaitano.telasempreativa' versionCode='28' versionName='1.0.23'" /tmp/tsa/APK_BADGING.txt
+          $ANDROID_HOME/build-tools/36.0.0/apksigner verify --verbose --print-certs "$APK" | tee /tmp/tsa/APK_VERIFY.txt
+          sha256sum "$APK" | tee /tmp/tsa/APK_SHA256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TelaSempreAtiva-V28-Teste
+          path: |
+            /tmp/tsa/src/app/build/outputs/apk/debug/app-debug.apk
+            /tmp/tsa/APK_BADGING.txt
+            /tmp/tsa/APK_VERIFY.txt
+            /tmp/tsa/APK_SHA256.txt
+          if-no-files-found: error
