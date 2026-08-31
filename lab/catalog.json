@@ -2,8 +2,23 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-08-31T00:50:00+01:00",
+  "updatedAt": "2026-08-31T01:00:00+01:00",
   "apps": [
+    {
+      "id": "tela-sempre-ativa",
+      "name": "Tela Sempre Ativa",
+      "packageName": "pt.vcaitano.telasempreativa",
+      "enabled": true,
+      "stable": {
+        "versionCode": 25,
+        "versionName": "1.0.20",
+        "apkUrl": "",
+        "sha256": "4b8bff428f75805e3f8d0d60fe8c8e2c39ff4e264a9fb8102382bb67c034eab8",
+        "signatureSha256": "f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a",
+        "notes": "BASE ESTÁVEL CONFIRMADA PELO UTILIZADOR: V25 / 1.0.20. O binário confirmado ainda precisa ser recuperado/publicado numa URL permanente; não substituir por V28 temporária nem por outra tentativa."
+      },
+      "candidate": null
+    },
     {
       "id": "voc-manager",
       "name": "VOC Manager",
