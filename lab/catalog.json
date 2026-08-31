@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-08-31T15:52:00+01:00",
+  "updatedAt": "2026-08-31T16:45:00+01:00",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -18,12 +18,12 @@
         "notes": "BASE ESTÁVEL CONFIRMADA PELO UTILIZADOR: V25 / 1.0.20. O binário confirmado ainda precisa ser recuperado/publicado numa URL permanente; não substituir por V28 temporária nem por outra tentativa."
       },
       "candidate": {
-        "versionCode": 32,
-        "versionName": "1.0.27-test",
-        "apkUrl": "https://temporary-snappy-redwood-yqm3s0d.vercel.app/TelaSempreAtiva-1.0.27-test-vc32.apk",
-        "sha256": "f1e94658421739130992e78ce2ca9a28d2da67d7bd4111546141362c799930e3",
+        "versionCode": 31,
+        "versionName": "1.0.26-test",
+        "apkUrl": "https://temporary-snappy-redwood-yqm3s0d.vercel.app/apks/tela-sempre-ativa/candidate/TelaSempreAtiva-1.0.26-test-vc31.apk",
+        "sha256": "4eb42024d04e154222d96af739ec63a133a4bfbb4a4f670190d8b7c0a19fc570",
         "signatureSha256": "f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a",
-        "notes": "CANDIDATO V32: popup de notificações abre somente por pressão longa e vibra ao abrir; painel de conteúdo usa toda a área vertical segura acima das ações sem invadir a zona superior de status/cutout; Abrir/Remover/Responder usam a notificação concreta selecionada e envio de PendingIntent compatível com Android atual. Não promovido a estável."
+        "notes": "CANDIDATO V31: bug crítico corrigido - clicar em 'Abrir' no popup agora executa o contentIntent real da notificação (não a app principal), com keyguard dispensado via callback onDismissSucceeded antes de iniciar a activity. Fallback automático para launchIntent caso não haja contentIntent. Polling ativo de listener a cada 2s (resolução do bug que impedia ícones aparecerem)."
       }
     },
     {
