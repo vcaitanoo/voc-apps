@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-08-31T14:15:00+01:00",
+  "updatedAt": "2026-08-31T15:52:00+01:00",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -18,12 +18,12 @@
         "notes": "BASE ESTÁVEL CONFIRMADA PELO UTILIZADOR: V25 / 1.0.20. O binário confirmado ainda precisa ser recuperado/publicado numa URL permanente; não substituir por V28 temporária nem por outra tentativa."
       },
       "candidate": {
-        "versionCode": 31,
-        "versionName": "1.0.26-test",
-        "apkUrl": "https://temporary-snappy-redwood-yqm3s0d.vercel.app/TelaSempreAtiva-1.0.26-test-vc31.apk",
-        "sha256": "d7928dae0a82fe617ab41cc233846915454207014091b08588b5c998db120061",
+        "versionCode": 32,
+        "versionName": "1.0.27-test",
+        "apkUrl": "https://temporary-snappy-redwood-yqm3s0d.vercel.app/TelaSempreAtiva-1.0.27-test-vc32.apk",
+        "sha256": "f1e94658421739130992e78ce2ca9a28d2da67d7bd4111546141362c799930e3",
         "signatureSha256": "f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a",
-        "notes": "CANDIDATO V31: mesma linha funcional da V30, preservando polling ativo de notificações a cada 2s. Novo versionCode para permitir atualização no VOC Lab. APK NÃO promovido a estável."
+        "notes": "CANDIDATO V32: popup de notificações abre somente por pressão longa e vibra ao abrir; painel de conteúdo usa toda a área vertical segura acima das ações sem invadir a zona superior de status/cutout; Abrir/Remover/Responder usam a notificação concreta selecionada e envio de PendingIntent compatível com Android atual. Não promovido a estável."
       }
     },
     {
