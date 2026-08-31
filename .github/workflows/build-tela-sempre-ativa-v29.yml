@@ -3,7 +3,6 @@ name: Build Tela Sempre Ativa V29
 on:
   push:
     paths:
-      - 'delivery/tela-sempre-ativa/v29/source.b64'
       - '.github/workflows/build-tela-sempre-ativa-v29.yml'
   workflow_dispatch:
 
@@ -24,12 +23,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Restore V29 source
+      - name: Restore V29 source from Drive checkpoint
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/tsa-v29"
-          base64 -d delivery/tela-sempre-ativa/v29/source.b64 > "$RUNNER_TEMP/tsa-v29.tar.xz"
+          URL='https://drive.usercontent.google.com/download?id=1qMKPWJ9RLcmcfAUhZVLV_GVXGusuCIAH&export=download&confirm=t'
+          curl -fL --retry 3 --retry-delay 2 "$URL" -o "$RUNNER_TEMP/tsa-v29.tar.xz"
+          echo '40469bae71d6667e731816cc5624f20c96031bf277f4ccb6eacae0c959d45f0f  '"$RUNNER_TEMP/tsa-v29.tar.xz" | sha256sum -c -
           tar -xJf "$RUNNER_TEMP/tsa-v29.tar.xz" -C "$RUNNER_TEMP/tsa-v29"
           cd "$RUNNER_TEMP/tsa-v29"
           chmod +x gradlew
