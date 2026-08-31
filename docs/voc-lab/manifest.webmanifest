@@ -1,0 +1,9 @@
+{
+  "name": "VOC Lab",
+  "short_name": "VOC Lab",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#101114",
+  "theme_color": "#101114",
+  "description": "Canal privado para instalar e testar APKs VOC."
+}
