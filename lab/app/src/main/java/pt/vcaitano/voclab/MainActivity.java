@@ -136,7 +136,11 @@ public class MainActivity extends Activity {
         if (code < 200 || code >= 300) throw new IllegalStateException("HTTP " + code);
         String text;
         try (InputStream input = new BufferedInputStream(connection.getInputStream())) {
-            text = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+            byte[] buffer = new byte[16 * 1024];
+            int read;
+            while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
+            text = new String(output.toByteArray(), StandardCharsets.UTF_8);
         } finally {
             connection.disconnect();
         }
@@ -154,9 +158,7 @@ public class MainActivity extends Activity {
     private void renderApps(List<LabApp> apps) {
         appsContainer.removeAllViews();
         statusText.setText("Catálogo atualizado • " + apps.size() + " apps");
-        for (LabApp app : apps) {
-            appsContainer.addView(buildCard(app));
-        }
+        for (LabApp app : apps) appsContainer.addView(buildCard(app));
     }
 
     private View buildCard(LabApp app) {
@@ -175,7 +177,6 @@ public class MainActivity extends Activity {
 
         long installedCode = installedVersionCode(app.packageName);
         String installedLabel = installedCode < 0 ? "não instalado" : installedVersionName(app.packageName) + " (" + installedCode + ")";
-
         TextView details = new TextView(this);
         StringBuilder text = new StringBuilder();
         text.append("Instalado: ").append(installedLabel).append("\n");
@@ -183,9 +184,7 @@ public class MainActivity extends Activity {
         if (app.candidate != null) {
             text.append("\nCANDIDATO: ").append(app.candidate.versionName).append(" (").append(app.candidate.versionCode).append(")");
             if (!app.candidate.notes.isEmpty()) text.append("\nAlteração: ").append(app.candidate.notes);
-        } else {
-            text.append("\nCandidato: nenhum");
-        }
+        } else text.append("\nCandidato: nenhum");
         details.setText(text.toString());
         details.setTextSize(14);
         details.setPadding(0, dp(7), 0, dp(7));
@@ -193,7 +192,10 @@ public class MainActivity extends Activity {
 
         Release target = app.candidate != null ? app.candidate : app.stable;
         Button action = new Button(this);
-        if (installedCode >= target.versionCode) {
+        if (target.apkUrl == null || target.apkUrl.isEmpty()) {
+            action.setText("APK AINDA NÃO PUBLICADO");
+            action.setEnabled(false);
+        } else if (installedCode >= target.versionCode) {
             action.setText("ABRIR");
             action.setOnClickListener(v -> openApp(app.packageName));
         } else {
@@ -201,34 +203,24 @@ public class MainActivity extends Activity {
             action.setOnClickListener(v -> startInstall(app, target, action));
         }
         card.addView(action, matchWrap());
-
         return card;
     }
 
     private void startInstall(LabApp app, Release release, Button button) {
         if (!getPackageManager().canRequestPackageInstalls()) {
             Toast.makeText(this, "Autorize o VOC Lab a instalar apps e tente novamente.", Toast.LENGTH_LONG).show();
-            Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()));
-            startActivity(settings);
+            startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
             return;
         }
-
         button.setEnabled(false);
         button.setText("A DESCARREGAR...");
         executor.execute(() -> {
             try {
                 File apk = downloadAndValidate(app, release);
                 installWithPackageInstaller(app.packageName, apk);
-                runOnUiThread(() -> {
-                    button.setEnabled(true);
-                    button.setText("CONFIRMAR INSTALAÇÃO");
-                });
+                runOnUiThread(() -> { button.setEnabled(true); button.setText("CONFIRMAR INSTALAÇÃO"); });
             } catch (Exception e) {
-                runOnUiThread(() -> {
-                    button.setEnabled(true);
-                    button.setText("TENTAR NOVAMENTE");
-                    Toast.makeText(this, "Falha: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                });
+                runOnUiThread(() -> { button.setEnabled(true); button.setText("TENTAR NOVAMENTE"); Toast.makeText(this, "Falha: " + e.getMessage(), Toast.LENGTH_LONG).show(); });
             }
         });
     }
@@ -238,7 +230,6 @@ public class MainActivity extends Activity {
         File dir = new File(getCacheDir(), "apks");
         if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("Não foi possível criar cache");
         File apk = new File(dir, app.id + "-" + release.versionCode + ".apk");
-
         HttpURLConnection connection = (HttpURLConnection) new URL(release.apkUrl).openConnection();
         connection.setConnectTimeout(15_000);
         connection.setReadTimeout(60_000);
@@ -246,30 +237,16 @@ public class MainActivity extends Activity {
         connection.setRequestProperty("User-Agent", "VOC-Lab/1.0");
         int code = connection.getResponseCode();
         if (code < 200 || code >= 300) throw new IllegalStateException("Download HTTP " + code);
-        try (InputStream input = new BufferedInputStream(connection.getInputStream());
-             OutputStream output = new FileOutputStream(apk)) {
-            byte[] buffer = new byte[64 * 1024];
-            int read;
-            while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
-        } finally {
-            connection.disconnect();
-        }
-
+        try (InputStream input = new BufferedInputStream(connection.getInputStream()); OutputStream output = new FileOutputStream(apk)) {
+            byte[] buffer = new byte[64 * 1024]; int read; while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
+        } finally { connection.disconnect(); }
         String actualSha = sha256(apk);
-        if (!release.sha256.isEmpty() && !actualSha.equalsIgnoreCase(release.sha256)) {
-            apk.delete();
-            throw new IllegalStateException("SHA-256 do APK não confere");
-        }
-
+        if (!release.sha256.isEmpty() && !actualSha.equalsIgnoreCase(release.sha256)) { apk.delete(); throw new IllegalStateException("SHA-256 do APK não confere"); }
         PackageInfo archive = getPackageManager().getPackageArchiveInfo(apk.getAbsolutePath(), PackageManager.GET_SIGNING_CERTIFICATES);
         if (archive == null) throw new IllegalStateException("APK inválido");
         if (!app.packageName.equals(archive.packageName)) throw new IllegalStateException("Package diferente: " + archive.packageName);
         if (archive.getLongVersionCode() != release.versionCode) throw new IllegalStateException("versionCode diferente: " + archive.getLongVersionCode());
-
-        if (!release.signatureSha256.isEmpty()) {
-            String signer = signerSha256(archive);
-            if (!signer.equalsIgnoreCase(release.signatureSha256)) throw new IllegalStateException("Assinatura do APK não confere");
-        }
+        if (!release.signatureSha256.isEmpty() && !signerSha256(archive).equalsIgnoreCase(release.signatureSha256)) throw new IllegalStateException("Assinatura do APK não confere");
         return apk;
     }
 
@@ -279,19 +256,12 @@ public class MainActivity extends Activity {
         params.setAppPackageName(packageName);
         int sessionId = installer.createSession(params);
         PackageInstaller.Session session = installer.openSession(sessionId);
-        try (InputStream input = new FileInputStream(apk);
-             OutputStream output = session.openWrite("base.apk", 0, apk.length())) {
-            byte[] buffer = new byte[64 * 1024];
-            int read;
-            while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
-            session.fsync(output);
+        try (InputStream input = new FileInputStream(apk); OutputStream output = session.openWrite("base.apk", 0, apk.length())) {
+            byte[] buffer = new byte[64 * 1024]; int read; while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read); session.fsync(output);
         }
-
-        Intent statusIntent = new Intent(this, MainActivity.class);
-        statusIntent.setAction(INSTALL_STATUS_ACTION);
+        Intent statusIntent = new Intent(this, MainActivity.class); statusIntent.setAction(INSTALL_STATUS_ACTION);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, sessionId, statusIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
-        session.commit(pendingIntent.getIntentSender());
-        session.close();
+        session.commit(pendingIntent.getIntentSender()); session.close();
     }
 
     private void handleInstallerResult(Intent intent) {
@@ -302,131 +272,30 @@ public class MainActivity extends Activity {
             if (confirm != null) startActivity(confirm);
             return;
         }
-        if (status == PackageInstaller.STATUS_SUCCESS) {
-            Toast.makeText(this, "Instalação concluída.", Toast.LENGTH_LONG).show();
-            refreshCatalog();
-        } else {
-            String message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
-            Toast.makeText(this, "Instalação falhou: " + (message == null ? status : message), Toast.LENGTH_LONG).show();
-        }
+        if (status == PackageInstaller.STATUS_SUCCESS) { Toast.makeText(this, "Instalação concluída.", Toast.LENGTH_LONG).show(); refreshCatalog(); }
+        else { String message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE); Toast.makeText(this, "Instalação falhou: " + (message == null ? status : message), Toast.LENGTH_LONG).show(); }
     }
 
     private void openApp(String packageName) {
         Intent launch = getPackageManager().getLaunchIntentForPackage(packageName);
-        if (launch == null) {
-            Toast.makeText(this, "Não foi possível abrir o app.", Toast.LENGTH_LONG).show();
-            return;
-        }
-        startActivity(launch);
+        if (launch == null) Toast.makeText(this, "Não foi possível abrir o app.", Toast.LENGTH_LONG).show(); else startActivity(launch);
     }
-
-    private long installedVersionCode(String packageName) {
-        try {
-            return getPackageManager().getPackageInfo(packageName, 0).getLongVersionCode();
-        } catch (Exception e) {
-            return -1;
-        }
-    }
-
-    private String installedVersionName(String packageName) {
-        try {
-            String name = getPackageManager().getPackageInfo(packageName, 0).versionName;
-            return name == null ? "?" : name;
-        } catch (Exception e) {
-            return "?";
-        }
-    }
-
-    private static String sha256(File file) throws Exception {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        try (InputStream input = new FileInputStream(file)) {
-            byte[] buffer = new byte[64 * 1024];
-            int read;
-            while ((read = input.read(buffer)) != -1) digest.update(buffer, 0, read);
-        }
-        return hex(digest.digest());
-    }
-
-    private static String signerSha256(PackageInfo archive) throws Exception {
-        if (archive.signingInfo == null) throw new IllegalStateException("APK sem assinatura");
-        android.content.pm.Signature[] signatures = archive.signingInfo.getApkContentsSigners();
-        if (signatures == null || signatures.length == 0) throw new IllegalStateException("APK sem certificado");
-        CertificateFactory factory = CertificateFactory.getInstance("X.509");
-        X509Certificate certificate = (X509Certificate) factory.generateCertificate(new java.io.ByteArrayInputStream(signatures[0].toByteArray()));
-        return hex(MessageDigest.getInstance("SHA-256").digest(certificate.getEncoded()));
-    }
-
-    private static String hex(byte[] bytes) {
-        StringBuilder builder = new StringBuilder(bytes.length * 2);
-        for (byte b : bytes) builder.append(String.format(Locale.US, "%02x", b));
-        return builder.toString();
-    }
-
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
-    }
-
-    private LinearLayout.LayoutParams matchWrap() {
-        return new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-    }
+    private long installedVersionCode(String packageName) { try { return getPackageManager().getPackageInfo(packageName, 0).getLongVersionCode(); } catch (Exception e) { return -1; } }
+    private String installedVersionName(String packageName) { try { String name = getPackageManager().getPackageInfo(packageName, 0).versionName; return name == null ? "?" : name; } catch (Exception e) { return "?"; } }
+    private static String sha256(File file) throws Exception { MessageDigest digest = MessageDigest.getInstance("SHA-256"); try (InputStream input = new FileInputStream(file)) { byte[] buffer = new byte[64 * 1024]; int read; while ((read = input.read(buffer)) != -1) digest.update(buffer, 0, read); } return hex(digest.digest()); }
+    private static String signerSha256(PackageInfo archive) throws Exception { if (archive.signingInfo == null) throw new IllegalStateException("APK sem assinatura"); android.content.pm.Signature[] signatures = archive.signingInfo.getApkContentsSigners(); if (signatures == null || signatures.length == 0) throw new IllegalStateException("APK sem certificado"); CertificateFactory factory = CertificateFactory.getInstance("X.509"); X509Certificate certificate = (X509Certificate) factory.generateCertificate(new java.io.ByteArrayInputStream(signatures[0].toByteArray())); return hex(MessageDigest.getInstance("SHA-256").digest(certificate.getEncoded())); }
+    private static String hex(byte[] bytes) { StringBuilder builder = new StringBuilder(bytes.length * 2); for (byte b : bytes) builder.append(String.format(Locale.US, "%02x", b)); return builder.toString(); }
+    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
+    private LinearLayout.LayoutParams matchWrap() { return new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); }
 
     private static final class LabApp {
-        final String id;
-        final String name;
-        final String packageName;
-        final boolean enabled;
-        final Release stable;
-        final Release candidate;
-
-        private LabApp(String id, String name, String packageName, boolean enabled, Release stable, Release candidate) {
-            this.id = id;
-            this.name = name;
-            this.packageName = packageName;
-            this.enabled = enabled;
-            this.stable = stable;
-            this.candidate = candidate;
-        }
-
-        static LabApp fromJson(JSONObject object) throws Exception {
-            JSONObject stableObject = object.getJSONObject("stable");
-            JSONObject candidateObject = object.optJSONObject("candidate");
-            return new LabApp(
-                    object.getString("id"),
-                    object.getString("name"),
-                    object.getString("packageName"),
-                    object.optBoolean("enabled", true),
-                    Release.fromJson(stableObject),
-                    candidateObject == null ? null : Release.fromJson(candidateObject)
-            );
-        }
+        final String id, name, packageName; final boolean enabled; final Release stable, candidate;
+        private LabApp(String id, String name, String packageName, boolean enabled, Release stable, Release candidate) { this.id=id; this.name=name; this.packageName=packageName; this.enabled=enabled; this.stable=stable; this.candidate=candidate; }
+        static LabApp fromJson(JSONObject o) throws Exception { JSONObject s=o.getJSONObject("stable"), c=o.optJSONObject("candidate"); return new LabApp(o.getString("id"),o.getString("name"),o.getString("packageName"),o.optBoolean("enabled",true),Release.fromJson(s),c==null?null:Release.fromJson(c)); }
     }
-
     private static final class Release {
-        final long versionCode;
-        final String versionName;
-        final String apkUrl;
-        final String sha256;
-        final String signatureSha256;
-        final String notes;
-
-        private Release(long versionCode, String versionName, String apkUrl, String sha256, String signatureSha256, String notes) {
-            this.versionCode = versionCode;
-            this.versionName = versionName;
-            this.apkUrl = apkUrl;
-            this.sha256 = sha256;
-            this.signatureSha256 = signatureSha256;
-            this.notes = notes;
-        }
-
-        static Release fromJson(JSONObject object) throws Exception {
-            return new Release(
-                    object.getLong("versionCode"),
-                    object.getString("versionName"),
-                    object.optString("apkUrl", ""),
-                    object.optString("sha256", ""),
-                    object.optString("signatureSha256", ""),
-                    object.optString("notes", "")
-            );
-        }
+        final long versionCode; final String versionName, apkUrl, sha256, signatureSha256, notes;
+        private Release(long versionCode,String versionName,String apkUrl,String sha256,String signatureSha256,String notes){this.versionCode=versionCode;this.versionName=versionName;this.apkUrl=apkUrl;this.sha256=sha256;this.signatureSha256=signatureSha256;this.notes=notes;}
+        static Release fromJson(JSONObject o) throws Exception { return new Release(o.getLong("versionCode"),o.getString("versionName"),o.optString("apkUrl",""),o.optString("sha256",""),o.optString("signatureSha256",""),o.optString("notes","")); }
     }
 }
