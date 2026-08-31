@@ -1,0 +1,139 @@
+name: Build Tela Sempre Ativa V31 AAB
+
+on:
+  push:
+    paths:
+      - '.github/workflows/build-tela-sempre-ativa-v31-aab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Restore exact V29 source checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tsa-v31"
+          URL='https://drive.usercontent.google.com/download?id=1qMKPWJ9RLcmcfAUhZVLV_GVXGusuCIAH&export=download&confirm=t'
+          curl -fL --retry 3 --retry-delay 2 "$URL" -o "$RUNNER_TEMP/tsa-v29.tar.xz"
+          echo '40469bae71d6667e731816cc5624f20c96031bf277f4ccb6eacae0c959d45f0f  '"$RUNNER_TEMP/tsa-v29.tar.xz" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/tsa-v29.tar.xz" -C "$RUNNER_TEMP/tsa-v31"
+          chmod +x "$RUNNER_TEMP/tsa-v31/gradlew"
+
+      - name: Apply only documented V30/V31 changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/tsa-v31"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('.')
+          gradle = root / 'app/build.gradle'
+          service = root / 'app/src/main/java/pt/vcaitano/telasempreativa/MediaNotificationService.java'
+          aod = root / 'app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java'
+
+          g = gradle.read_text()
+          g2 = re.sub(r'versionCode\s+29\b', 'versionCode 31', g, count=1)
+          g2 = re.sub(r"versionName\s+'1\.0\.24'", "versionName '1.0.26-test'", g2, count=1)
+          if g2 == g:
+              raise SystemExit('version patch did not apply')
+          gradle.write_text(g2)
+
+          s = service.read_text()
+          marker = '    private final Handler handler = new Handler(Looper.getMainLooper());\n'
+          polling = '''    private final Handler handler = new Handler(Looper.getMainLooper());\n    private static final long NOTIFICATION_POLL_MS = 2_000L;\n    private final Runnable notificationPollingRunnable = new Runnable() {\n        @Override public void run() {\n            if (isListenerConnected()) publishNotifications();\n            handler.postDelayed(this, NOTIFICATION_POLL_MS);\n        }\n    };\n'''
+          if marker not in s:
+              raise SystemExit('handler marker missing')
+          s = s.replace(marker, polling, 1)
+
+          create_marker = '        instance = this;\n        sessionManager = (MediaSessionManager) getSystemService(MEDIA_SESSION_SERVICE);'
+          create_repl = '        instance = this;\n        handler.post(notificationPollingRunnable);\n        sessionManager = (MediaSessionManager) getSystemService(MEDIA_SESSION_SERVICE);'
+          if create_marker not in s:
+              raise SystemExit('onCreate marker missing')
+          s = s.replace(create_marker, create_repl, 1)
+
+          static_marker = '    static final class NotificationContent {'
+          static_insert = '''    static boolean isListenerConnected() {\n        return instance != null;\n    }\n\n    static final class NotificationContent {'''
+          if static_marker not in s:
+              raise SystemExit('notification content marker missing')
+          s = s.replace(static_marker, static_insert, 1)
+
+          old_open = '''    static boolean openNotification(String packageName) {\n        MediaNotificationService service = instance;\n        if (service == null) return false;\n        StatusBarNotification sbn = service.findNotificationForPackage(packageName);\n        if (sbn == null || sbn.getNotification() == null) return false;\n        PendingIntent contentIntent = sbn.getNotification().contentIntent;\n        if (contentIntent == null) return false;\n        try {\n            contentIntent.send();\n            return true;\n        } catch (PendingIntent.CanceledException ignored) {\n            return false;\n        }\n    }\n'''
+          new_open = '''    static boolean openNotification(String packageName) {\n        MediaNotificationService service = instance;\n        if (service == null || packageName == null) return false;\n        StatusBarNotification sbn = service.findNotificationForPackage(packageName);\n        if (sbn != null && sbn.getNotification() != null) {\n            PendingIntent contentIntent = sbn.getNotification().contentIntent;\n            if (contentIntent != null) {\n                try {\n                    contentIntent.send();\n                    return true;\n                } catch (PendingIntent.CanceledException ignored) {\n                }\n            }\n        }\n        Intent launchIntent = service.getPackageManager().getLaunchIntentForPackage(packageName);\n        if (launchIntent == null) return false;\n        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);\n        try {\n            service.startActivity(launchIntent);\n            return true;\n        } catch (Exception ignored) {\n            return false;\n        }\n    }\n'''
+          if old_open not in s:
+              raise SystemExit('openNotification original block missing')
+          s = s.replace(old_open, new_open, 1)
+          service.write_text(s)
+
+          a = aod.read_text()
+          if 'import android.app.KeyguardManager;' not in a:
+              a = a.replace('import android.app.Activity;\n', 'import android.app.Activity;\nimport android.app.KeyguardManager;\n', 1)
+
+          old_listener = '''        openAction.setOnClickListener(v -> {\n            MediaNotificationService.openNotification(packageName);\n            closeNotificationPopup();\n        });'''
+          new_listener = '''        openAction.setOnClickListener(v -> openNotificationFromPopup(packageName));'''
+          if old_listener not in a:
+              raise SystemExit('openAction listener block missing')
+          a = a.replace(old_listener, new_listener, 1)
+
+          method_marker = '    private void showInlineReply(String packageName, LinearLayout card) {'
+          method = '''    private void openNotificationFromPopup(String packageName) {\n        Runnable open = () -> {\n            MediaNotificationService.openNotification(packageName);\n            closeNotificationPopup();\n        };\n        if (Build.VERSION.SDK_INT >= 26) {\n            KeyguardManager keyguard = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);\n            if (keyguard != null && keyguard.isKeyguardLocked()) {\n                keyguard.requestDismissKeyguard(this, new KeyguardManager.KeyguardDismissCallback() {\n                    @Override public void onDismissSucceeded() {\n                        runOnUiThread(open);\n                    }\n                    @Override public void onDismissCancelled() {\n                        runOnUiThread(open);\n                    }\n                    @Override public void onDismissError() {\n                        runOnUiThread(open);\n                    }\n                });\n                return;\n            }\n        }\n        open.run();\n    }\n\n    private void showInlineReply(String packageName, LinearLayout card) {'''
+          if method_marker not in a:
+              raise SystemExit('showInlineReply marker missing')
+          a = a.replace(method_marker, method, 1)
+          aod.write_text(a)
+          PY
+
+          grep -n "applicationId\|versionCode\|versionName" app/build.gradle
+          grep -n "NOTIFICATION_POLL_MS\|isListenerConnected\|openNotificationFromPopup" \
+            app/src/main/java/pt/vcaitano/telasempreativa/MediaNotificationService.java \
+            app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java
+
+      - name: Build release AAB
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/tsa-v31"
+          ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: Collect AAB and source checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/out"
+          AAB="$(find "$RUNNER_TEMP/tsa-v31/app/build/outputs/bundle/release" -type f -name '*.aab' | head -n 1)"
+          test -n "$AAB"
+          cp "$AAB" "$RUNNER_TEMP/out/TelaSempreAtiva_V31_vc31_GOOGLE_PLAY_UNSIGNED.aab"
+          cd "$RUNNER_TEMP/tsa-v31"
+          tar --exclude='./.gradle' --exclude='./app/build' -cJf "$RUNNER_TEMP/out/TelaSempreAtiva_V31_vc31_FONTE.tar.xz" .
+          {
+            echo 'BASE_V29_SHA256=40469bae71d6667e731816cc5624f20c96031bf277f4ccb6eacae0c959d45f0f'
+            echo 'PACKAGE=pt.vcaitano.telasempreativa'
+            echo 'VERSION_CODE=31'
+            echo 'VERSION_NAME=1.0.26-test'
+            echo 'CHANGED_FILES=app/build.gradle,app/src/main/java/pt/vcaitano/telasempreativa/MediaNotificationService.java,app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java'
+          } > "$RUNNER_TEMP/out/AUDIT_V31.txt"
+          sha256sum "$RUNNER_TEMP/out/"* > "$RUNNER_TEMP/out/SHA256SUMS.txt"
+
+      - name: Upload unsigned build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tsa-v31-aab-unsigned
+          path: ${{ runner.temp }}/out
+          if-no-files-found: error
+          retention-days: 3
