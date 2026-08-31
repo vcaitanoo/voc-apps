@@ -74,7 +74,8 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/voc-lab-badging.txt
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/voc-lab-signature.txt
-          grep -q "package: name='pt.vcaitano.voclab' versionCode='1' versionName='1.0.0'" /tmp/voc-lab-badging.txt
+          grep -q "package: name='pt.vcaitano.voclab' versionCode='3' versionName='1.0.2'" /tmp/voc-lab-badging.txt
+          grep -q "application-icon-192:" /tmp/voc-lab-badging.txt
           sha256sum "$APK" | tee /tmp/voc-lab-sha256.txt
 
       - name: Publish latest VOC Lab APK
@@ -83,16 +84,16 @@ jobs:
           set -euo pipefail
           APK="lab/app/build/outputs/apk/release/app-release.apk"
           mkdir -p lab/apk
-          cp "$APK" lab/apk/voc-lab-v1.0.0.apk
+          cp "$APK" lab/apk/voc-lab-v1.0.2.apk
           APK_SHA="$(sha256sum "$APK" | awk '{print $1}')"
           SIGNER="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/voc-lab-signature.txt | head -1 | tr '[:upper:]' '[:lower:]')"
           cat > lab/release.json <<EOF
           {
             "name": "VOC Lab",
             "packageName": "pt.vcaitano.voclab",
-            "versionCode": 1,
-            "versionName": "1.0.0",
-            "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/lab/apk/voc-lab-v1.0.0.apk",
+            "versionCode": 3,
+            "versionName": "1.0.2",
+            "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/lab/apk/voc-lab-v1.0.2.apk",
             "sha256": "$APK_SHA",
             "signatureSha256": "$SIGNER",
             "validation": "build_and_structure_verified_not_real_device_tested"
@@ -105,11 +106,11 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add lab/apk/voc-lab-v1.0.0.apk lab/release.json
+          git add lab/apk/voc-lab-v1.0.2.apk lab/release.json
           if git diff --cached --quiet; then
             echo "No APK change"
           else
-            git commit -m "release(lab): publish VOC Lab 1.0.0"
+            git commit -m "release(lab): publish VOC Lab 1.0.2 with icon"
             git push origin HEAD:main
           fi
 
@@ -117,7 +118,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: voc-lab-v1.0.0
+          name: voc-lab-v1.0.2
           path: |
             lab/app/build/outputs/apk/release/app-release.apk
             /tmp/voc-lab-badging.txt
