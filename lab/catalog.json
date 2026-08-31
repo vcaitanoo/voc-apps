@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-08-31T01:00:00+01:00",
+  "updatedAt": "2026-08-31T03:30:00+01:00",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -17,7 +17,14 @@
         "signatureSha256": "f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a",
         "notes": "BASE ESTÁVEL CONFIRMADA PELO UTILIZADOR: V25 / 1.0.20. O binário confirmado ainda precisa ser recuperado/publicado numa URL permanente; não substituir por V28 temporária nem por outra tentativa."
       },
-      "candidate": null
+      "candidate": {
+        "versionCode": 30,
+        "versionName": "1.0.25-test",
+        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/lab/apks/tela-sempre-ativa/candidate/TelaSempreAtiva-1.0.25-test-vc30.apk",
+        "sha256": "c88539287777c6fcb29e0b819dc8fa09445a545f639e7db9ebd5cd31afc24235",
+        "signatureSha256": "f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a",
+        "notes": "CANDIDATO: correção do bug que impedia ícones de notificação aparecerem. Substituído callback onListenerConnected por polling ativo (Handler.postDelayed a cada 2s) que consulta isListenerConnected() diretamente. APK NÃO publicado em produção."
+      }
     },
     {
       "id": "voc-manager",
