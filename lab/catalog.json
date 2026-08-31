@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-08-31T17:15:00+01:00",
+  "updatedAt": "2026-09-01T23:45:00+01:00",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -84,7 +84,14 @@
         "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
         "notes": "Versão estável atualmente registrada no catálogo oficial."
       },
-      "candidate": null
+      "candidate": {
+        "versionCode": 11,
+        "versionName": "0.2.9",
+        "apkUrl": "https://jarvis-028-permanent-release.vercel.app/Jarvis-0.2.9.apk",
+        "sha256": "E2E54FB2F1D393E4F6CE10429818CDA333DAA47764691A5DFF71702F6B50771D",
+        "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
+        "notes": "CANDIDATO V11: build release com versionCode 11 e versão 0.2.9, assinado com a chave permanente jarvis-release (mesmo certificado da 0.2.8). Build compilado a partir da fonte 0.2.7 com incremento de versão. Compilação e estrutura verificadas; execução real em Android não testada."
+      }
     }
   ]
 }
