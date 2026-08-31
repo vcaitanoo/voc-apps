@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "catalogId": "voc-lab",
+  "catalogName": "VOC Lab",
+  "updatedAt": "2026-08-31T00:50:00+01:00",
+  "apps": [
+    {
+      "id": "voc-manager",
+      "name": "VOC Manager",
+      "packageName": "pt.vcaitano.vocmanager",
+      "enabled": true,
+      "stable": {
+        "versionCode": 6,
+        "versionName": "1.2.2",
+        "apkUrl": "https://voc-manager-v122-final-now.vercel.app/voc-Manager-v1.2.2.apk",
+        "sha256": "174b46283ec1d733c46d6f0a3220eccd945e17bd2781da4009d84cdde91074da",
+        "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8",
+        "notes": "Versão estável atualmente registrada no catálogo oficial."
+      },
+      "candidate": null
+    },
+    {
+      "id": "voc-tv",
+      "name": "VOC TV",
+      "packageName": "pt.vcaitano.iptvia",
+      "enabled": true,
+      "stable": {
+        "versionCode": 19,
+        "versionName": "0.19.0",
+        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-tv/v0.19/vocTV-v0.19.apk",
+        "sha256": "e49d7dd74caececb594c2d773da50e5b96a0cbd8646a0774f6e53d5387e45874",
+        "signatureSha256": "629c7b0942460a5d484ec938cc3e0a4e32a6a489572cd179fb94e43cefa05b2e",
+        "notes": "Versão estável atualmente registrada no catálogo oficial."
+      },
+      "candidate": null
+    },
+    {
+      "id": "damas",
+      "name": "Damas",
+      "packageName": "pt.vcaitano.damas",
+      "enabled": true,
+      "stable": {
+        "versionCode": 7,
+        "versionName": "1.0.6",
+        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/damas/v1.0.6/Damas-v1.0.6.apk",
+        "sha256": "a94e90f33007892dc5c176dcb9a9d631bfa0690503737af39022c9f1c8b1493b",
+        "signatureSha256": "07df7362d3a99e638d54ce97e35328b6ca415f44481198ff2f6cf47bbadb9269",
+        "notes": "Versão estável atualmente registrada no catálogo oficial."
+      },
+      "candidate": null
+    },
+    {
+      "id": "jarvis",
+      "name": "Jarvis",
+      "packageName": "pt.vcaitano.jarvis",
+      "enabled": true,
+      "stable": {
+        "versionCode": 10,
+        "versionName": "0.2.8",
+        "apkUrl": "https://jarvis-028-permanent-release.vercel.app/Jarvis-0.2.8.apk",
+        "sha256": "1c5170cbda9468fa73abe46341bdd995277c7d9fe74781d2371182e84f3157c7",
+        "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
+        "notes": "Versão estável atualmente registrada no catálogo oficial."
+      },
+      "candidate": null
+    }
+  ]
+}

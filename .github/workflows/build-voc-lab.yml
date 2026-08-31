@@ -1,0 +1,125 @@
+name: Build VOC Lab
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'lab/app/**'
+      - 'lab/build.gradle.kts'
+      - 'lab/settings.gradle.kts'
+      - 'lab/gradle.properties'
+      - '.github/workflows/build-voc-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Restore signing key
+        shell: bash
+        env:
+          LAB_KEYSTORE_B64: ${{ secrets.VOC_LAB_KEYSTORE_B64 || secrets.VOC_MANAGER_KEYSTORE_B64 }}
+          LAB_STORE_PASSWORD: ${{ secrets.VOC_LAB_KEYSTORE_PASSWORD || secrets.VOC_MANAGER_KEYSTORE_PASSWORD }}
+          LAB_KEY_ALIAS: ${{ secrets.VOC_LAB_KEY_ALIAS || 'voc-manager-release' }}
+          LAB_KEY_PASSWORD: ${{ secrets.VOC_LAB_KEY_PASSWORD || secrets.VOC_LAB_KEYSTORE_PASSWORD || secrets.VOC_MANAGER_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$LAB_KEYSTORE_B64"
+          test -n "$LAB_STORE_PASSWORD"
+          test -n "$LAB_KEY_ALIAS"
+          test -n "$LAB_KEY_PASSWORD"
+          KEYSTORE_PATH="$RUNNER_TEMP/voc-lab-release.jks"
+          printf '%s' "$LAB_KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+          echo "VOC_LAB_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+          echo "VOC_LAB_STORE_PASSWORD=$LAB_STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "VOC_LAB_KEY_ALIAS=$LAB_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "VOC_LAB_KEY_PASSWORD=$LAB_KEY_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Build release APK
+        run: gradle -p lab clean assembleRelease --stacktrace
+
+      - name: Validate APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="lab/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/voc-lab-badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/voc-lab-signature.txt
+          grep -q "package: name='pt.vcaitano.voclab' versionCode='1' versionName='1.0.0'" /tmp/voc-lab-badging.txt
+          sha256sum "$APK" | tee /tmp/voc-lab-sha256.txt
+
+      - name: Publish latest VOC Lab APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="lab/app/build/outputs/apk/release/app-release.apk"
+          mkdir -p lab/apk
+          cp "$APK" lab/apk/voc-lab-v1.0.0.apk
+          APK_SHA="$(sha256sum "$APK" | awk '{print $1}')"
+          SIGNER="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/voc-lab-signature.txt | head -1 | tr '[:upper:]' '[:lower:]')"
+          cat > lab/release.json <<EOF
+          {
+            "name": "VOC Lab",
+            "packageName": "pt.vcaitano.voclab",
+            "versionCode": 1,
+            "versionName": "1.0.0",
+            "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/lab/apk/voc-lab-v1.0.0.apk",
+            "sha256": "$APK_SHA",
+            "signatureSha256": "$SIGNER",
+            "validation": "build_and_structure_verified_not_real_device_tested"
+          }
+          EOF
+
+      - name: Commit APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lab/apk/voc-lab-v1.0.0.apk lab/release.json
+          if git diff --cached --quiet; then
+            echo "No APK change"
+          else
+            git commit -m "release(lab): publish VOC Lab 1.0.0"
+            git push origin HEAD:main
+          fi
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voc-lab-v1.0.0
+          path: |
+            lab/app/build/outputs/apk/release/app-release.apk
+            /tmp/voc-lab-badging.txt
+            /tmp/voc-lab-signature.txt
+            /tmp/voc-lab-sha256.txt
