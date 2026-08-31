@@ -9,6 +9,14 @@ on:
       - 'lab/settings.gradle.kts'
       - 'lab/gradle.properties'
       - '.github/workflows/build-voc-lab.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'lab/app/**'
+      - 'lab/build.gradle.kts'
+      - 'lab/settings.gradle.kts'
+      - 'lab/gradle.properties'
+      - '.github/workflows/build-voc-lab.yml'
   workflow_dispatch:
 
 permissions:
@@ -87,6 +95,7 @@ jobs:
           cp "$APK" lab/apk/voc-lab-v1.0.2.apk
           APK_SHA="$(sha256sum "$APK" | awk '{print $1}')"
           SIGNER="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/voc-lab-signature.txt | head -1 | tr '[:upper:]' '[:lower:]')"
+          test "$SIGNER" = "9822c1bf439a0790b5dfd58f97ec972735d4bcfa3b591a455760fa62d5fd5380"
           cat > lab/release.json <<EOF
           {
             "name": "VOC Lab",
@@ -101,6 +110,7 @@ jobs:
           EOF
 
       - name: Commit APK
+        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
