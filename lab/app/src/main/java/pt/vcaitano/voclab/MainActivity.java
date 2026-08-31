@@ -21,6 +21,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -39,7 +40,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
-    private static final String CATALOG_URL = "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/lab/catalog.json";
+    private static final String[] CATALOG_URLS = new String[] {
+            "https://temporary-snappy-redwood-yqm3s0d.vercel.app/catalog.json",
+            "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/lab/catalog.json"
+    };
     private static final String INSTALL_STATUS_ACTION = "pt.vcaitano.voclab.INSTALL_STATUS";
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -64,9 +68,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (appsContainer != null) {
-            refreshCatalog();
-        }
+        if (appsContainer != null) refreshCatalog();
     }
 
     @Override
@@ -108,7 +110,6 @@ public class MainActivity extends Activity {
         appsContainer = new LinearLayout(this);
         appsContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(appsContainer, matchWrap());
-
         setContentView(scroll);
     }
 
@@ -117,47 +118,60 @@ public class MainActivity extends Activity {
         statusText.setText("A carregar catálogo...");
         executor.execute(() -> {
             try {
-                List<LabApp> apps = loadCatalog();
-                runOnUiThread(() -> renderApps(apps));
+                CatalogResult result = loadCatalog();
+                runOnUiThread(() -> renderApps(result.apps, result.source));
             } catch (Exception e) {
                 runOnUiThread(() -> statusText.setText("Falha ao carregar catálogo: " + e.getMessage()));
             }
         });
     }
 
-    private List<LabApp> loadCatalog() throws Exception {
-        HttpURLConnection connection = (HttpURLConnection) new URL(CATALOG_URL + "?t=" + System.currentTimeMillis()).openConnection();
+    private CatalogResult loadCatalog() throws Exception {
+        StringBuilder errors = new StringBuilder();
+        for (String url : CATALOG_URLS) {
+            try {
+                String text = downloadText(url);
+                JSONObject root = new JSONObject(text);
+                if (root.optInt("schemaVersion", -1) != 1) throw new IllegalStateException("schemaVersion inválida");
+                JSONArray array = root.getJSONArray("apps");
+                List<LabApp> result = new ArrayList<>();
+                for (int i = 0; i < array.length(); i++) {
+                    LabApp app = LabApp.fromJson(array.getJSONObject(i));
+                    if (app.enabled) result.add(app);
+                }
+                return new CatalogResult(result, new URL(url).getHost());
+            } catch (Exception e) {
+                if (errors.length() > 0) errors.append(" | ");
+                errors.append(new URL(url).getHost()).append(": ").append(e.getMessage());
+            }
+        }
+        throw new IllegalStateException(errors.toString());
+    }
+
+    private String downloadText(String url) throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL(url + "?t=" + System.currentTimeMillis()).openConnection();
         connection.setConnectTimeout(10_000);
         connection.setReadTimeout(15_000);
         connection.setUseCaches(false);
+        connection.setInstanceFollowRedirects(true);
         connection.setRequestProperty("Cache-Control", "no-cache");
-        connection.setRequestProperty("User-Agent", "VOC-Lab/1.0");
+        connection.setRequestProperty("User-Agent", "VOC-Lab/1.0.1");
         int code = connection.getResponseCode();
         if (code < 200 || code >= 300) throw new IllegalStateException("HTTP " + code);
-        String text;
-        try (InputStream input = new BufferedInputStream(connection.getInputStream())) {
-            java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+        try (InputStream input = new BufferedInputStream(connection.getInputStream());
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[16 * 1024];
             int read;
             while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
-            text = new String(output.toByteArray(), StandardCharsets.UTF_8);
+            return new String(output.toByteArray(), StandardCharsets.UTF_8);
         } finally {
             connection.disconnect();
         }
-        JSONObject root = new JSONObject(text);
-        if (root.optInt("schemaVersion", -1) != 1) throw new IllegalStateException("schemaVersion inválida");
-        JSONArray array = root.getJSONArray("apps");
-        List<LabApp> result = new ArrayList<>();
-        for (int i = 0; i < array.length(); i++) {
-            LabApp app = LabApp.fromJson(array.getJSONObject(i));
-            if (app.enabled) result.add(app);
-        }
-        return result;
     }
 
-    private void renderApps(List<LabApp> apps) {
+    private void renderApps(List<LabApp> apps, String source) {
         appsContainer.removeAllViews();
-        statusText.setText("Catálogo atualizado • " + apps.size() + " apps");
+        statusText.setText("Catálogo atualizado • " + apps.size() + " apps • " + source);
         for (LabApp app : apps) appsContainer.addView(buildCard(app));
     }
 
@@ -234,12 +248,15 @@ public class MainActivity extends Activity {
         connection.setConnectTimeout(15_000);
         connection.setReadTimeout(60_000);
         connection.setInstanceFollowRedirects(true);
-        connection.setRequestProperty("User-Agent", "VOC-Lab/1.0");
+        connection.setRequestProperty("User-Agent", "VOC-Lab/1.0.1");
         int code = connection.getResponseCode();
         if (code < 200 || code >= 300) throw new IllegalStateException("Download HTTP " + code);
         try (InputStream input = new BufferedInputStream(connection.getInputStream()); OutputStream output = new FileOutputStream(apk)) {
-            byte[] buffer = new byte[64 * 1024]; int read; while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
+            byte[] buffer = new byte[64 * 1024];
+            int read;
+            while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
         } finally { connection.disconnect(); }
+
         String actualSha = sha256(apk);
         if (!release.sha256.isEmpty() && !actualSha.equalsIgnoreCase(release.sha256)) { apk.delete(); throw new IllegalStateException("SHA-256 do APK não confere"); }
         PackageInfo archive = getPackageManager().getPackageArchiveInfo(apk.getAbsolutePath(), PackageManager.GET_SIGNING_CERTIFICATES);
@@ -257,11 +274,15 @@ public class MainActivity extends Activity {
         int sessionId = installer.createSession(params);
         PackageInstaller.Session session = installer.openSession(sessionId);
         try (InputStream input = new FileInputStream(apk); OutputStream output = session.openWrite("base.apk", 0, apk.length())) {
-            byte[] buffer = new byte[64 * 1024]; int read; while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read); session.fsync(output);
+            byte[] buffer = new byte[64 * 1024]; int read;
+            while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
+            session.fsync(output);
         }
-        Intent statusIntent = new Intent(this, MainActivity.class); statusIntent.setAction(INSTALL_STATUS_ACTION);
+        Intent statusIntent = new Intent(this, MainActivity.class);
+        statusIntent.setAction(INSTALL_STATUS_ACTION);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, sessionId, statusIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
-        session.commit(pendingIntent.getIntentSender()); session.close();
+        session.commit(pendingIntent.getIntentSender());
+        session.close();
     }
 
     private void handleInstallerResult(Intent intent) {
@@ -272,14 +293,20 @@ public class MainActivity extends Activity {
             if (confirm != null) startActivity(confirm);
             return;
         }
-        if (status == PackageInstaller.STATUS_SUCCESS) { Toast.makeText(this, "Instalação concluída.", Toast.LENGTH_LONG).show(); refreshCatalog(); }
-        else { String message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE); Toast.makeText(this, "Instalação falhou: " + (message == null ? status : message), Toast.LENGTH_LONG).show(); }
+        if (status == PackageInstaller.STATUS_SUCCESS) {
+            Toast.makeText(this, "Instalação concluída.", Toast.LENGTH_LONG).show();
+            refreshCatalog();
+        } else {
+            String message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
+            Toast.makeText(this, "Instalação falhou: " + (message == null ? status : message), Toast.LENGTH_LONG).show();
+        }
     }
 
     private void openApp(String packageName) {
         Intent launch = getPackageManager().getLaunchIntentForPackage(packageName);
         if (launch == null) Toast.makeText(this, "Não foi possível abrir o app.", Toast.LENGTH_LONG).show(); else startActivity(launch);
     }
+
     private long installedVersionCode(String packageName) { try { return getPackageManager().getPackageInfo(packageName, 0).getLongVersionCode(); } catch (Exception e) { return -1; } }
     private String installedVersionName(String packageName) { try { String name = getPackageManager().getPackageInfo(packageName, 0).versionName; return name == null ? "?" : name; } catch (Exception e) { return "?"; } }
     private static String sha256(File file) throws Exception { MessageDigest digest = MessageDigest.getInstance("SHA-256"); try (InputStream input = new FileInputStream(file)) { byte[] buffer = new byte[64 * 1024]; int read; while ((read = input.read(buffer)) != -1) digest.update(buffer, 0, read); } return hex(digest.digest()); }
@@ -288,11 +315,17 @@ public class MainActivity extends Activity {
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
     private LinearLayout.LayoutParams matchWrap() { return new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); }
 
+    private static final class CatalogResult {
+        final List<LabApp> apps; final String source;
+        CatalogResult(List<LabApp> apps, String source) { this.apps = apps; this.source = source; }
+    }
+
     private static final class LabApp {
         final String id, name, packageName; final boolean enabled; final Release stable, candidate;
         private LabApp(String id, String name, String packageName, boolean enabled, Release stable, Release candidate) { this.id=id; this.name=name; this.packageName=packageName; this.enabled=enabled; this.stable=stable; this.candidate=candidate; }
         static LabApp fromJson(JSONObject o) throws Exception { JSONObject s=o.getJSONObject("stable"), c=o.optJSONObject("candidate"); return new LabApp(o.getString("id"),o.getString("name"),o.getString("packageName"),o.optBoolean("enabled",true),Release.fromJson(s),c==null?null:Release.fromJson(c)); }
     }
+
     private static final class Release {
         final long versionCode; final String versionName, apkUrl, sha256, signatureSha256, notes;
         private Release(long versionCode,String versionName,String apkUrl,String sha256,String signatureSha256,String notes){this.versionCode=versionCode;this.versionName=versionName;this.apkUrl=apkUrl;this.sha256=sha256;this.signatureSha256=signatureSha256;this.notes=notes;}
