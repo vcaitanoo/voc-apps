@@ -1,0 +1,65 @@
+name: Build Tela Sempre Ativa V29
+
+on:
+  push:
+    paths:
+      - 'delivery/tela-sempre-ativa/v29/source.b64'
+      - '.github/workflows/build-tela-sempre-ativa-v29.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Restore V29 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tsa-v29"
+          base64 -d delivery/tela-sempre-ativa/v29/source.b64 > "$RUNNER_TEMP/tsa-v29.tar.xz"
+          tar -xJf "$RUNNER_TEMP/tsa-v29.tar.xz" -C "$RUNNER_TEMP/tsa-v29"
+          cd "$RUNNER_TEMP/tsa-v29"
+          chmod +x gradlew
+          grep -n "versionCode\|versionName\|applicationId" app/build.gradle
+
+      - name: Build adsTest APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/tsa-v29"
+          ./gradlew assembleAdsTest --no-daemon --stacktrace
+
+      - name: Collect unsigned APK and APK signer
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/out/apksigner/lib"
+          APK="$(find "$RUNNER_TEMP/tsa-v29/app/build/outputs/apk" -type f -name '*.apk' | head -n 1)"
+          test -n "$APK"
+          cp "$APK" "$RUNNER_TEMP/out/TelaSempreAtiva_V29_vc29_CANDIDATO_UNSIGNED.apk"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          cp "$BUILD_TOOLS/apksigner" "$RUNNER_TEMP/out/apksigner/"
+          cp "$BUILD_TOOLS/lib/apksigner.jar" "$RUNNER_TEMP/out/apksigner/lib/"
+          sha256sum "$RUNNER_TEMP/out/TelaSempreAtiva_V29_vc29_CANDIDATO_UNSIGNED.apk" > "$RUNNER_TEMP/out/unsigned.sha256"
+          printf '%s\n' "$BUILD_TOOLS" > "$RUNNER_TEMP/out/build-tools-version.txt"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tsa-v29-unsigned-and-tools
+          path: ${{ runner.temp }}/out
+          if-no-files-found: error
+          retention-days: 7
