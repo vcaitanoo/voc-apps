@@ -8,13 +8,13 @@
   <title>VOC Lab</title>
   <style>
     :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#f5f5f5;background:#101114}
-    *{box-sizing:border-box} body{margin:0;background:#101114} main{max-width:760px;margin:auto;padding:22px 16px 48px}
+    *{box-sizing:border-box}body{margin:0;background:#101114}main{max-width:760px;margin:auto;padding:22px 16px 48px}
     h1{font-size:2rem;margin:0;text-align:center}.sub{text-align:center;color:#aaa;margin:8px 0 18px;line-height:1.4}
     .top{display:flex;gap:10px;margin-bottom:14px}.btn{border:0;border-radius:12px;padding:13px 16px;font-weight:800;font-size:15px;text-decoration:none;text-align:center;display:block;background:#fff;color:#111;cursor:pointer;width:100%}
     .card{background:#1c1e23;border:1px solid #30333a;border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 5px 18px #0004}
     .name{font-size:21px;font-weight:800;margin-bottom:8px}.row{color:#c7c7c7;margin:4px 0}.candidate{color:#ffcf5a;font-weight:800}.notes{margin:10px 0;color:#ddd;font-size:14px;line-height:1.4}
-    .download{margin-top:12px;background:#43e07d;color:#07150b}.stable{background:#29303a;color:#fff;margin-top:8px}.small{font-size:12px;color:#8f939b;margin-top:8px;word-break:break-all}
-    .status{padding:12px;border-radius:12px;background:#1c1e23;color:#bbb;margin-bottom:10px}.error{color:#ff7b7b}
+    .download{margin-top:12px;background:#43e07d;color:#07150b}.stable{background:#29303a;color:#fff;margin-top:8px}.disabled{margin-top:12px;background:#3a3d44;color:#b7bac0;cursor:not-allowed}
+    .small{font-size:12px;color:#8f939b;margin-top:8px;word-break:break-all}.status{padding:12px;border-radius:12px;background:#1c1e23;color:#bbb;margin-bottom:10px}.error{color:#ff7b7b}
   </style>
 </head>
 <body>
@@ -30,28 +30,30 @@ const CATALOG='https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/lab/cat
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function load(){
   const status=document.getElementById('status'),apps=document.getElementById('apps');
-  status.className='status'; status.textContent='A carregar catálogo...'; apps.innerHTML='';
+  status.className='status';status.textContent='A carregar catálogo...';apps.innerHTML='';
   try{
-    const r=await fetch(CATALOG+'?t='+Date.now(),{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status);
-    const data=await r.json(); const list=(data.apps||[]).filter(a=>a.enabled!==false);
+    const r=await fetch(CATALOG+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);
+    const data=await r.json();const list=(data.apps||[]).filter(a=>a.enabled!==false);
     status.textContent='Catálogo atualizado · '+list.length+' apps';
     for(const a of list){
-      const target=a.candidate||a.stable; const hasCandidate=!!a.candidate;
-      const card=document.createElement('section'); card.className='card';
+      const target=a.candidate||a.stable,hasCandidate=!!a.candidate,hasTargetUrl=!!(target&&target.apkUrl),hasStableUrl=!!(a.stable&&a.stable.apkUrl);
+      const primary=hasTargetUrl
+        ? `<a class="btn download" href="${esc(target.apkUrl)}">${hasCandidate?'INSTALAR / ATUALIZAR CANDIDATO':'INSTALAR / ATUALIZAR'}</a>`
+        : `<div class="btn disabled">APK AINDA NÃO PUBLICADO NO LAB</div>`;
+      const stableButton=hasCandidate&&hasStableUrl?`<a class="btn stable" href="${esc(a.stable.apkUrl)}">BAIXAR ESTÁVEL</a>`:'';
+      const card=document.createElement('section');card.className='card';
       card.innerHTML=`<div class="name">${esc(a.name)}</div>
         <div class="row">Package: ${esc(a.packageName)}</div>
         <div class="row">Estável: <b>${esc(a.stable.versionName)} (${esc(a.stable.versionCode)})</b></div>
         <div class="row ${hasCandidate?'candidate':''}">${hasCandidate?'CANDIDATO: '+esc(a.candidate.versionName)+' ('+esc(a.candidate.versionCode)+')':'Candidato: nenhum'}</div>
         ${target.notes?`<div class="notes">${esc(target.notes)}</div>`:''}
-        <a class="btn download" href="${esc(target.apkUrl)}">${hasCandidate?'INSTALAR / ATUALIZAR CANDIDATO':'INSTALAR / ATUALIZAR'}</a>
-        ${hasCandidate?`<a class="btn stable" href="${esc(a.stable.apkUrl)}">BAIXAR ESTÁVEL</a>`:''}
+        ${primary}${stableButton}
         <div class="small">SHA-256: ${esc(target.sha256)}</div>`;
       apps.appendChild(card);
     }
   }catch(e){status.className='status error';status.textContent='Falha ao carregar: '+e.message;}
 }
-if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
-load();
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});load();
 </script>
 </body>
 </html>
