@@ -20,7 +20,7 @@
       "candidate": {
         "versionCode": 30,
         "versionName": "1.0.25-test",
-        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/lab/apks/tela-sempre-ativa/candidate/TelaSempreAtiva-1.0.25-test-vc30.apk",
+        "apkUrl": "https://temporary-snappy-redwood-yqm3s0d.vercel.app/apks/tela-sempre-ativa/candidate/TelaSempreAtiva-1.0.25-test-vc30.apk",
         "sha256": "c88539287777c6fcb29e0b819dc8fa09445a545f639e7db9ebd5cd31afc24235",
         "signatureSha256": "f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a",
         "notes": "CANDIDATO: correção do bug que impedia ícones de notificação aparecerem. Substituído callback onListenerConnected por polling ativo (Handler.postDelayed a cada 2s) que consulta isListenerConnected() diretamente. APK NÃO publicado em produção."
