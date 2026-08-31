@@ -1,0 +1,97 @@
+name: Transfer TSA V29 candidate
+
+on:
+  push:
+    branches: [transfer-tsa-v29]
+    paths: [.github/workflows/transfer-tsa-v29.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  transfer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: transfer-tsa-v29
+          fetch-depth: 0
+
+      - name: Recover exact signed V29 from Vercel deployment
+        shell: bash
+        env:
+          BASE_URL: https://damas-api36-build-probe-k63e1xj3x-ache-aquis-projects.vercel.app
+          SHARE_TOKEN: 6nQzT55yYflYL9O8lpuZiG3VasJI19Vd
+          EXPECTED_SHA256: 0aa6ab0bf9d4d5e59445bdd2de7ee729102cd0bb92cad43391ef93e6916fb9f3
+        run: |
+          set -euo pipefail
+          cookie="$RUNNER_TEMP/vercel.cookies"
+          root="$RUNNER_TEMP/root.html"
+          # Establish the temporary Vercel share session. The token expires automatically.
+          curl -sS -L -c "$cookie" -b "$cookie" "$BASE_URL/?_vercel_share=$SHARE_TOKEN" -o "$root" || true
+
+          mkdir -p lab/apks/tela-sempre-ativa/candidate
+          out="lab/apks/tela-sempre-ativa/candidate/TelaSempreAtiva-v29-1.0.24.apk"
+          tmp="$RUNNER_TEMP/candidate.apk"
+
+          mapfile -t discovered < <(grep -Eo 'href=["'\'' ]?[^"'\'' >]+\.apk' "$root" 2>/dev/null | sed -E 's/^href=["'\'' ]?//' | sed 's#^/##' | sort -u || true)
+          candidates=(
+            "${discovered[@]}"
+            "TelaSempreAtiva-v29-release.apk"
+            "TelaSempreAtiva_V29_RELEASE.apk"
+            "TelaSempreAtiva-v29-signed.apk"
+            "TelaSempreAtiva_V29_SIGNED.apk"
+            "TelaSempreAtiva-v29-final.apk"
+            "TelaSempreAtiva_V29_FINAL.apk"
+            "TelaSempreAtiva-v29-candidate.apk"
+            "TelaSempreAtiva_V29_CANDIDATE.apk"
+            "TelaSempreAtiva-v29.apk"
+            "TelaSempreAtiva_V29.apk"
+            "TelaSempreAtiva_V29_POPUP_TOUCH_RELEASE.apk"
+            "TelaSempreAtiva_V29_POPUP_TOUCH_SIGNED.apk"
+            "TelaSempreAtiva_V29_POPUP_TOUCH_TESTE.apk"
+            "TelaSempreAtiva-v29-debug.apk"
+            "app-release.apk"
+            "app/build/outputs/apk/release/app-release.apk"
+            "out/TelaSempreAtiva_V29_RELEASE.apk"
+            "out/TelaSempreAtiva-v29-release.apk"
+            "download/TelaSempreAtiva_V29_RELEASE.apk"
+            "download/TelaSempreAtiva-v29-release.apk"
+            "tsa-v29.apk"
+            "candidate.apk"
+          )
+
+          found=""
+          for rel in "${candidates[@]}"; do
+            [[ -n "$rel" ]] || continue
+            rm -f "$tmp"
+            code=$(curl -sS -L -c "$cookie" -b "$cookie" -o "$tmp" -w '%{http_code}' "$BASE_URL/$rel" || true)
+            [[ "$code" == "200" ]] || continue
+            got=$(sha256sum "$tmp" | awk '{print $1}')
+            echo "Checked $rel -> $got"
+            if [[ "$got" == "$EXPECTED_SHA256" ]]; then
+              found="$rel"
+              mv "$tmp" "$out"
+              break
+            fi
+          done
+
+          if [[ -z "$found" ]]; then
+            echo "Exact V29 artifact not found; refusing to publish any substitute." >&2
+            exit 31
+          fi
+
+          test "$(sha256sum "$out" | awk '{print $1}')" = "$EXPECTED_SHA256"
+          echo "Recovered exact candidate: $found"
+          ls -lh "$out"
+
+      - name: Commit only the verified candidate APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "VOC Lab transfer"
+          git config user.email "actions@users.noreply.github.com"
+          rm -f .github/workflows/transfer-tsa-v29.yml
+          git add -A
+          git commit -m "Add verified Tela Sempre Ativa V29 candidate APK"
+          git push origin HEAD:transfer-tsa-v29
