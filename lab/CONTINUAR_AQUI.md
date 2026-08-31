@@ -8,7 +8,23 @@ VOC Lab é o canal privado de desenvolvimento. O VOC Manager oficial não deve s
 - Package: `pt.vcaitano.voclab`
 - Fonte: `lab/`
 - Catálogo: `lab/catalog.json`
-- APK do próprio Lab: `lab/apk/`
+- APK do próprio Lab: `https://temporary-snappy-redwood-yqm3s0d.vercel.app/VOC-Lab-v1.0.0.apk`
+
+## Build inicial do VOC Lab — 1.0.0
+- versionCode: `1`
+- versionName: `1.0.0`
+- minSdk: `28`
+- targetSdk: `36`
+- compileSdk: `36`
+- Gradle: build concluído com `BUILD SUCCESSFUL`
+- APK SHA-256: `af691404cf1057a8149f837348bf8f24d6e89eb935f3a946d1f554d9a004cf1a`
+- Certificado SHA-256: `9822c1bf439a0790b5dfd58f97ec972735d4bcfa3b591a455760fa62d5fd5380`
+- Certificado DN: `CN=VOC Lab, OU=Android, O=vcaitano, L=Lousada, ST=Porto, C=PT`
+- Assinatura verificada no APK: APK Signature Scheme v3.
+- Estrutura confirmada: `AndroidManifest.xml`, `classes.dex`, `resources.arsc`, atividade principal `pt.vcaitano.voclab.MainActivity`.
+- Permissões confirmadas: INTERNET, REQUEST_INSTALL_PACKAGES e QUERY_ALL_PACKAGES.
+- Estado: compilação e estrutura verificadas. **Ainda não considerar execução em Android confirmada até o utilizador instalar, abrir e testar no telemóvel.**
+- Chave privada: usar sempre a mesma chave do pacote privado `VOC_LAB_CHAVE_PRIVADA_BACKUP.zip`; nunca gerar outra chave para atualização.
 
 ## Regra de continuidade
 Cada app possui no máximo:
