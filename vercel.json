@@ -1,5 +1,6 @@
 {
-  "version": 2,
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
   "buildCommand": "bash scripts/build-v33-play-vercel.sh",
   "outputDirectory": "lab",
   "installCommand": "echo skip",
