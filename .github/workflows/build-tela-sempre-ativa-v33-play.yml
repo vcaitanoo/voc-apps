@@ -1,0 +1,116 @@
+name: Build Tela Sempre Ativa V33 Play Restored
+
+on:
+  push:
+    paths:
+      - '.github/workflows/build-tela-sempre-ativa-v33-play.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Restore exact source and V33 popup
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/tsa-v33"
+          mkdir -p "$SRC" "$RUNNER_TEMP/out"
+          curl -fL --retry 3 --retry-delay 2 'https://drive.usercontent.google.com/download?id=1qMKPWJ9RLcmcfAUhZVLV_GVXGusuCIAH&export=download&confirm=t' -o "$RUNNER_TEMP/base.tar.xz"
+          echo '40469bae71d6667e731816cc5624f20c96031bf277f4ccb6eacae0c959d45f0f  '"$RUNNER_TEMP/base.tar.xz" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/base.tar.xz" -C "$SRC"
+          printf '%s' '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' | base64 -d | gzip -dc > "$RUNNER_TEMP/v33.patch"
+          cd "$SRC"
+          patch -p2 < "$RUNNER_TEMP/v33.patch"
+          chmod +x gradlew
+          grep -q "applicationId 'pt.vcaitano.telasempreativa'" app/build.gradle
+          grep -q 'versionCode 20260901' app/build.gradle
+          grep -q "versionName '1.0.28'" app/build.gradle
+          grep -q 'Mantenha pressionado para abrir as ações' app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java
+          grep -q 'openNotificationAfterUnlock' app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java
+          grep -q 'notification-content-card' app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java
+          grep -q 'android.permission.VIBRATE' app/src/main/AndroidManifest.xml
+          echo "SRC=$SRC" >> "$GITHUB_ENV"
+          zip -qr "$RUNNER_TEMP/out/TelaSempreAtiva_V33_RESTAURADA_FONTE_vc20260901.zip" . -x '.gradle/*' 'app/build/*' 'build/*'
+
+      - name: Build APK first
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$SRC"
+          ./gradlew clean assembleRelease --no-daemon --stacktrace
+
+      - name: Build AAB from the exact same source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$SRC"
+          ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: Sign with historical key
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEY="$RUNNER_TEMP/tela_sempre_ativa_v1.jks"
+          README="$RUNNER_TEMP/signing-readme.txt"
+          curl -fL --retry 3 --retry-delay 2 'https://drive.usercontent.google.com/download?id=1TfGb0ofAVWupoDZwiAwFIdGuaGVivKWI&export=download&confirm=t' -o "$KEY"
+          curl -fL --retry 3 --retry-delay 2 'https://drive.usercontent.google.com/download?id=1EIaAAdAkzu78VUtYS3cJttY_IfxDQtdN&export=download&confirm=t' -o "$README"
+          echo 'c2fbe75c95dec92e3612c9a186dfa654ed0427aa9aeac2ea2caa4b1de749ab03  '"$KEY" | sha256sum -c -
+          PASS="$(sed -n 's/^Senha do ficheiro: //p' "$README" | head -n1 | sed 's/[[:space:]]*$//')"
+          KEYPASS="$(sed -n 's/^Senha da chave: //p' "$README" | head -n1 | sed 's/[[:space:]]*$//')"
+          test -n "$PASS" && test -n "$KEYPASS"
+          export PASS KEYPASS
+          keytool -list -v -keystore "$KEY" -alias telaativa -storepass:env PASS > "$RUNNER_TEMP/keyinfo.txt"
+          CERT="$(sed -n 's/.*SHA256: //p' "$RUNNER_TEMP/keyinfo.txt" | head -n1 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          test "$CERT" = 'f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a'
+          APK_UNSIGNED="$(find "$SRC/app/build/outputs/apk/release" -type f -name '*.apk' | head -n1)"
+          AAB_UNSIGNED="$(find "$SRC/app/build/outputs/bundle/release" -type f -name '*.aab' | head -n1)"
+          test -s "$APK_UNSIGNED" && test -s "$AAB_UNSIGNED"
+          BT="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n1)"
+          "$BT/zipalign" -p -f 4 "$APK_UNSIGNED" "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" sign --ks "$KEY" --ks-key-alias telaativa --ks-pass env:PASS --key-pass env:KEYPASS --out "$RUNNER_TEMP/out/TelaSempreAtiva_V33_RESTAURADA_v1.0.28_vc20260901.apk" "$RUNNER_TEMP/aligned.apk"
+          jarsigner -keystore "$KEY" -storepass:env PASS -keypass:env KEYPASS -signedjar "$RUNNER_TEMP/out/TelaSempreAtiva_V33_RESTAURADA_v1.0.28_vc20260901.aab" "$AAB_UNSIGNED" telaativa
+
+      - name: Structural validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/out"
+          APK="$OUT/TelaSempreAtiva_V33_RESTAURADA_v1.0.28_vc20260901.apk"
+          AAB="$OUT/TelaSempreAtiva_V33_RESTAURADA_v1.0.28_vc20260901.aab"
+          BT="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n1)"
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | tee "$OUT/apk-signature.txt"
+          "$BT/aapt" dump badging "$APK" | tee "$OUT/apk-badging.txt"
+          grep -q "package: name='pt.vcaitano.telasempreativa' versionCode='20260901' versionName='1.0.28'" "$OUT/apk-badging.txt"
+          grep -q 'Signer #1 certificate SHA-256 digest: f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a' "$OUT/apk-signature.txt"
+          unzip -l "$APK" | grep -q 'AndroidManifest.xml'
+          unzip -l "$APK" | grep -q 'classes.dex'
+          unzip -l "$APK" | grep -q 'resources.arsc'
+          jarsigner -verify -verbose -certs "$AAB" > "$OUT/aab-jarsigner-verify.txt"
+          grep -q 'jar verified.' "$OUT/aab-jarsigner-verify.txt"
+          unzip -l "$AAB" > "$OUT/aab-contents.txt"
+          grep -q 'base/manifest/AndroidManifest.xml' "$OUT/aab-contents.txt"
+          grep -q 'base/dex/classes.dex' "$OUT/aab-contents.txt"
+          grep -q 'base/resources.pb' "$OUT/aab-contents.txt"
+          sha256sum "$APK" "$AAB" "$OUT/TelaSempreAtiva_V33_RESTAURADA_FONTE_vc20260901.zip" > "$OUT/SHA256SUMS.txt"
+          APK_SHA="$(sha256sum "$APK" | awk '{print $1}')"
+          AAB_SHA="$(sha256sum "$AAB" | awk '{print $1}')"
+          printf '%s\n'             'TELA SEMPRE ATIVA — V33 RESTAURADA PARA GOOGLE PLAY'             'packageName: pt.vcaitano.telasempreativa'             'versionCode: 20260901'             'versionName: 1.0.28'             'certificado SHA-256: f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a'             "APK SHA-256: $APK_SHA"             "AAB SHA-256: $AAB_SHA"             'Base checkpoint SHA-256: 40469bae71d6667e731816cc5624f20c96031bf277f4ccb6eacae0c959d45f0f'             'Popup: pressão longa + vibração + área segura máxima + Abrir/Responder/Remover + Abrir após desbloqueio'             'Ficheiros alterados: app/build.gradle; app/src/main/AndroidManifest.xml; AodActivity.java; MediaNotificationService.java'             'Validação: compilação e estrutura verificadas; execução em Android real NÃO testada neste workflow.'             > "$OUT/VALIDACAO_V33_PLAY.txt"
+
+      - name: Upload APK AAB source and validation
+        uses: actions/upload-artifact@v4
+        with:
+          name: TelaSempreAtiva_V33_RESTAURADA_PLAY_vc20260901
+          path: ${{ runner.temp }}/out
+          if-no-files-found: error
+          retention-days: 14
