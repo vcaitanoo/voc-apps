@@ -21,9 +21,9 @@
         "versionCode": 33,
         "versionName": "1.0.27-test",
         "apkUrl": "https://temporary-snappy-redwood-yqm3s0d.vercel.app/apks/tela-sempre-ativa/candidate/TelaSempreAtiva-1.0.27-test-vc33.apk",
-        "sha256": "947191ecceada3eaa7ec7f50260df1a41c5741dec29e37421a6e8ab38dcc9e75",
+        "sha256": "29afb8ed9dfa678700ded154f0675ec479d69ff5c91935fb7d4b8368d6034c11",
         "signatureSha256": "f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a",
-        "notes": "CANDIDATO V33 (fonte recuperada): Compilado a partir da fonte V33 recuperada que estava no VOC Lab e funciona perfeitamente para notificações. Botão Abrir usa getLaunchIntentForPackage via MediaNotificationService.openNotification(). Keyguard dispensado via requestDismissKeyguard com callback onDismissSucceeded."
+        "notes": "CANDIDATO V33: Compilado a partir da fonte recuperada que funciona perfeitamente para notificações. APK assinado com o keystore correto. Botão Abrir usa getLaunchIntentForPackage. Keyguard dispensado via requestDismissKeyguard."
       }
     },
     {

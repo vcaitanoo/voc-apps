@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "buildCommand": "",
+  "outputDirectory": "lab",
+  "installCommand": "echo skip",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/$1" }
+  ]
+}
