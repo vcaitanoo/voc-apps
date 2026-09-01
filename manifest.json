@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-apps",
   "catalogName": "voc apps",
-  "updatedAt": "2026-08-26T20:02:00Z",
+  "updatedAt": "2026-09-01T23:50:00Z",
   "apps": [
     {
       "id": "voc-manager",
@@ -86,14 +86,14 @@
       "category": "productivity",
       "description": "Assistente pessoal com voz, texto, lembretes e contexto do dispositivo.",
       "status": "published",
-      "versionCode": 10,
-      "versionName": "0.2.8",
+       "versionCode": 11,
+      "versionName": "0.2.9",
       "minSdk": 26,
-      "apkUrl": "https://jarvis-028-permanent-release.vercel.app/Jarvis-0.2.8.apk",
-      "sha256": "1c5170cbda9468fa73abe46341bdd995277c7d9fe74781d2371182e84f3157c7",
+      "apkUrl": "https://jarvis-028-permanent-release.vercel.app/Jarvis-0.2.9.apk",
+      "sha256": "E2E54FB2F1D393E4F6CE10429818CDA333DAA47764691A5DFF71702F6B50771D",
       "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
       "iconUrl": null,
-      "changelog": "Jarvis 0.2.8 — build release com versionCode 10 e assinatura permanente; mantém as correções de reconhecimento de voz, escuta persistente e VoicePrint da base 0.2.7.",
+      "changelog": "Jarvis 0.2.9 — build release com versionCode 11 e assinatura permanente; mantém as correções de reconhecimento de voz, escuta persistente e VoicePrint da base 0.2.7.",
       "mandatory": false,
       "monetization": {
         "type": "free",
