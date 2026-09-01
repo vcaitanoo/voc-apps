@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "",
+  "buildCommand": "bash scripts/build-v33-play-vercel.sh",
   "outputDirectory": "lab",
   "installCommand": "echo skip",
   "rewrites": [
