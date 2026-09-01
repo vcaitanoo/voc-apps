@@ -1,0 +1,314 @@
+--- a/app/build.gradle
++++ b/app/build.gradle
+@@ -8,8 +8,8 @@
+         applicationId 'pt.vcaitano.telasempreativa'
+         minSdk 27
+         targetSdk 36
+-        versionCode 29
+-        versionName '1.0.24'
++        versionCode 33
++        versionName '1.0.27-test'
+         manifestPlaceholders = [admobAppId: 'ca-app-pub-4663833571268509~7119728069']
+         buildConfigField 'String', 'SETTINGS_NATIVE_AD_ID', '"ca-app-pub-4663833571268509/7487393728"'
+         buildConfigField 'String', 'AOD_BANNER_AD_ID', '"ca-app-pub-4663833571268509/6921131529"'
+--- a/app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java
++++ b/app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java
+@@ -43,6 +43,7 @@
+ import android.text.TextUtils;
+ import android.text.format.DateFormat;
+ import android.view.Gravity;
++import android.view.HapticFeedbackConstants;
+ import android.view.MotionEvent;
+ import android.view.View;
+ import android.view.ViewGroup;
+@@ -583,7 +584,12 @@
+                 icon.setClickable(true);
+                 icon.setFocusable(true);
+                 icon.setContentDescription("Notificação de " + packageName);
+-                icon.setOnClickListener(v -> showNotificationPopup(packageName, icon));
++                icon.setLongClickable(true);
++                icon.setOnLongClickListener(v -> {
++                    v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
++                    showNotificationPopup(packageName, icon);
++                    return true;
++                });
+                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(44), dp(44));
+                 params.leftMargin = dp(2);
+                 params.rightMargin = dp(2);
+@@ -720,6 +726,7 @@
+ 
+         MediaNotificationService.NotificationContent notificationContent =
+                 MediaNotificationService.getNotificationContent(packageName);
++        String notificationKey = notificationContent.notificationKey;
+         LinearLayout contentCard = null;
+         int contentEstimatedHeight = 0;
+         if (prefs.getBoolean(Prefs.SHOW_NOTIFICATION_CONTENT, true)) {
+@@ -766,7 +773,7 @@
+         card.addView(popupDivider());
+         card.addView(openAction);
+ 
+-        boolean canReply = MediaNotificationService.canReply(packageName);
++        boolean canReply = MediaNotificationService.canReply(packageName, notificationKey);
+         TextView replyAction = null;
+         if (canReply) {
+             replyAction = popupAction("□", "Responder", Color.rgb(245, 245, 247));
+@@ -782,26 +789,35 @@
+         int estimatedHeight = dp(canReply ? 186 : 138);
+         int left = iconX + sourceIcon.getWidth() / 2 - cardWidth / 2;
+         left = Math.max(dp(10), Math.min(left, root.getWidth() - cardWidth - dp(10)));
+-        int top = iconY - estimatedHeight - dp(16);
+-        if (contentCard != null) top -= contentEstimatedHeight + dp(10);
+-        if (top < dp(10)) top = dp(10);
++
++        int safeTop = dp(10);
++        WindowInsets insets = root.getRootWindowInsets();
++        if (insets != null && Build.VERSION.SDK_INT >= 30) {
++            android.graphics.Insets status = insets.getInsetsIgnoringVisibility(
++                    WindowInsets.Type.statusBars() | WindowInsets.Type.displayCutout());
++            safeTop = Math.max(safeTop, status.top + dp(8));
++        } else if (insets != null && Build.VERSION.SDK_INT >= 28 && insets.getDisplayCutout() != null) {
++            safeTop = Math.max(safeTop, insets.getDisplayCutout().getSafeInsetTop() + dp(8));
++        }
++
++        int actionTop = iconY - estimatedHeight - dp(16);
++        actionTop = Math.max(safeTop, actionTop);
+ 
+         if (contentCard != null) {
+             int contentWidth = Math.min(dp(260), Math.max(cardWidth, root.getWidth() - dp(32)));
+             int contentLeft = iconX + sourceIcon.getWidth() / 2 - contentWidth / 2;
+             contentLeft = Math.max(dp(10), Math.min(contentLeft, root.getWidth() - contentWidth - dp(10)));
+-            FrameLayout.LayoutParams contentLp = new FrameLayout.LayoutParams(contentWidth,
+-                    ViewGroup.LayoutParams.WRAP_CONTENT);
++            int availableHeight = Math.max(dp(56), actionTop - safeTop - dp(10));
++            FrameLayout.LayoutParams contentLp = new FrameLayout.LayoutParams(contentWidth, availableHeight);
+             contentLp.leftMargin = contentLeft;
+-            contentLp.topMargin = top;
++            contentLp.topMargin = safeTop;
+             notificationPopupLayer.addView(contentCard, contentLp);
+-            top += contentEstimatedHeight + dp(10);
+         }
+ 
+         FrameLayout.LayoutParams cardLp = new FrameLayout.LayoutParams(cardWidth,
+                 ViewGroup.LayoutParams.WRAP_CONTENT);
+         cardLp.leftMargin = left;
+-        cardLp.topMargin = top;
++        cardLp.topMargin = actionTop;
+         notificationPopupLayer.addView(card, cardLp);
+ 
+         card.setAlpha(0f);
+@@ -811,20 +827,42 @@
+         card.setPivotY(estimatedHeight);
+         card.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(200L).start();
+ 
+-        openAction.setOnClickListener(v -> {
+-            MediaNotificationService.openNotification(packageName);
+-            closeNotificationPopup();
+-        });
++        openAction.setOnClickListener(v -> openNotificationFromPopup(packageName));
+         removeAction.setOnClickListener(v -> {
+-            MediaNotificationService.dismissNotification(packageName);
++            MediaNotificationService.dismissNotification(packageName, notificationKey);
+             closeNotificationPopup();
+         });
+         if (replyAction != null) {
+-            replyAction.setOnClickListener(v -> showInlineReply(packageName, card));
+-        }
+-    }
+-
+-    private void showInlineReply(String packageName, LinearLayout card) {
++            replyAction.setOnClickListener(v -> showInlineReply(packageName, notificationKey, card));
++        }
++    }
++
++    private void openNotificationFromPopup(String packageName) {
++        Runnable open = () -> {
++            MediaNotificationService.openNotification(packageName);
++            closeNotificationPopup();
++        };
++        if (Build.VERSION.SDK_INT >= 26) {
++            KeyguardManager keyguard = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
++            if (keyguard != null && keyguard.isKeyguardLocked()) {
++                keyguard.requestDismissKeyguard(this, new KeyguardManager.KeyguardDismissCallback() {
++                    @Override public void onDismissSucceeded() {
++                        runOnUiThread(open);
++                    }
++                    @Override public void onDismissCancelled() {
++                        runOnUiThread(open);
++                    }
++                    @Override public void onDismissError() {
++                        runOnUiThread(open);
++                    }
++                });
++                return;
++            }
++        }
++        open.run();
++    }
++
++    private void showInlineReply(String packageName, String notificationKey, LinearLayout card) {
+         if (card == null) return;
+         while (card.getChildCount() > 1) card.removeViewAt(1);
+         card.addView(popupDivider());
+@@ -855,7 +893,7 @@
+         row.addView(send, new LinearLayout.LayoutParams(dp(32), dp(32)));
+         card.addView(row);
+         send.setOnClickListener(v -> {
+-            if (MediaNotificationService.replyNotification(packageName, input.getText())) {
++            if (MediaNotificationService.replyNotification(packageName, notificationKey, input.getText())) {
+                 closeNotificationPopup();
+             }
+         });
+--- a/app/src/main/java/pt/vcaitano/telasempreativa/MediaNotificationService.java
++++ b/app/src/main/java/pt/vcaitano/telasempreativa/MediaNotificationService.java
+@@ -39,6 +39,13 @@
+ 
+     private static final ArrayList<String> lastPackages = new ArrayList<>();
+     private final Handler handler = new Handler(Looper.getMainLooper());
++    private static final long NOTIFICATION_POLL_MS = 2_000L;
++    private final Runnable notificationPollingRunnable = new Runnable() {
++        @Override public void run() {
++            if (isListenerConnected()) publishNotifications();
++            handler.postDelayed(this, NOTIFICATION_POLL_MS);
++        }
++    };
+     private MediaSessionManager sessionManager;
+     private MediaController currentController;
+ 
+@@ -68,6 +75,7 @@
+     public void onCreate() {
+         super.onCreate();
+         instance = this;
++        handler.post(notificationPollingRunnable);
+         sessionManager = (MediaSessionManager) getSystemService(MEDIA_SESSION_SERVICE);
+         IntentFilter filter = new IntentFilter();
+         filter.addAction(ACTION_REQUEST);
+@@ -245,6 +253,19 @@
+         return null;
+     }
+ 
++    private StatusBarNotification findNotificationByKey(String notificationKey) {
++        if (notificationKey == null) return null;
++        try {
++            StatusBarNotification[] active = getActiveNotifications();
++            if (active == null) return null;
++            for (StatusBarNotification sbn : active) {
++                if (sbn != null && notificationKey.equals(sbn.getKey())) return sbn;
++            }
++        } catch (Exception ignored) {
++        }
++        return null;
++    }
++
+     private Notification.Action findReplyAction(Notification notification) {
+         if (notification == null || notification.actions == null) return null;
+         for (Notification.Action action : notification.actions) {
+@@ -255,23 +276,29 @@
+         return null;
+     }
+ 
++    static boolean isListenerConnected() {
++        return instance != null;
++    }
++
+     static final class NotificationContent {
+         final CharSequence title;
+         final CharSequence text;
+-
+-        NotificationContent(CharSequence title, CharSequence text) {
++        final String notificationKey;
++
++        NotificationContent(CharSequence title, CharSequence text, String notificationKey) {
+             this.title = title == null ? "" : title;
+             this.text = text == null ? "" : text;
++            this.notificationKey = notificationKey;
+         }
+     }
+ 
+     static NotificationContent getNotificationContent(String packageName) {
+         MediaNotificationService service = instance;
+-        if (service == null) return new NotificationContent("", "");
++        if (service == null) return new NotificationContent("", "", null);
+         StatusBarNotification sbn = service.findNotificationForPackage(packageName);
+-        if (sbn == null || sbn.getNotification() == null) return new NotificationContent("", "");
++        if (sbn == null || sbn.getNotification() == null) return new NotificationContent("", "", null);
+         Bundle extras = sbn.getNotification().extras;
+-        if (extras == null) return new NotificationContent("", "");
++        if (extras == null) return new NotificationContent("", "", sbn.getKey());
+         CharSequence title = firstNonEmpty(
+                 extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE),
+                 extras.getCharSequence(Notification.EXTRA_TITLE),
+@@ -282,35 +309,38 @@
+                 extras.getCharSequence(Notification.EXTRA_TEXT),
+                 extras.getCharSequence(Notification.EXTRA_INFO_TEXT),
+                 extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT));
+-        return new NotificationContent(title, text);
+-    }
+-
+-    static boolean canReply(String packageName) {
++        return new NotificationContent(title, text, sbn.getKey());
++    }
++
++    static boolean canReply(String packageName, String notificationKey) {
+         MediaNotificationService service = instance;
+         if (service == null) return false;
+-        StatusBarNotification sbn = service.findNotificationForPackage(packageName);
++        StatusBarNotification sbn = notificationKey == null
++                ? service.findNotificationForPackage(packageName)
++                : service.findNotificationByKey(notificationKey);
+         return sbn != null && service.findReplyAction(sbn.getNotification()) != null;
+     }
+ 
+     static boolean openNotification(String packageName) {
+         MediaNotificationService service = instance;
++        if (service == null || packageName == null) return false;
++        Intent launchIntent = service.getPackageManager().getLaunchIntentForPackage(packageName);
++        if (launchIntent == null) return false;
++        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
++        try {
++            service.startActivity(launchIntent);
++            return true;
++        } catch (Exception ignored) {
++            return false;
++        }
++    }
++
++    static boolean dismissNotification(String packageName, String notificationKey) {
++        MediaNotificationService service = instance;
+         if (service == null) return false;
+-        StatusBarNotification sbn = service.findNotificationForPackage(packageName);
+-        if (sbn == null || sbn.getNotification() == null) return false;
+-        PendingIntent contentIntent = sbn.getNotification().contentIntent;
+-        if (contentIntent == null) return false;
+-        try {
+-            contentIntent.send();
+-            return true;
+-        } catch (PendingIntent.CanceledException ignored) {
+-            return false;
+-        }
+-    }
+-
+-    static boolean dismissNotification(String packageName) {
+-        MediaNotificationService service = instance;
+-        if (service == null) return false;
+-        StatusBarNotification sbn = service.findNotificationForPackage(packageName);
++        StatusBarNotification sbn = notificationKey == null
++                ? service.findNotificationForPackage(packageName)
++                : service.findNotificationByKey(notificationKey);
+         if (sbn == null) return false;
+         try {
+             service.cancelNotification(sbn.getKey());
+@@ -320,10 +350,12 @@
+         }
+     }
+ 
+-    static boolean replyNotification(String packageName, CharSequence text) {
++    static boolean replyNotification(String packageName, String notificationKey, CharSequence text) {
+         MediaNotificationService service = instance;
+         if (service == null || TextUtils.isEmpty(text)) return false;
+-        StatusBarNotification sbn = service.findNotificationForPackage(packageName);
++        StatusBarNotification sbn = notificationKey == null
++                ? service.findNotificationForPackage(packageName)
++                : service.findNotificationByKey(notificationKey);
+         if (sbn == null) return false;
+         Notification.Action action = service.findReplyAction(sbn.getNotification());
+         if (action == null || action.actionIntent == null) return false;
