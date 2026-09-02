@@ -1,0 +1,114 @@
+name: TEMP Jarvis VC23 build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/jarvis-vc23-temp.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone official GitLab source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git clone --depth 1 --branch fix/jarvis-vc23-audio https://gitlab.com/oliveira.caitano2023/voc-lab.git gl
+          cd gl
+          cat lab/sources/jarvis/candidate/0.2.15/source.part.* > /tmp/source.b64
+          base64 -d /tmp/source.b64 > /tmp/source.zip
+          echo '1370f787b2488ef3ccaf5c20ec88ccf2b96442c51407a308e5304fe8a9ae2f55  /tmp/source.zip' | sha256sum -c -
+          mkdir jarvis0215
+          unzip -q /tmp/source.zip -d jarvis0215
+          cp lab/sources/jarvis/candidate/0.2.15/overrides/VoicePrint.kt jarvis0215/app/src/main/java/pt/vcaitano/jarvis/voice/VoicePrint.kt
+          python3 lab/sources/jarvis/candidate/0.2.16/apply_vc18.py
+          python3 lab/sources/jarvis/candidate/0.2.17/apply_vc19.py
+          python3 lab/sources/jarvis/candidate/0.2.18/apply_vc20.py
+          python3 lab/sources/jarvis/candidate/0.2.19/apply_vc21.py
+          python3 lab/sources/jarvis/candidate/0.2.20/apply_vc22.py
+          python3 lab/sources/jarvis/candidate/0.2.21/apply_vc23.py
+          grep -q 'versionCode = 23' jarvis0215/app/build.gradle.kts
+          grep -q 'versionName = "0.2.21"' jarvis0215/app/build.gradle.kts
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.1'
+
+      - name: Android SDK 37
+        shell: bash
+        run: |
+          set -euxo pipefail
+          SDK="$RUNNER_TEMP/android-sdk"
+          mkdir -p "$SDK/platforms" "$SDK/build-tools" "$SDK/licenses"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          curl -fL --retry 3 https://dl.google.com/android/repository/platform-37.0_r02.zip -o /tmp/platform37.zip
+          mkdir -p /tmp/platform37 && unzip -q /tmp/platform37.zip -d /tmp/platform37
+          PDIR="$(find /tmp/platform37 -type f -name android.jar -printf '%h\n' | head -n1)"
+          mkdir -p "$SDK/platforms/android-37" && cp -a "$PDIR/." "$SDK/platforms/android-37/"
+          curl -fL --retry 3 https://dl.google.com/android/repository/build-tools_r37_linux.zip -o /tmp/bt37.zip
+          mkdir -p /tmp/bt37 && unzip -q /tmp/bt37.zip -d /tmp/bt37
+          BDIR="$(find /tmp/bt37 -type f \( -name aapt -o -name aapt2 \) -printf '%h\n' | head -n1)"
+          mkdir -p "$SDK/build-tools/37.0.0" && cp -a "$BDIR/." "$SDK/build-tools/37.0.0/"
+          printf '%s\n' 8933bad161af4178b1185d1a37fbf41ea5269c55 d56f5187479451eabf01fb78af6dfcb131a6481e 24333f8a63b6825ea9c5514f83c2829b004d1fee > "$SDK/licenses/android-sdk-license"
+          printf 'sdk.dir=%s\n' "$SDK" > gl/jarvis0215/local.properties
+
+      - name: Get temporary signing material via OIDC
+        shell: bash
+        run: |
+          set -euxo pipefail
+          OIDC_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=jarvis-vc23-build"
+          OIDC_TOKEN="$(curl -fsSL -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$OIDC_URL" | jq -r .value)"
+          curl -fsSL -H "Authorization: Bearer $OIDC_TOKEN" 'https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-vc23-build-temp?mode=signing' -o /tmp/signing.json
+          jq -r .keystoreB64 /tmp/signing.json | base64 -d > /tmp/jarvis-release.jks
+          echo '0f642fb4658dd2b3989b2208aeb88479e9bd5a35dca913d6da9cee3e8079a9bc  /tmp/jarvis-release.jks' | sha256sum -c -
+          echo "JARVIS_STORE_PASSWORD=$(jq -r .password /tmp/signing.json)" >> "$GITHUB_ENV"
+          echo "JARVIS_KEY_PASSWORD=$(jq -r .password /tmp/signing.json)" >> "$GITHUB_ENV"
+          echo "JARVIS_KEY_ALIAS=$(jq -r .alias /tmp/signing.json)" >> "$GITHUB_ENV"
+          echo "JARVIS_KEYSTORE_PATH=/tmp/jarvis-release.jks" >> "$GITHUB_ENV"
+          rm -f /tmp/signing.json
+
+      - name: Build and validate release APK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd gl/jarvis0215
+          gradle --no-daemon :app:assembleRelease --stacktrace
+          cd ../..
+          mkdir -p out
+          cp gl/jarvis0215/app/build/outputs/apk/release/app-release.apk out/Jarvis-0.2.21-vc23.apk
+          sha256sum out/Jarvis-0.2.21-vc23.apk | tee out/sha256.txt
+          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging out/Jarvis-0.2.21-vc23.apk | grep -E '^package:|sdkVersion|targetSdkVersion' | tee out/badging.txt
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs out/Jarvis-0.2.21-vc23.apk | tee out/apksigner.txt
+          grep -q "name='pt.vcaitano.jarvis' versionCode='23' versionName='0.2.21'" out/badging.txt
+          grep -qi 'f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2' out/apksigner.txt
+          grep -q 'Verified using v2 scheme.*true' out/apksigner.txt
+          grep -q 'Verified using v3 scheme.*true' out/apksigner.txt
+
+      - name: Publish APK to Supabase
+        shell: bash
+        run: |
+          set -euxo pipefail
+          OIDC_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=jarvis-vc23-build"
+          OIDC_TOKEN="$(curl -fsSL -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$OIDC_URL" | jq -r .value)"
+          curl --fail --location -H "Authorization: Bearer $OIDC_TOKEN" -H 'Content-Type: application/vnd.android.package-archive' --data-binary @out/Jarvis-0.2.21-vc23.apk 'https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-vc23-build-temp?mode=upload' | tee out/upload.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Jarvis-0.2.21-vc23
+          path: out/
+          retention-days: 2
