@@ -1,5 +1,6 @@
 name: TEMP Jarvis VC23 build
 
+# temporary one-shot runner
 on:
   push:
     branches: [main]
