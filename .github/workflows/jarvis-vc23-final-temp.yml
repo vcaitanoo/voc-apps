@@ -114,3 +114,5 @@ jobs:
           path: out/
           if-no-files-found: error
           retention-days: 2
+
+# trigger: 2026-09-02T19:36+01:00
