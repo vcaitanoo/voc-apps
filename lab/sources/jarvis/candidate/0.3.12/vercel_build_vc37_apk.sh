@@ -60,6 +60,20 @@ for old, new in replacements.items():
         raise SystemExit('VC37 build wrapper expected block missing: ' + old[:70])
     base = base.replace(old, new)
 
+# Nunca deixar a compilação presa indefinidamente em um download sem progresso.
+base = base.replace(
+    "curl -fL --retry 4 --retry-all-errors ",
+    "curl --connect-timeout 20 --max-time 300 --speed-time 30 --speed-limit 10000 -fL --retry 4 --retry-all-errors ",
+)
+base = base.replace(
+    "curl -fsSL --retry 4 --retry-all-errors",
+    "curl --connect-timeout 20 --max-time 300 --speed-time 30 --speed-limit 10000 -fsSL --retry 4 --retry-all-errors",
+)
+base = base.replace(
+    "curl -sS -w '%{http_code}'",
+    "curl --connect-timeout 20 --max-time 600 --speed-time 45 --speed-limit 10000 -sS -w '%{http_code}'",
+)
+
 # Keep the candidate on the currently registered VC36 signing identity.
 if "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2" not in base:
     raise SystemExit("VC37: expected historical candidate certificate reference missing")
