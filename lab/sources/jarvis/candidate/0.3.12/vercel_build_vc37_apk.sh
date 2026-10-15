@@ -74,6 +74,15 @@ base = base.replace(
     "curl --connect-timeout 20 --max-time 600 --speed-time 45 --speed-limit 10000 -sS -w '%{http_code}'",
 )
 
+# Esta candidata precisa do APK release, não de um build debug adicional.
+# Evita compilar duas variantes Kotlin no runner lento; os validadores e a
+# assinatura release continuam obrigatórios.
+gradle_old = '"$GRADLE_BIN" --no-daemon :app:testDebugUnitTest :app:assembleRelease --stacktrace'
+gradle_new = '"$GRADLE_BIN" --no-daemon :app:assembleRelease --stacktrace'
+if base.count(gradle_old) != 1:
+    raise SystemExit("VC37: comando Gradle esperado ausente ou duplicado")
+base = base.replace(gradle_old, gradle_new, 1)
+
 # Keep the candidate on the currently registered VC36 signing identity.
 if "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2" not in base:
     raise SystemExit("VC37: expected historical candidate certificate reference missing")
