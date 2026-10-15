@@ -11,6 +11,10 @@ const PROJECT_PATH = "oliveira.caitano2023/voc-lab";
 const ALLOWED_REF = "main";
 const OBJECT = "jarvis/candidate/Jarvis-0.3.12-vc37.apk";
 const JWKS = createRemoteJWKSet(new URL("https://gitlab.com/oauth/discovery/keys"));
+const GITHUB_ISSUER = "https://token.actions.githubusercontent.com";
+const GITHUB_REPOSITORY = "vcaitanoo/voc-apps";
+const GITHUB_WORKFLOW_REF = "vcaitanoo/voc-apps/.github/workflows/jarvis-vc37-build.yml@refs/heads/main";
+const GITHUB_JWKS = createRemoteJWKSet(new URL("https://token.actions.githubusercontent.com/.well-known/jwks"));
 
 const headers = { "content-type": "application/json", "cache-control": "no-store" };
 const reply = (body: unknown, status = 200) =>
@@ -19,19 +23,37 @@ const reply = (body: unknown, status = 200) =>
 async function authorize(request: Request): Promise<boolean> {
   const authorization = request.headers.get("authorization") ?? "";
   if (!authorization.startsWith("Bearer ")) return false;
+  const token = authorization.slice(7);
+
+  // CI GitLab project VOC Lab: protected main only.
   try {
-    const { payload } = await jwtVerify(authorization.slice(7), JWKS, {
-      issuer: ISSUER,
-      audience: AUDIENCE,
-    });
-    return String(payload.project_id ?? "") === PROJECT_ID &&
+    const { payload } = await jwtVerify(token, JWKS, { issuer: ISSUER, audience: AUDIENCE });
+    if (
+      String(payload.project_id ?? "") === PROJECT_ID &&
       String(payload.namespace_id ?? "") === NAMESPACE_ID &&
       String(payload.project_path ?? "") === PROJECT_PATH &&
       String(payload.ref ?? "") === ALLOWED_REF &&
       String(payload.ref_type ?? "") === "branch" &&
-      String(payload.ref_protected ?? "") === "true";
-  } catch (error) {
-    console.error("GitLab OIDC authorization rejected");
+      String(payload.ref_protected ?? "") === "true"
+    ) return true;
+  } catch {
+    // Continue to the tightly scoped GitHub Actions identity below.
+  }
+
+  // Hosted GitHub runner: one repository, main branch, one exact workflow.
+  try {
+    const { payload } = await jwtVerify(token, GITHUB_JWKS, {
+      issuer: GITHUB_ISSUER,
+      audience: AUDIENCE,
+    });
+    return String(payload.repository ?? "") === GITHUB_REPOSITORY &&
+      String(payload.repository_owner ?? "").toLowerCase() === "vcaitanoo" &&
+      String(payload.ref ?? "") === "refs/heads/main" &&
+      String(payload.sub ?? "") === "repo:vcaitanoo/voc-apps:ref:refs/heads/main" &&
+      String(payload.workflow_ref ?? "") === GITHUB_WORKFLOW_REF &&
+      ["push", "workflow_dispatch"].includes(String(payload.event_name ?? ""));
+  } catch {
+    console.error("Build OIDC authorization rejected");
     return false;
   }
 }
