@@ -26,7 +26,7 @@ base = Path(sys.argv[1]).read_text()
 
 replacements = {
     "ENDPOINT='https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-build-oidc'":
-        'ENDPOINT="${JARVIS_BUILD_ENDPOINT:-https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-vc36-build-oidc}"',
+        'ENDPOINT="${JARVIS_BUILD_ENDPOINT:-https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-vc37-build-oidc}"',
     '.jarvis-build-vc26': '.jarvis-build-vc37',
     "APK_NAME='Jarvis-0.3.1-vc26.apk'": "APK_NAME='Jarvis-0.3.12-vc37.apk'",
     'Jarvis-0.3.1-vc26.sha256.txt': 'Jarvis-0.3.12-vc37.sha256.txt',
@@ -59,6 +59,11 @@ for old, new in replacements.items():
     if old not in base:
         raise SystemExit('VC37 build wrapper expected block missing: ' + old[:70])
     base = base.replace(old, new)
+
+# Keep the candidate on the currently registered VC36 signing identity.
+if "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2" not in base:
+    raise SystemExit("VC37: expected historical candidate certificate reference missing")
+base = base.replace("f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2", "5ee20e731c090c755bd2fb4f2d8e7d9537f2ed33b359a46254fb466293346059")
 
 # A validacao da VC26 (que exigia uma topologia de audio que ja nao existe)
 # e substituida pelas invariantes que interessam a VC37.
@@ -188,6 +193,15 @@ echo "SHA256=$APK_SHA"
 echo "apkUrl=$PUBLIC_URL"
 echo 'VC37_PUBLISH_OK'
 """
+
+verify_line = '"$SDK/build-tools/37.0.0/apksigner" verify --verbose --print-certs "$OUT/$APK_NAME" > "$TMP/apksigner.txt"'
+if verify_line not in base:
+    raise SystemExit("VC37: apksigner verification line missing")
+base = base.replace(
+    verify_line,
+    verify_line + '\nif ! grep -Fq "Signer #1 certificate SHA-256 digest: 5ee20e731c090c755bd2fb4f2d8e7d9537f2ed33b359a46254fb466293346059" "$TMP/apksigner.txt"; then echo "VALIDATION_FAILED: assinatura não corresponde à candidata VC36" >&2; exit 1; fi',
+    1,
+)
 
 base = base.rstrip("\n") + "\n" + publish
 
