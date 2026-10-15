@@ -143,6 +143,19 @@ base = base.replace(
 )
 base = base.replace('echo \'VC26_APK_BUILD_OK\'', 'echo \'VC37_APK_BUILD_OK\'')
 
+# GitHub Actions OIDC tokens are short-lived, so refresh before signing and upload.
+github_oidc_refresh = r'''
+if [[ -n "\${ACTIONS_ID_TOKEN_REQUEST_URL:-}" && -n "\${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
+  OIDC_URL="\${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fkhinnoxpesnhtmmvrken.supabase.co%2Ffunctions%2Fv1%2Fjarvis-vc37-build-oidc"
+  VERCEL_OIDC_TOKEN="$(curl --connect-timeout 15 --max-time 30 -fsSL -H "Authorization: Bearer \${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$OIDC_URL" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
+  export VERCEL_OIDC_TOKEN
+fi
+'''
+signing_marker = "echo '[6/10] Obtendo a assinatura histórica por OIDC efêmero...'"
+if signing_marker not in base:
+    raise SystemExit("VC37: signing marker not found while adding fresh GitHub OIDC")
+base = base.replace(signing_marker, github_oidc_refresh + "\n" + signing_marker, 1)
+
 # ---------------------------------------------------------------------------
 # Publicacao no Storage.
 #
@@ -158,6 +171,11 @@ publish = """
 SUPABASE_URL="$(printf '%s' "$ENDPOINT" | sed -E 's#^(https://[^/]+).*#\\1#')"
 
 echo '[11/12] Publicando os bytes exatos no armazenamento permanente...'
+if [[ -n "\${ACTIONS_ID_TOKEN_REQUEST_URL:-}" && -n "\${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
+  OIDC_URL="\${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fkhinnoxpesnhtmmvrken.supabase.co%2Ffunctions%2Fv1%2Fjarvis-vc37-build-oidc"
+  VERCEL_OIDC_TOKEN="$(curl --connect-timeout 15 --max-time 30 -fsSL -H "Authorization: Bearer \${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$OIDC_URL" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
+  export VERCEL_OIDC_TOKEN
+fi
 APK_PATH="$OUT/$APK_NAME"
 APK_SHA="$(sha256sum "$APK_PATH" | cut -d' ' -f1)"
 OBJECT="jarvis/candidate/$APK_NAME"
