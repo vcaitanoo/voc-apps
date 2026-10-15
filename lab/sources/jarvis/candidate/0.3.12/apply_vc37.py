@@ -68,7 +68,6 @@ replace_once(VOICE,
         tts?.setPitch(0.90f)
         tts?.setSpeechRate(0.96f)''',
 'no female speech fallback')
-VOICE.write_text(voice, encoding="utf-8")
 vp = VOICEPRINT.read_text(encoding="utf-8")
 old = 'private const val COS_PASS=0.91;private const val COS_STRICT=0.965;private const val PITCH_MIN_RATIO=0.78;private const val PITCH_MAX_RATIO=1.28'
 new = 'private const val COS_PASS=0.70;private const val COS_STRICT=0.82;private const val PITCH_MIN_RATIO=0.55;private const val PITCH_MAX_RATIO=1.85'
