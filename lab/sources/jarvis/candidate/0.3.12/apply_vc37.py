@@ -85,5 +85,5 @@ if capture.index('MediaRecorder.AudioSource.MIC') > capture.index('MediaRecorder
 if capture.index('recorder.startRecording()') > capture.index('emit(State.LISTENING)'): raise SystemExit('VC37 UI before microphone recording')
 if capture.index('BrainClient.transcribe(token, wav)') > capture.index('VoicePrint.matches(appContext, capturedPcm)'): raise SystemExit('VC37 VoicePrint blocks transcription')
 if 'COS_PASS=0.70' not in vp or 'COS_STRICT=0.82' not in vp: raise SystemExit('VC37 thresholds missing')
-if 'if (!maleReady)' not in voice or '0.76f' in voice: raise SystemExit('VC37 female fallback remains')
+if 'if (!maleReady)' not in voice or 'setPitch(if (maleReady)' in voice: raise SystemExit('VC37 conditional female fallback remains')
 print('VC37 source patch validated')
