@@ -23,9 +23,9 @@ replace_once(BUILD, 'versionName = "0.3.11"', 'versionName = "0.3.12"', "version
 replace_once(
     VOICE,
     '''        val requestedEngine = when (engineStep) {
-            0 -> null
+            0 -> "com.samsung.SMT"
             1 -> "com.google.android.tts"
-            else -> "com.samsung.SMT"
+            else -> null
         }''',
     '''        val requestedEngine = when (engineStep) {
             0 -> "com.samsung.SMT"
@@ -122,6 +122,26 @@ replace_once(
             tts?.setSpeechRate(0.96f)
             tts?.setPitch(0.90f)''',
     "mandatory male voice and explicit failure",
+)
+
+# Voice metadata is not sufficient: confirm that Android accepted the exact
+# selected male voice. If assignment failed, try the next engine instead.
+replace_once(
+    VOICE,
+    '''        if (selected != null) {
+            runCatching { engine.voice = selected }
+            return true
+        }
+        return false''',
+    '''        if (selected != null) {
+            val applied = runCatching {
+                engine.voice = selected
+                engine.voice?.name == selected.name
+            }.getOrDefault(false)
+            if (applied) return true
+        }
+        return false''',
+    "confirm selected male voice was applied",
 )
 
 # Even if the TTS constructor itself throws (for example, an uninstalled engine
@@ -319,6 +339,7 @@ checks = [
     ('0 -> "com.samsung.SMT"' in voice and '1 -> "com.google.android.tts"' in voice, "historical Samsung TTS priority"),
     ("ttsReady" in voice and "handleTtsPlaybackError(engineStep)" in voice, "TTS readiness and fallback"),
     ("lastSpeechText" in voice and "speakWithMaleOnlyLocalFallback(retryText, 0)" in voice, "retry same answer after TTS failure"),
+    ('engine.voice?.name == selected.name' in voice, "explicit male voice actually applied"),
     ('europeanPortuguese = Locale("pt", "PT")' in voice, "PT-PT locale retained"),
     ('country == "PT") value += 12_000' in voice, "PT-PT priority retained"),
 ]
