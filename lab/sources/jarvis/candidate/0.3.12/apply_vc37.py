@@ -212,7 +212,7 @@ replace_once(
                 runCatching { tts?.shutdown() }
                 tts = null
                 initializeTextToSpeech(engineStep + 1)
-                handler.postDelayed({ speakWithMaleOnlyLocalFallback(retryText, 0) }, 350L)
+                handler.postDelayed({ speakWithLocalFallback(retryText, 0) }, 350L)
                 return@post
             }
 
@@ -289,7 +289,7 @@ replace_once(
 
 # Track text waiting for speech and wait for asynchronous TTS initialization.
 voice = VOICE.read_text(encoding="utf-8")
-speech_start = voice.find("    private fun speakWithMaleOnlyLocalFallback(text: String, attempt: Int = 0) {")
+speech_start = voice.find("    private fun speakWithLocalFallback(text: String, attempt: Int = 0) {")
 if speech_start < 0:
     raise SystemExit("VC37 expected speech function missing")
 speech_end = voice.find("\n    private fun ", speech_start + 10)
@@ -297,8 +297,8 @@ if speech_end < 0:
     raise SystemExit("VC37 speech function end missing")
 speech = voice[speech_start:speech_end]
 speech = speech.replace(
-    "    private fun speakWithMaleOnlyLocalFallback(text: String, attempt: Int = 0) {\n",
-    "    private fun speakWithMaleOnlyLocalFallback(text: String, attempt: Int = 0) {\n"
+    "    private fun speakWithLocalFallback(text: String, attempt: Int = 0) {\n",
+    "    private fun speakWithLocalFallback(text: String, attempt: Int = 0) {\n"
     "        lastSpeechText = text\n",
     1,
 )
@@ -337,7 +337,7 @@ checks = [
     ("COS_PASS=0.86" in vp and "COS_STRICT=0.93" in vp, "balanced VoicePrint threshold"),
     ('0 -> "com.samsung.SMT"' in voice and '1 -> "com.google.android.tts"' in voice, "historical Samsung TTS priority"),
     ("ttsReady" in voice and "handleTtsPlaybackError(engineStep)" in voice, "TTS readiness and fallback"),
-    ("lastSpeechText" in voice and "speakWithMaleOnlyLocalFallback(retryText, 0)" in voice, "retry same answer after TTS failure"),
+    ("lastSpeechText" in voice and "speakWithLocalFallback(retryText, 0)" in voice, "retry same answer after TTS failure"),
     ('engine.voice?.name == selected.name' in voice, "explicit male voice actually applied"),
     ('europeanPortuguese = Locale("pt", "PT")' in voice, "PT-PT locale retained"),
     ('country == "PT") value += 12_000' in voice, "PT-PT priority retained"),
