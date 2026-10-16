@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -60,6 +60,54 @@ jobs:
           test -s dist/publish.json
           cat dist/publish.json
           sha256sum dist/Jarvis-0.3.12-vc37.apk
+
+      - name: Register verified candidate in VOC Lab catalog
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s gl/dist/publish.json
+          python3 - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          catalog_path = Path("lab/catalog.json")
+          report_path = Path("gl/dist/publish.json")
+          catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+          app = next((item for item in catalog["apps"] if item.get("id") == "jarvis"), None)
+          if app is None:
+              raise SystemExit("Jarvis ausente de lab/catalog.json")
+          if report.get("versionCode") != 37 or report.get("versionName") != "0.3.12":
+              raise SystemExit("Relatório de publicação não é VC37 / 0.3.12")
+          if report.get("apk") != "Jarvis-0.3.12-vc37.apk":
+              raise SystemExit("Nome do APK inesperado")
+          url = report.get("apkUrl", "")
+          sha = report.get("sha256", "")
+          if not url.startswith("https://") or len(sha) != 64:
+              raise SystemExit("URL ou SHA-256 inválido")
+          app["candidate"] = {
+              "versionCode": 37,
+              "versionName": "0.3.12",
+              "apkUrl": url,
+              "sha256": sha.lower(),
+              "signatureSha256": "5ee20e731c090c755bd2fb4f2d8e7d9537f2ed33b359a46254fb466293346059",
+              "notes": "CANDIDATO VC37 / 0.3.12: correção da escuta silenciosa e voz masculina obrigatória em português. APK publicado no armazenamento permanente, SHA-256 verificado contra o binário servido e certificado validado no build. Teste físico ainda pendente; não é versão estável."
+          }
+          catalog["updatedAt"] = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+          catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          print("Jarvis candidate catalog entry updated; stable entry preserved.")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lab/catalog.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish Jarvis VC37 candidate metadata"
+            git push origin HEAD:main
+          else
+            echo "Catalog already contains this verified candidate."
+          fi
 
       - name: Save build evidence
         if: always()
