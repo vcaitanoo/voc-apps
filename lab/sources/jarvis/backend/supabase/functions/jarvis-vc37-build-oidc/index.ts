@@ -14,6 +14,10 @@ const JWKS = createRemoteJWKSet(new URL("https://gitlab.com/oauth/discovery/keys
 const GITHUB_ISSUER = "https://token.actions.githubusercontent.com";
 const GITHUB_REPOSITORY = "vcaitanoo/voc-apps";
 const GITHUB_WORKFLOW_REF = "vcaitanoo/voc-apps/.github/workflows/jarvis-vc37-build.yml@refs/heads/main";
+const GITHUB_SUBJECTS = new Set([
+  "repo:vcaitanoo@162039938/voc-apps@1335849419:ref:refs/heads/main",
+  "repo:vcaitanoo/voc-apps:ref:refs/heads/main",
+]);
 const GITHUB_JWKS = createRemoteJWKSet(new URL("https://token.actions.githubusercontent.com/.well-known/jwks"));
 
 const headers = { "content-type": "application/json", "cache-control": "no-store" };
@@ -49,7 +53,7 @@ async function authorize(request: Request): Promise<boolean> {
     return String(payload.repository ?? "") === GITHUB_REPOSITORY &&
       String(payload.repository_owner ?? "").toLowerCase() === "vcaitanoo" &&
       String(payload.ref ?? "") === "refs/heads/main" &&
-      String(payload.sub ?? "") === "repo:vcaitanoo/voc-apps:ref:refs/heads/main" &&
+      GITHUB_SUBJECTS.has(String(payload.sub ?? "")) &&
       String(payload.workflow_ref ?? "") === GITHUB_WORKFLOW_REF &&
       ["push", "workflow_dispatch"].includes(String(payload.event_name ?? ""));
   } catch {
