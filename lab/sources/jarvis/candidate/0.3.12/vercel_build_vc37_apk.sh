@@ -252,7 +252,7 @@ if verify_line not in base:
     raise SystemExit("VC37: apksigner verification line missing")
 base = base.replace(
     verify_line,
-    verify_line + '\nif ! grep -Fq "Signer #1 certificate SHA-256 digest: f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2" "$TMP/apksigner.txt"; then echo "VALIDATION_FAILED: assinatura não corresponde à candidata VC36" >&2; exit 1; fi',
+    verify_line + '\nif ! grep -Fiq "Signer #1 certificate SHA-256 digest: f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2" "$TMP/apksigner.txt"; then echo "VALIDATION_FAILED: certificado histórico do Jarvis não confere" >&2; grep -i "Signer #1 certificate SHA-256 digest" "$TMP/apksigner.txt" >&2 || true; exit 1; fi',
     1,
 )
 
