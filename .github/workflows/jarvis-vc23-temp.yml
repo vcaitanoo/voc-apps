@@ -1,12 +1,7 @@
-name: TEMP Jarvis VC23 build
+name: ARCHIVED - Jarvis VC23 temporary build
 
+# Retired legacy build: can only be launched manually for historical recovery.
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/jarvis-vc23-temp.yml'
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
