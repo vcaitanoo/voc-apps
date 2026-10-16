@@ -1,0 +1,24 @@
+{
+  "versionName": "0.3.0",
+  "versionCode": 25,
+  "packageName": "pt.vcaitano.jarvis",
+  "sourceCommit": "2eb134fbf5aa8c90848df0976e564da239de874a",
+  "sourceTreeSha256": "4598d90e6c04a3bc87cabf3f94b4809615709df1c09a69ef5927dc452800bb53",
+  "baseZipSha256": "1370f787b2488ef3ccaf5c20ec88ccf2b96442c51407a308e5304fe8a9ae2f55",
+  "patchSha256": "616f673a09921e0ea14c24f023139981e8819e1c77c381476275a891d1dd6749",
+  "certificateSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
+  "buildDeployment": "dpl_7qyKv7wGBLGT13fL1uWiXtTujfP6",
+  "publishedAt": "2026-09-03T07:41:08Z",
+  "apk": {
+    "name": "Jarvis-0.3.0-vc25.apk",
+    "bytes": 9270822,
+    "sha256": "5a122735e6da4d72178933ae7a1c96483675dc107f2395a4995828607381831a",
+    "url": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.0-vc25.apk"
+  },
+  "aab": {
+    "name": "Jarvis-0.3.0-vc25.aab",
+    "bytes": 8891403,
+    "sha256": "12e0a349c43e3ed93e57397931e9d6d5f264a10655a6cdf6597389b05d34fe4f",
+    "url": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.0-vc25.aab"
+  }
+}
