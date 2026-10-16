@@ -8,9 +8,9 @@
 #
 # O que muda face a VC35:
 #   - aplica tambem o apply_vc37.py (persona, pt-PT, wake-word ack)
-#   - valida que explicitMale sobreviveu (voz masculina obrigatoria)
-#   - valida que PT-PT tem prioridade sobre BR no score do TTS
-#   - valida que o prompt do wake-word ja nao fala em "usuario" nem em pt-BR
+#   - recupera a voz masculina Samsung primeiro, com fallback Google/default
+#   - exige VoicePrint antes de transcrever para rejeitar a TV/vozes alheias
+#   - valida recuperação do TTS e limiares equilibrados de VoicePrint
 
 set -euo pipefail
 
@@ -114,11 +114,15 @@ if grep -q 'startListening(' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice
 fi
 
 # Biometria tem de continuar fail-closed e com os thresholds da VC33.
-grep -q 'COS_PASS=0.70' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoicePrint.kt"
-grep -q 'COS_STRICT=0.82' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoicePrint.kt"
+grep -q 'COS_PASS=0.86' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoicePrint.kt"
+grep -q 'COS_STRICT=0.93' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoicePrint.kt"
 
 # Voz masculina e obrigatoria - e a unica coisa que o dono pediu para preservar.
 grep -q 'explicitMale' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt"
+grep -q '0 -> "com.samsung.SMT"' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt"
+grep -q '1 -> "com.google.android.tts"' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt"
+grep -q 'handleTtsPlaybackError(engineStep)' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt"
+grep -q 'ttsReady' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt"
 
 # PT-PT tem de valer mais que pt-BR no score do TTS, senao a voz portuguesa
 # nunca seria escolhida mesmo existindo.
