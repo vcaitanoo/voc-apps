@@ -1,0 +1,426 @@
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -34,8 +34,8 @@
+         applicationId = "pt.vcaitano.jarvis"
+         minSdk = 26
+         targetSdk = 37
+-        versionCode = 29
+-        versionName = "0.3.4"
++        versionCode = 31
++        versionName = "0.3.6"
+ 
+         buildConfigField(
+             "String",
+--- a/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt
++++ b/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt
+@@ -85,39 +85,8 @@
+     private var tts: TextToSpeech? = null
+ 
+     init {
+-        tts = TextToSpeech(appContext) { status ->
+-            if (status == TextToSpeech.SUCCESS) {
+-                configurePortugueseVoice()
+-                tts?.setSpeechRate(0.96f)
+-                tts?.setPitch(0.90f)
+-                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+-                    override fun onStart(utteranceId: String?) {
+-                        handler.post {
+-                            speaking = true
+-                            emit(State.SPEAKING)
+-                        }
+-                    }
+-
+-                    override fun onDone(utteranceId: String?) {
+-                        if (utteranceId == finalUtteranceId) {
+-                            handler.post { finishSpeaking() }
+-                        }
+-                    }
++        initializeTextToSpeech(preferSamsung = true)
+ 
+-                    @Deprecated("Deprecated in Java")
+-                    override fun onError(utteranceId: String?) {
+-                muteRecognitionMusicWindow(700L)
+-                        handler.post {
+-                            SpeechCoordinator.release(speechOwnerId)
+-                            speaking = false
+-                            waitingForReply = false
+-                            onErrorMessage("Não consegui reproduzir a resposta em voz alta.")
+-                            publishIdleOrListening()
+-                        }
+-                    }
+-                })
+-            }
+-        }
+ 
+         // Migração: nas versões anteriores a autorização contínua não era
+         // persistida. Se o microfone já foi autorizado e o usuário nunca marcou
+@@ -434,18 +403,31 @@
+             return
+         }
+ 
+-        val recorder = try {
+-            AudioRecord(
+-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
+-                SAMPLE_RATE,
+-                AudioFormat.CHANNEL_IN_MONO,
+-                AudioFormat.ENCODING_PCM_16BIT,
+-                maxOf(minBuffer * 2, FRAME_SAMPLES * 8)
+-            )
+-        } catch (_: Throwable) { null }
++        // MIC gives Samsung devices a fuller signal than VOICE_RECOGNITION on
++        // some firmwares. Both are plain AudioRecord sources and stay silent.
++        var preparedRecorder: AudioRecord? = null
++        for (source in intArrayOf(
++            MediaRecorder.AudioSource.MIC,
++            MediaRecorder.AudioSource.VOICE_RECOGNITION
++        )) {
++            val candidate = try {
++                AudioRecord(
++                    source,
++                    SAMPLE_RATE,
++                    AudioFormat.CHANNEL_IN_MONO,
++                    AudioFormat.ENCODING_PCM_16BIT,
++                    maxOf(minBuffer * 2, FRAME_SAMPLES * 8)
++                )
++            } catch (_: Throwable) { null }
++            if (candidate != null && candidate.state == AudioRecord.STATE_INITIALIZED) {
++                preparedRecorder = candidate
++                break
++            }
++            runCatching { candidate?.release() }
++        }
++        val recorder = preparedRecorder
+ 
+-        if (recorder == null || recorder.state != AudioRecord.STATE_INITIALIZED) {
+-            runCatching { recorder?.release() }
++        if (recorder == null) {
+             emit(State.ERROR)
+             onErrorMessage("Não consegui abrir o microfone para ouvir.")
+             return
+@@ -461,12 +443,17 @@
+         Thread {
+             val pcm = ByteArrayOutputStream()
+             val buffer = ShortArray(FRAME_SAMPLES)
++            val preRoll = ArrayDeque<ByteArray>()
++            var preRollBytes = 0
+             var heardSpeech = false
+             var silenceFrames = 0
+             var totalFrames = 0
+-            val startTimeoutFrames = (SAMPLE_RATE * 10) / FRAME_SAMPLES
++            var noisePeak = 80.0
++            val calibrationFrames = 6 // ~240 ms
++            val preRollMaxBytes = SAMPLE_RATE * 2 * 4 / 10 // ~400 ms PCM16
++            val startTimeoutFrames = (SAMPLE_RATE * 8) / FRAME_SAMPLES
+             val maxFrames = (SAMPLE_RATE * 18) / FRAME_SAMPLES
+-            val silenceStopFrames = (SAMPLE_RATE * 12 / 10) / FRAME_SAMPLES
++            val silenceStopFrames = (SAMPLE_RATE * 7 / 10) / FRAME_SAMPLES // ~700 ms
+ 
+             try {
+                 recorder.startRecording()
+@@ -480,21 +467,47 @@
+                 ) {
+                     val read = recorder.read(buffer, 0, buffer.size)
+                     if (read <= 0) continue
++
+                     var peak = 0
++                    val frameBytes = ByteArray(read * 2)
++                    var byteIndex = 0
+                     for (i in 0 until read) {
+                         val value = buffer[i].toInt()
+                         val abs = kotlin.math.abs(value)
+                         if (abs > peak) peak = abs
+-                        pcm.write(value and 0xFF)
+-                        pcm.write((value shr 8) and 0xFF)
++                        frameBytes[byteIndex++] = (value and 0xFF).toByte()
++                        frameBytes[byteIndex++] = ((value shr 8) and 0xFF).toByte()
+                     }
+                     totalFrames += 1
+-                    if (peak >= 700) {
+-                        heardSpeech = true
+-                        silenceFrames = 0
+-                    } else if (heardSpeech) {
+-                        silenceFrames += 1
++
++                    if (!heardSpeech) {
++                        // Calibrate only on the first quiet frames. Pre-roll preserves
++                        // the beginning of the word even while the threshold adapts.
++                        if (totalFrames <= calibrationFrames) {
++                            noisePeak = (noisePeak * 0.72) + (peak * 0.28)
++                        } else if (peak < noisePeak * 1.8) {
++                            noisePeak = (noisePeak * 0.94) + (peak * 0.06)
++                        }
++
++                        preRoll.addLast(frameBytes)
++                        preRollBytes += frameBytes.size
++                        while (preRollBytes > preRollMaxBytes && preRoll.isNotEmpty()) {
++                            preRollBytes -= preRoll.removeFirst().size
++                        }
++
++                        val speechThreshold = maxOf(170, minOf(850, (noisePeak * 2.25 + 70).toInt()))
++                        if (totalFrames > 2 && peak >= speechThreshold) {
++                            heardSpeech = true
++                            while (preRoll.isNotEmpty()) pcm.write(preRoll.removeFirst())
++                            preRollBytes = 0
++                            silenceFrames = 0
++                        }
++                    } else {
++                        pcm.write(frameBytes)
++                        val continuationThreshold = maxOf(110, (noisePeak * 1.45 + 35).toInt())
++                        if (peak >= continuationThreshold) silenceFrames = 0 else silenceFrames += 1
+                     }
++
+                     if (!heardSpeech && totalFrames >= startTimeoutFrames) break
+                     if (heardSpeech && silenceFrames >= silenceStopFrames) break
+                 }
+@@ -510,10 +523,10 @@
+             rawCaptureActive = false
+             listening = false
+ 
+-            if (!heardSpeech || pcm.size() < SAMPLE_RATE / 2) {
++            if (!heardSpeech || pcm.size() < 4_000) {
+                 handler.post {
+                     if (continuousEnabled && !waitingForReply && !speaking) {
+-                        startRecognitionSoon(250L)
++                        startRecognitionSoon(120L)
+                     } else publishIdleOrListening()
+                 }
+                 return@Thread
+@@ -525,7 +538,7 @@
+             handler.post {
+                 if (epoch != rawCaptureEpoch || destroyed) return@post
+                 if (text.isBlank()) {
+-                    if (continuousEnabled && !waitingForReply && !speaking) startRecognitionSoon(350L)
++                    if (continuousEnabled && !waitingForReply && !speaking) startRecognitionSoon(180L)
+                     else publishIdleOrListening()
+                 } else {
+                     routeTranscribedSpeech(text)
+@@ -648,40 +661,94 @@
+         runCatching { r?.destroy() }
+     }
+ 
++    private fun initializeTextToSpeech(preferSamsung: Boolean) {
++        val listener = TextToSpeech.OnInitListener { status ->
++            if (status != TextToSpeech.SUCCESS) {
++                if (preferSamsung && !destroyed) {
++                    runCatching { tts?.shutdown() }
++                    tts = null
++                    handler.post { initializeTextToSpeech(preferSamsung = false) }
++                }
++                return@OnInitListener
++            }
++
++            val maleReady = configurePortugueseVoice()
++            tts?.setSpeechRate(0.98f)
++            tts?.setPitch(if (maleReady) 0.94f else 0.80f)
++            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
++                override fun onStart(utteranceId: String?) {
++                    handler.post {
++                        speaking = true
++                        emit(State.SPEAKING)
++                    }
++                }
++
++                override fun onDone(utteranceId: String?) {
++                    if (utteranceId == finalUtteranceId) {
++                        handler.post { finishSpeaking() }
++                    }
++                }
++
++                @Deprecated("Deprecated in Java")
++                override fun onError(utteranceId: String?) {
++                    handler.post {
++                        SpeechCoordinator.release(speechOwnerId)
++                        speaking = false
++                        waitingForReply = false
++                        onErrorMessage("Não consegui reproduzir a resposta em voz alta.")
++                        publishIdleOrListening()
++                    }
++                }
++            })
++        }
++
++        tts = if (preferSamsung) {
++            // On Galaxy devices this is the Samsung TTS engine. The historical
++            // Jarvis male voice is exposed by Samsung's pt-BR male voice pack.
++            TextToSpeech(appContext, listener, "com.samsung.SMT")
++        } else {
++            TextToSpeech(appContext, listener)
++        }
++    }
++
+     private fun configurePortugueseVoice(): Boolean {
+         val engine = tts ?: return false
+         runCatching { engine.setLanguage(brazilianPortuguese) }
+ 
+-        fun isMale(name: String): Boolean {
+-            val normalized = name.lowercase(Locale.ROOT)
+-            return listOf("male", "masculino", "homem", " man ", "_man_", "-man-").any(normalized::contains)
+-        }
+-        fun isFemale(name: String): Boolean {
+-            val normalized = name.lowercase(Locale.ROOT)
+-            return listOf("female", "feminina", "mulher", "woman").any(normalized::contains)
++        fun explicitMale(name: String): Boolean {
++            val n = name.lowercase(Locale.ROOT)
++            if (listOf("female", "feminina", "mulher", "woman", "_f00", "-f00", "#female_").any(n::contains)) return false
++            return listOf(
++                "male", "masculino", "homem", "#male_", "_m00", "-m00",
++                "_m01", "-m01", "_m02", "-m02", "_m03", "-m03"
++            ).any(n::contains) || Regex("(?:^|[_#-])m\\d{1,2}(?:$|[_#-])").containsMatchIn(n)
++        }
++
++        fun score(voice: android.speech.tts.Voice): Int {
++            if (!explicitMale(voice.name)) return Int.MIN_VALUE
++            val language = voice.locale.language.lowercase(Locale.ROOT)
++            val country = voice.locale.country.uppercase(Locale.ROOT)
++            var value = 0
++            if (language == "pt" && country == "BR") value += 10_000
++            else if (language == "pt") value += 6_000
++            else return Int.MIN_VALUE
++            if (voice.name.contains("#male_", ignoreCase = true)) value += 1_000
++            if (voice.name.contains("m00", ignoreCase = true)) value += 900
++            if (!voice.isNetworkConnectionRequired) value += 250
++            value += voice.quality
++            return value
+         }
+ 
+         val voices = runCatching { engine.voices?.toList().orEmpty() }.getOrDefault(emptyList())
+-        val ptBr = voices.filter {
+-            it.locale.language.equals("pt", ignoreCase = true) &&
+-                it.locale.country.equals("BR", ignoreCase = true)
+-        }
+-        val male = ptBr
+-            .filter { isMale(it.name) && !isFemale(it.name) }
+-            .sortedWith(compareByDescending<android.speech.tts.Voice> { it.quality }.thenBy { it.isNetworkConnectionRequired })
+-            .firstOrNull()
+-        val anyPtBr = ptBr
+-            .sortedWith(compareByDescending<android.speech.tts.Voice> { it.quality }.thenBy { it.isNetworkConnectionRequired })
+-            .firstOrNull()
+-        val anyPortuguese = voices
+-            .filter { it.locale.language.equals("pt", ignoreCase = true) }
+-            .sortedWith(compareByDescending<android.speech.tts.Voice> { it.quality }.thenBy { it.isNetworkConnectionRequired })
+-            .firstOrNull()
+-        val selected = male
++        val selected = voices.maxByOrNull(::score)?.takeIf { score(it) > Int.MIN_VALUE }
+         if (selected != null) {
+             runCatching { engine.voice = selected }
+             return true
+         }
++
++        // Do not deliberately switch to an unspecified PT-BR voice here: on the
++        // tested Samsung that resolves to the female default. Keep pt-BR locale
++        // and use a lower pitch only as the last-resort compatibility path.
+         return false
+     }
+ 
+@@ -728,9 +795,9 @@
+             return
+         }
+ 
+-        configurePortugueseVoice()
+-        tts?.setPitch(0.90f)
+-        tts?.setSpeechRate(0.96f)
++        val maleReady = configurePortugueseVoice()
++        tts?.setPitch(if (maleReady) 0.94f else 0.80f)
++        tts?.setSpeechRate(0.98f)
+         val chunks = splitForSpeech(text)
+         if (chunks.isEmpty()) {
+             finishSpeaking()
+--- a/app/src/main/java/pt/vcaitano/jarvis/voice/ReminderSpeechService.kt
++++ b/app/src/main/java/pt/vcaitano/jarvis/voice/ReminderSpeechService.kt
+@@ -74,15 +74,25 @@
+         SpeechCoordinator.claim(ownerId) { handler.post { stopSpeechAndSelf() } }
+ 
+         runCatching { tts?.shutdown() }
+-        tts = TextToSpeech(applicationContext) { status ->
++        initializeReminderTts(text, ownerId, preferSamsung = true)
++    }
++
++    private fun initializeReminderTts(text: String, ownerId: String, preferSamsung: Boolean) {
++        val listener = TextToSpeech.OnInitListener { status ->
+             if (status != TextToSpeech.SUCCESS) {
+-                stopSpeechAndSelf()
+-                return@TextToSpeech
++                if (preferSamsung) {
++                    runCatching { tts?.shutdown() }
++                    tts = null
++                    handler.post { initializeReminderTts(text, ownerId, preferSamsung = false) }
++                } else {
++                    stopSpeechAndSelf()
++                }
++                return@OnInitListener
+             }
+-            val engine = tts ?: return@TextToSpeech
+-            configurePortugueseVoice(engine)
+-            engine.setSpeechRate(0.96f)
+-            engine.setPitch(0.90f)
++            val engine = tts ?: return@OnInitListener
++            val maleReady = configurePortugueseVoice(engine)
++            engine.setSpeechRate(0.98f)
++            engine.setPitch(if (maleReady) 0.94f else 0.80f)
+             engine.setAudioAttributes(
+                 AudioAttributes.Builder()
+                     .setUsage(AudioAttributes.USAGE_ALARM)
+@@ -103,30 +113,48 @@
+                 stopSpeechAndSelf()
+             }
+         }
++        tts = if (preferSamsung) {
++            TextToSpeech(applicationContext, listener, "com.samsung.SMT")
++        } else {
++            TextToSpeech(applicationContext, listener)
++        }
+     }
+ 
+-    private fun configurePortugueseVoice(engine: TextToSpeech) {
++    private fun configurePortugueseVoice(engine: TextToSpeech): Boolean {
+         val ptBr = Locale("pt", "BR")
+         runCatching { engine.setLanguage(ptBr) }
+         val voices = runCatching { engine.voices?.toList().orEmpty() }.getOrDefault(emptyList())
+-        fun male(name: String): Boolean {
+-            val value = name.lowercase(Locale.ROOT)
+-            return listOf("male", "masculino", "homem", "_man_", "-man-").any(value::contains) &&
+-                !listOf("female", "feminina", "mulher", "woman").any(value::contains)
++
++        fun explicitMale(name: String): Boolean {
++            val n = name.lowercase(Locale.ROOT)
++            if (listOf("female", "feminina", "mulher", "woman", "_f00", "-f00", "#female_").any(n::contains)) return false
++            return listOf(
++                "male", "masculino", "homem", "#male_", "_m00", "-m00",
++                "_m01", "-m01", "_m02", "-m02", "_m03", "-m03"
++            ).any(n::contains) || Regex("(?:^|[_#-])m\\d{1,2}(?:$|[_#-])").containsMatchIn(n)
++        }
++
++        fun score(voice: android.speech.tts.Voice): Int {
++            if (!explicitMale(voice.name)) return Int.MIN_VALUE
++            val language = voice.locale.language.lowercase(Locale.ROOT)
++            val country = voice.locale.country.uppercase(Locale.ROOT)
++            var value = 0
++            if (language == "pt" && country == "BR") value += 10_000
++            else if (language == "pt") value += 6_000
++            else return Int.MIN_VALUE
++            if (voice.name.contains("#male_", ignoreCase = true)) value += 1_000
++            if (voice.name.contains("m00", ignoreCase = true)) value += 900
++            if (!voice.isNetworkConnectionRequired) value += 250
++            value += voice.quality
++            return value
+         }
+-        val candidates = listOf(
+-            voices.filter { it.locale.language == "pt" && it.locale.country == "BR" && male(it.name) },
+-            voices.filter { it.locale.language == "pt" && it.locale.country == "BR" },
+-            voices.filter { it.locale.language == "pt" }
+-        )
+-        val selected = candidates.asSequence().flatMap { group ->
+-            group.sortedWith(compareByDescending<android.speech.tts.Voice> { it.quality }.thenBy { it.isNetworkConnectionRequired }).asSequence()
+-        }.firstOrNull() ?: engine.defaultVoice ?: voices.firstOrNull()
++
++        val selected = voices.maxByOrNull(::score)?.takeIf { score(it) > Int.MIN_VALUE }
+         if (selected != null) {
+             runCatching { engine.voice = selected }
+-        } else {
+-            runCatching { engine.setLanguage(Locale.getDefault()) }
++            return true
+         }
++        return false
+     }
+ 
+     private fun buildSpokenReminder(content: String, triggerAtMillis: Long): String {
