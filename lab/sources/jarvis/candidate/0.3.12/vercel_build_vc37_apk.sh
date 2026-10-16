@@ -265,7 +265,7 @@ echo "SIGNATURE_CERTIFICATE_OK=$ACTUAL_CERT_SHA"
 """
 base = base.replace(
     verify_line,
-    verify_line + '\\n' + certificate_check,
+    verify_line + '\n' + certificate_check,
     1,
 )
 
