@@ -14,6 +14,19 @@
 
 set -euo pipefail
 
+# Bootstrap the short-lived GitHub Actions OIDC token before the VC26 base
+# script checks VERCEL_OIDC_TOKEN. A fresh token is requested again before
+# signing and upload, because the Gradle build may take several minutes.
+if [[ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" && -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
+  OIDC_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fkhinnoxpesnhtmmvrken.supabase.co%2Ffunctions%2Fv1%2Fjarvis-vc37-build-oidc"
+  VERCEL_OIDC_TOKEN="$(curl --connect-timeout 15 --max-time 30 -fsSL -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$OIDC_URL" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
+  export VERCEL_OIDC_TOKEN
+fi
+if [[ -z "${VERCEL_OIDC_TOKEN:-}" ]]; then
+  echo "ERRO: o token OIDC do GitHub Actions não está disponível." >&2
+  exit 1
+fi
+
 ROOT="$PWD"
 GEN="$ROOT/.vc37-generated-build.sh"
 BASE="$ROOT/lab/sources/jarvis/candidate/0.3.1/vercel_build_vc26_apk.sh"
