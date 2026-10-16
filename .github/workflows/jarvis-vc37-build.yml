@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/jarvis-vc37-build.yml'
-      - 'lab/sources/jarvis/candidate/0.3.12/**'
+      - 'lab/sources/jarvis/candidate/**'
       - 'lab/sources/jarvis/backend/supabase/functions/jarvis-vc37-build-oidc/index.ts'
   workflow_dispatch:
 
@@ -36,19 +36,21 @@ jobs:
         with:
           gradle-version: '9.5.1'
 
-      - name: Prepare canonical source and overlay the GitHub candidate
+      - name: Prepare canonical source from GitHub
         shell: bash
         run: |
           set -euo pipefail
-          git clone --depth 1 --branch main https://gitlab.com/oliveira.caitano2023/voc-lab.git gl
-          test -f gl/lab/sources/jarvis/candidate/0.3.1/vercel_build_vc26_apk.sh
-          test -f gl/lab/sources/jarvis/candidate/0.2.15/source.part.001
-          mkdir -p gl/lab/sources/jarvis/candidate/0.3.12
-          cp -a lab/sources/jarvis/candidate/0.3.12/. gl/lab/sources/jarvis/candidate/0.3.12/
+          test -f lab/sources/jarvis/candidate/0.3.1/vercel_build_vc26_apk.sh
+          test -s lab/sources/jarvis/candidate/0.2.15/source.part.00
+          test -f lab/sources/jarvis/candidate/0.2.15/overrides/VoicePrint.kt
+          test -f lab/sources/jarvis/candidate/0.3.11/apply_vc36.py
+          test -f lab/sources/jarvis/candidate/0.3.12/apply_vc37.py
+          mkdir -p gl/lab/sources/jarvis
+          cp -a lab/sources/jarvis/candidate gl/lab/sources/jarvis/
           grep -q 'ACTIONS_ID_TOKEN_REQUEST_URL' gl/lab/sources/jarvis/candidate/0.3.12/vercel_build_vc37_apk.sh
           grep -q 'Signer #1 certificate SHA-256 digest: f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2' gl/lab/sources/jarvis/candidate/0.3.12/vercel_build_vc37_apk.sh
-          echo "GitLab canonical base commit: $(git -C gl rev-parse HEAD)"
-          echo "GitHub candidate commit: $GITHUB_SHA"
+          echo "GitHub canonical source commit: $GITHUB_SHA"
+          echo "Source parts and VC18..VC37 patch chain are present."
 
       - name: Build, validate and publish candidate
         shell: bash
