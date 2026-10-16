@@ -4,8 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - '.github/workflows/jarvis-vc37-build.yml'
-      - 'lab/sources/jarvis/candidate/**'
+      - 'lab/sources/jarvis/candidate/0.3.12/**'
       - 'lab/sources/jarvis/backend/supabase/functions/jarvis-vc37-build-oidc/index.ts'
   workflow_dispatch:
 
