@@ -1,0 +1,124 @@
+name: Jarvis VC38 candidate build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/jarvis-vc38-build.yml'
+      - 'lab/sources/jarvis/candidate/**'
+      - 'lab/sources/jarvis/backend/supabase/functions/jarvis-vc38-build-oidc/index.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build, verify and publish Jarvis 0.3.13
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      JARVIS_BUILD_ENDPOINT: https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-vc38-build-oidc
+
+    steps:
+      - name: Check out GitHub source of truth
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 9.5.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.1'
+
+      - name: Prepare canonical source from GitHub
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f lab/sources/jarvis/candidate/0.3.1/vercel_build_vc26_apk.sh
+          test -s lab/sources/jarvis/candidate/0.2.15/source.part.00
+          test -f lab/sources/jarvis/candidate/0.2.15/overrides/VoicePrint.kt
+          test -f lab/sources/jarvis/candidate/0.3.11/apply_vc36.py
+          test -f lab/sources/jarvis/candidate/0.3.13/apply_vc38.py
+          mkdir -p gl/lab/sources/jarvis
+          cp -a lab/sources/jarvis/candidate gl/lab/sources/jarvis/
+          cp -a lab/catalog.json gl/lab/catalog.json
+          cp -a manifest.json gl/manifest.json
+          grep -q 'ACTIONS_ID_TOKEN_REQUEST_URL' gl/lab/sources/jarvis/candidate/0.3.13/vercel_build_vc38_apk.sh
+          grep -q 'EXPECTED_CERT_SHA="f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2"' gl/lab/sources/jarvis/candidate/0.3.13/vercel_build_vc38_apk.sh
+          echo "GitHub canonical source commit: $GITHUB_SHA"
+          echo "Source parts and VC18..VC38 patch chain are present."
+
+      - name: Build, validate and publish candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd gl
+          bash lab/sources/jarvis/candidate/0.3.13/vercel_build_vc38_apk.sh
+          test -s dist/Jarvis-0.3.13-vc38.apk
+          test -s dist/publish.json
+          cat dist/publish.json
+          sha256sum dist/Jarvis-0.3.13-vc38.apk
+
+      - name: Register verified candidate in VOC Lab catalog
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s gl/dist/publish.json
+          python3 - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          catalog_path = Path("lab/catalog.json")
+          report_path = Path("gl/dist/publish.json")
+          catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+          app = next((item for item in catalog["apps"] if item.get("id") == "jarvis"), None)
+          if app is None:
+              raise SystemExit("Jarvis ausente de lab/catalog.json")
+          if report.get("versionCode") != 38 or report.get("versionName") != "0.3.13":
+              raise SystemExit("Relatório de publicação não é VC38 / 0.3.13")
+          if report.get("apk") != "Jarvis-0.3.13-vc38.apk":
+              raise SystemExit("Nome do APK inesperado")
+          url = report.get("apkUrl", "")
+          sha = report.get("sha256", "")
+          if not url.startswith("https://") or len(sha) != 64:
+              raise SystemExit("URL ou SHA-256 inválido")
+          app["candidate"] = {
+              "versionCode": 38,
+              "versionName": "0.3.13",
+              "apkUrl": url,
+              "sha256": sha.lower(),
+              "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
+              "notes": "CANDIDATO VC38 / 0.3.13: correção da escuta silenciosa e voz masculina obrigatória em português. APK publicado no armazenamento permanente, SHA-256 verificado contra o binário servido e certificado validado no build. Teste físico ainda pendente; não é versão estável."
+          }
+          catalog["updatedAt"] = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+          catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          print("Jarvis candidate catalog entry updated; stable entry preserved.")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lab/catalog.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish Jarvis VC38 candidate metadata"
+            git push origin HEAD:main
+          else
+            echo "Catalog already contains this verified candidate."
+          fi
+
+      - name: Save build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-vc38-build-evidence
+          path: |
+            gl/dist/**
+          if-no-files-found: warn
+          retention-days: 7
