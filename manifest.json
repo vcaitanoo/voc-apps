@@ -86,7 +86,7 @@
       "category": "productivity",
       "description": "Assistente pessoal com voz, texto, lembretes e contexto do dispositivo.",
       "status": "published",
-       "versionCode": 11,
+      "versionCode": 11,
       "versionName": "0.2.9",
       "minSdk": 26,
       "apkUrl": "https://jarvis-028-permanent-release.vercel.app/Jarvis-0.2.9.apk",
@@ -102,7 +102,12 @@
         "period": null,
         "trialDays": 0,
         "provider": "none"
-      }
+      },
+      "sourcePath": "lab/sources/jarvis/candidate/0.3.12/",
+      "reconstruction": "base 0.2.15 + VoicePrint override -> VC18 -> VC19 -> VC20 -> VC21 -> VC22 voice repair -> VC23 -> VC24 -> VC25 -> VC26 -> VC27 -> VC28 -> VC29 -> VC31 -> VC32 -> VC33 -> VC34 -> VC35 -> VC36 -> VC37 (VC30 não faz parte da candidata atual)",
+      "candidateVersionCode": 37,
+      "candidateVersionName": "0.3.12",
+      "candidateApkSha256": "7c3011f3b6476a5eafcaab330bee28c674935e76c8bf44df994aa648372a99bc"
     }
   ]
 }
