@@ -1,0 +1,16 @@
+{
+  "version": "0.3.1",
+  "versionCode": 26,
+  "package": "pt.vcaitano.jarvis",
+  "apk": "Jarvis-0.3.1-vc26.apk",
+  "apkUrl": "https://temporary-snappy-redwood-yqm3s0d-jmufl1587-ache-aquis-projects.vercel.app/Jarvis-0.3.1-vc26.apk",
+  "apkSha256": "060271c1f5c2f7e2eaaf6d29f7d8c3a046de264c906fe20210641611aeb9bd2c",
+  "certificateSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
+  "baseCandidate": {"versionCode":25,"versionName":"0.3.0","apkSha256":"5a122735e6da4d72178933ae7a1c96483675dc107f2395a4995828607381831a"},
+  "source": "canonical patches through VC25 + apply_vc26.py",
+  "modifiedRuntimeFiles": ["app/build.gradle.kts", "app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt"],
+  "scope": ["strict male PT-BR response voice", "background recognition tone suppression"],
+  "validation": "compile-and-structural-only",
+  "physicalAndroidTest": false,
+  "aabBuilt": false
+}
