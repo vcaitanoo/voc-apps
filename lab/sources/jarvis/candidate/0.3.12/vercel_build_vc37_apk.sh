@@ -84,7 +84,7 @@ if base.count(gradle_old) != 1:
 base = base.replace(gradle_old, gradle_new, 1)
 
 # Preserve the canonical release signing identity enforced by the base build script.
-if ("f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2" not in base:
+if "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2" not in base:
     raise SystemExit("VC37: expected historical release certificate reference missing")
 
 # A validacao da VC26 (que exigia uma topologia de audio que ja nao existe)
