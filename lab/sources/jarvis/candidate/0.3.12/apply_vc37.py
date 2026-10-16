@@ -23,8 +23,8 @@ replace_once(BUILD, 'versionName = "0.3.11"', 'versionName = "0.3.12"', "version
 replace_once(
     VOICE,
     '''        val requestedEngine = when (engineStep) {
-            0 -> "com.samsung.SMT"
-            1 -> "com.google.android.tts"
+            0 -> "com.google.android.tts"
+            1 -> "com.samsung.SMT"
             else -> null
         }''',
     '''        val requestedEngine = when (engineStep) {
