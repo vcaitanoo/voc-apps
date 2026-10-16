@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-09-01T23:45:00+01:00",
+  "updatedAt": "2026-10-16T06:46:23Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -85,12 +85,12 @@
         "notes": "Versão estável atualmente registrada no catálogo oficial."
       },
       "candidate": {
-        "versionCode": 11,
-        "versionName": "0.2.9",
-        "apkUrl": "https://jarvis-028-permanent-release.vercel.app/Jarvis-0.2.9.apk",
-        "sha256": "E2E54FB2F1D393E4F6CE10429818CDA333DAA47764691A5DFF71702F6B50771D",
+        "versionCode": 37,
+        "versionName": "0.3.12",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.12-vc37.apk",
+        "sha256": "7c3011f3b6476a5eafcaab330bee28c674935e76c8bf44df994aa648372a99bc",
         "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
-        "notes": "CANDIDATO V11: build release com versionCode 11 e versão 0.2.9, assinado com a chave permanente jarvis-release (mesmo certificado da 0.2.8). Build compilado a partir da fonte 0.2.7 com incremento de versão. Compilação e estrutura verificadas; execução real em Android não testada."
+        "notes": "CANDIDATO VC37 / 0.3.12: correção da escuta silenciosa e voz masculina obrigatória em português. APK publicado no armazenamento permanente, SHA-256 verificado contra o binário servido e certificado validado no build. Teste físico ainda pendente; não é versão estável."
       }
     }
   ]
