@@ -46,7 +46,7 @@ jobs:
           mkdir -p gl/lab/sources/jarvis/candidate/0.3.12
           cp -a lab/sources/jarvis/candidate/0.3.12/. gl/lab/sources/jarvis/candidate/0.3.12/
           grep -q 'ACTIONS_ID_TOKEN_REQUEST_URL' gl/lab/sources/jarvis/candidate/0.3.12/vercel_build_vc37_apk.sh
-          grep -q 'Signer #1 certificate SHA-256 digest: 5ee20e731c090c755bd2fb4f2d8e7d9537f2ed33b359a46254fb466293346059' gl/lab/sources/jarvis/candidate/0.3.12/vercel_build_vc37_apk.sh
+          grep -q 'Signer #1 certificate SHA-256 digest: f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2' gl/lab/sources/jarvis/candidate/0.3.12/vercel_build_vc37_apk.sh
           echo "GitLab canonical base commit: $(git -C gl rev-parse HEAD)"
           echo "GitHub candidate commit: $GITHUB_SHA"
 
@@ -92,7 +92,7 @@ jobs:
               "versionName": "0.3.12",
               "apkUrl": url,
               "sha256": sha.lower(),
-              "signatureSha256": "5ee20e731c090c755bd2fb4f2d8e7d9537f2ed33b359a46254fb466293346059",
+              "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
               "notes": "CANDIDATO VC37 / 0.3.12: correção da escuta silenciosa e voz masculina obrigatória em português. APK publicado no armazenamento permanente, SHA-256 verificado contra o binário servido e certificado validado no build. Teste físico ainda pendente; não é versão estável."
           }
           catalog["updatedAt"] = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
