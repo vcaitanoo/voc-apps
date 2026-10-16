@@ -132,9 +132,9 @@ jobs:
               if report.get(key) != value:
                   raise SystemExit(f"VC38 report mismatch for {key}")
           PY
-          OIDC_URL="\${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fkhinnoxpesnhtmmvrken.supabase.co%2Ffunctions%2Fv1%2Fjarvis-vc38-build-oidc"
-          VERCEL_OIDC_TOKEN="$(curl --connect-timeout 15 --max-time 30 -fsSL -H "Authorization: Bearer \${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$OIDC_URL" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
-          HTTP_CODE="$(curl --connect-timeout 15 --max-time 30 -sS -w '%{http_code}' -o "$RUNNER_TEMP/voc-lab-catalog-sync.json" -X POST -H "Authorization: Bearer \${VERCEL_OIDC_TOKEN}" -H "x-action: publish-catalog" -H "Content-Type: application/json" --data-binary @gl/dist/publish.json "$JARVIS_BUILD_ENDPOINT")"
+          OIDC_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fkhinnoxpesnhtmmvrken.supabase.co%2Ffunctions%2Fv1%2Fjarvis-vc38-build-oidc"
+          VERCEL_OIDC_TOKEN="$(curl --connect-timeout 15 --max-time 30 -fsSL -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$OIDC_URL" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
+          HTTP_CODE="$(curl --connect-timeout 15 --max-time 30 -sS -w '%{http_code}' -o "$RUNNER_TEMP/voc-lab-catalog-sync.json" -X POST -H "Authorization: Bearer ${VERCEL_OIDC_TOKEN}" -H "x-action: publish-catalog" -H "Content-Type: application/json" --data-binary @gl/dist/publish.json "$JARVIS_BUILD_ENDPOINT")"
           cat "$RUNNER_TEMP/voc-lab-catalog-sync.json"
           test "$HTTP_CODE" = "200"
           python3 - "$RUNNER_TEMP/voc-lab-catalog-sync.json" <<'PY'
