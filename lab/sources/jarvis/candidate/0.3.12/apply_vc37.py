@@ -129,13 +129,9 @@ replace_once(
 replace_once(
     VOICE,
     '''        if (selected != null) {
-            val applied = runCatching {
-                engine.voice = selected
-                engine.voice?.name == selected.name
-            }.getOrDefault(false)
-            if (applied) return true
-        }
-        return false''',
+            runCatching { engine.voice = selected }
+            return true
+        }''',
     '''        if (selected != null) {
             val applied = runCatching {
                 engine.voice = selected
