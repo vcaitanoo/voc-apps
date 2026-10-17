@@ -1,11 +1,6 @@
 name: Jarvis VC41 male Brazilian voice build
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'lab/sources/jarvis/candidate/0.3.16/**'
-      - '.github/workflows/jarvis-vc41-build.yml'
   workflow_dispatch:
 
 permissions:
