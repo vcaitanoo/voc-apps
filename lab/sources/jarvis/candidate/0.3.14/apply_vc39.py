@@ -14,10 +14,10 @@ replace_once(BUILD, "versionCode = 38", "versionCode = 39", "versionCode")
 replace_once(BUILD, 'versionName = "0.3.13"', 'versionName = "0.3.14"', "versionName")
 
 brain = BRAIN.read_text(encoding="utf-8")
-required = ["looksLikeReminderListing", "updateReminderTime", "reminderManagementResponse", "confirmo apagar todos os lembretes"]
+required = ["looksLikeReminderListing", "updateReminderTime", "reminderManagementResponse", "confirmo apagar todos os lembretes", "jarvis_update_reminder_time"]
 missing = [item for item in required if item not in brain]
 if missing:
     raise SystemExit("VC39 reminder management implementation missing: " + ", ".join(missing))
-if 'requestMethod = "PATCH"' not in brain:
-    raise SystemExit("VC39 reminder editing PATCH path missing")
+if 'jarvis_update_reminder_time' not in brain:
+    raise SystemExit("VC39 reminder editing RPC path missing")
 print("VC39 reminder management invariants validated")
