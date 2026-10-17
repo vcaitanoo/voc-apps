@@ -48,7 +48,7 @@ replacements = {
     # source archive does not include this override automatically, so install it
     # into the extracted source before applying version-specific patches.
     'cp lab/sources/jarvis/candidate/0.2.15/overrides/VoicePrint.kt "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoicePrint.kt"':
-        'cp lab/sources/jarvis/candidate/0.2.15/overrides/VoicePrint.kt "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoicePrint.kt"\ncp lab/sources/jarvis/candidate/0.2.16/overrides/BrainClient.kt "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/network/BrainClient.kt"',
+        'cp lab/sources/jarvis/candidate/0.2.15/overrides/VoicePrint.kt "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoicePrint.kt"\nmkdir -p "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/network"\ncp lab/sources/jarvis/candidate/0.2.16/overrides/BrainClient.kt "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/network/BrainClient.kt"',
 
 
     # Aplica VC27 a VC39 a seguir a VC26. (VC30 nao existe na cadeia: foi
