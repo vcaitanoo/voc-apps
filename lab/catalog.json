@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-10-17T17:07:29Z",
+  "updatedAt": "2026-10-17T17:44:10.673Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -85,12 +85,12 @@
         "notes": "Versão estável atualmente registrada no catálogo oficial."
       },
       "candidate": {
-        "versionCode": 40,
-        "versionName": "0.3.15",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.15-vc40.apk",
-        "sha256": "f2cf37f96d12aef69e80e4322b518c9b31379f7aaa7fe42a400dae6399abbcf2",
+        "versionCode": 41,
+        "versionName": "0.3.16",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.16-vc41.apk",
+        "sha256": "d6ebdf8c7761dc707e1179f365c063d689a1844d21e3f1388e69002d93151c66",
         "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
-        "notes": "CANDIDATO VC40 / 0.3.15: gestão de lembretes por voz e texto, listagem, alteração de horário, remoção direcionada e confirmação antes de apagar todos. APK publicado no armazenamento permanente, SHA-256 verificado e certificado validado no build. Teste físico ainda pendente; não é versão estável."
+        "notes": "Correção focada na voz: exige voz masculina identificada em português do Brasil (pt-BR), sem fallback para voz feminina/genérica, e remove avisos de falha de síntese. APK assinado; teste físico pendente."
       }
     }
   ]
