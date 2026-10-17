@@ -22,8 +22,8 @@ def replace_regex(text: str, pattern: str, replacement: str, label: str, count: 
 
 # VC42 / 0.3.17 is based on the known-good VC39 chain, deliberately skipping
 # VC40's regression that allowed an untagged (female-default) voice.
-replace_once(BUILD, "versionCode = 42", "versionCode = 42", "versionCode")
-replace_once(BUILD, 'versionName = "0.3.17"', 'versionName = "0.3.17"', "versionName")
+replace_once(BUILD, "versionCode = 39", "versionCode = 42", "versionCode")
+replace_once(BUILD, 'versionName = "0.3.14"', 'versionName = "0.3.17"', "versionName")
 
 voice = VOICE.read_text(encoding="utf-8")
 
@@ -191,7 +191,7 @@ build = BUILD.read_text(encoding="utf-8")
 voice = VOICE.read_text(encoding="utf-8")
 checks = [
     ("versionCode = 42" in build and 'versionName = "0.3.17"' in build, "identity"),
-    ('0 -> "com.google.android.tts"' in voice and '1 -> "com.samsung.SMT"' in voice, "Samsung male voice engine first"),
+    ('0 -> "com.google.android.tts"' in voice and '1 -> "com.samsung.SMT"' in voice, "Google explicit male voice engine first"),
     ('country == "BR") value += 12_000' in voice, "PT-BR first"),
     ('else return Int.MIN_VALUE' in voice, "non-PT-BR voices rejected"),
     ('explicitMale' in voice and 'female' in voice, "explicit male selector retained"),
