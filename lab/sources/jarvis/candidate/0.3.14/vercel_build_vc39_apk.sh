@@ -44,6 +44,13 @@ replacements = {
     "APK_NAME='Jarvis-0.3.1-vc26.apk'": "APK_NAME='Jarvis-0.3.14-vc39.apk'",
     'Jarvis-0.3.1-vc26.sha256.txt': 'Jarvis-0.3.14-vc39.sha256.txt',
 
+    # BrainClient override contains the new reminder-management logic. The base
+    # source archive does not include this override automatically, so install it
+    # into the extracted source before applying version-specific patches.
+    'cp lab/sources/jarvis/candidate/0.2.15/overrides/VoicePrint.kt "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoicePrint.kt"':
+        'cp lab/sources/jarvis/candidate/0.2.15/overrides/VoicePrint.kt "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoicePrint.kt"\\ncp lab/sources/jarvis/candidate/0.2.16/overrides/BrainClient.kt "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/network/BrainClient.kt"',
+
+
     # Aplica VC27 a VC39 a seguir a VC26. (VC30 nao existe na cadeia: foi
     # deliberadamente saltada e nao faz parte da candidata.)
     "python3 lab/sources/jarvis/candidate/0.3.1/apply_vc26.py\n":
