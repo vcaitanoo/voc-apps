@@ -56,6 +56,17 @@ replace_once(
     "strict pt-BR-only male voice scoring",
 )
 
+replace_once(
+    VOICE,
+    '''            if (language == "pt" && country == "BR") value += 12_000
+            else return Int.MIN_VALUE
+            else return Int.MIN_VALUE''',
+    '''            if (language == "pt" && country == "BR") value += 12_000
+            else return Int.MIN_VALUE''',
+    "remove duplicated non-PT-BR guard",
+)
+
+
 voice = VOICE.read_text(encoding="utf-8")  # Re-read changes written by replace_once above
 
 # If the requested engine has no explicitly male PT-BR voice, continue trying
