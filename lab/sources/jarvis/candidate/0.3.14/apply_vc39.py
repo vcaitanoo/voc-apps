@@ -56,7 +56,7 @@ if "Isso vai apagar todos os" not in brain:
     line_end = brain.find("\n", line_start)
     if line_end < 0:
         raise SystemExit("VC39 cancel-all detection line is incomplete")
-    confirmation = '''
+    confirmation = r'''
         if (cancelAll && reminders.size > 1) {
             val confirmed = Regex("\\b(confirmo|confirmar|confirmado|confirmada|sim apague|pode apagar|pode excluir)\\b")
                 .containsMatchIn(normalizedMessage)
