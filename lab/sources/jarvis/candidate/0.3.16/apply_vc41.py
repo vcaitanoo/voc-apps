@@ -78,7 +78,7 @@ voice = replace_regex(
 \s*onErrorMessage\("(?:Não consegui iniciar o mecanismo de voz do Android\. Verifique se o serviço de texto para voz está ativado\.|Não consegui abrir nenhum mecanismo de voz disponível neste telemóvel\.|Não consegui reproduzir a resposta em voz alta, mesmo após tentar os mecanismos de voz disponíveis\.|Não consegui reproduzir a resposta em voz alta\.)"\)''',
     'publishIdleOrListening()',
     "suppress TTS init/playback warnings",
-    count=4,
+    count=3,
 )
 voice = voice.replace('onErrorMessage("Não consegui iniciar a leitura em voz alta.")', '/* TTS falhou; não mostrar aviso de voz ao utilizador. */')
 voice = voice.replace('onErrorMessage("Não encontrei uma voz masculina em português nos mecanismos de voz disponíveis. Verifique as vozes instaladas no Samsung TTS ou no Google TTS.")', '/* Sem voz masculina disponível: não usar voz feminina nem mostrar aviso. */')
