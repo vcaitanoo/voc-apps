@@ -185,6 +185,9 @@ reminder = replace_regex(
 )
 REMINDER.write_text(reminder, encoding="utf-8")
 
+# Prefer Google TTS first, where Brazilian male voices are commonly explicitly tagged.
+voice = voice.replace('0 -> "com.samsung.SMT"', '0 -> "com.google.android.tts"', 1)
+voice = voice.replace('1 -> "com.google.android.tts"', '1 -> "com.samsung.SMT"', 1)
 VOICE.write_text(voice, encoding="utf-8")
 
 build = BUILD.read_text(encoding="utf-8")
@@ -205,4 +208,4 @@ for ok, label in checks:
     if not ok:
         raise SystemExit("VC42 validation failed: " + label)
 
-print("VC42 validated: explicit male PT-BR only; Samsung first; female/default fallback removed; no voice-failure notices")
+print("VC42 validated: explicit male PT-BR only; Google TTS first; female/default fallback removed; no voice-failure notices")
