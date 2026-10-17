@@ -246,27 +246,28 @@ object BrainClient {
         if (accessToken.isBlank() || id.isBlank()) return false
         return runCatching {
             val root = BuildConfig.SUPABASE_URL.trim().trimEnd('/')
-            val encodedId = java.net.URLEncoder.encode(id, "UTF-8")
-            val connection = (URL("$root/rest/v1/jarvis_reminders?id=eq.$encodedId&active=eq.true").openConnection() as HttpURLConnection).apply {
-                requestMethod = "PATCH"
+            val connection = (URL("$root/rest/v1/rpc/jarvis_update_reminder_time").openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
                 connectTimeout = CONNECT_TIMEOUT_MS
                 readTimeout = READ_TIMEOUT_MS
                 doOutput = true
                 setRequestProperty("Accept", "application/json")
                 setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                setRequestProperty("Prefer", "return=representation")
                 setRequestProperty("apikey", BuildConfig.SUPABASE_PUBLISHABLE_KEY)
                 setRequestProperty("Authorization", "Bearer $accessToken")
             }
             try {
-                connection.outputStream.bufferedWriter(Charsets.UTF_8).use {
-                    it.write(JSONObject().put("next_fire_at", Instant.ofEpochMilli(millis).toString()).toString())
-                }
+                val body = JSONObject()
+                    .put("p_id", id)
+                    .put("p_next_fire_at", Instant.ofEpochMilli(millis).toString())
+                connection.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(body.toString()) }
                 val status = connection.responseCode
                 val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-                val response = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-                status in 200..299 && runCatching { JSONArray(response).length() > 0 }.getOrDefault(false)
-            } finally { connection.disconnect() }
+                val response = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty().trim()
+                status in 200..299 && response == "true"
+            } finally {
+                connection.disconnect()
+            }
         }.getOrDefault(false)
     }
 
