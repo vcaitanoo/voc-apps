@@ -56,10 +56,7 @@ replacements = {
         "python3 lab/sources/jarvis/candidate/0.3.8/apply_vc33.py\n"
         "python3 lab/sources/jarvis/candidate/0.3.9/apply_vc34.py\n"
         "python3 lab/sources/jarvis/candidate/0.3.10/apply_vc35.py\n"
-        "python3 lab/sources/jarvis/candidate/0.3.11/apply_vc36.py\npython3 lab/sources/jarvis/candidate/0.3.13/apply_vc38.py\n"
-        "mkdir -p jarvis0215/app/src/main/java/pt/vcaitano/jarvis/network\n"
-        "cp lab/sources/jarvis/candidate/0.2.16/overrides/BrainClient.kt jarvis0215/app/src/main/java/pt/vcaitano/jarvis/network/BrainClient.kt\n"
-        "python3 lab/sources/jarvis/candidate/0.3.14/apply_vc39.py\n",
+        "python3 lab/sources/jarvis/candidate/0.3.11/apply_vc36.py\npython3 lab/sources/jarvis/candidate/0.3.13/apply_vc38.py\npython3 lab/sources/jarvis/candidate/0.3.14/apply_vc39.py\n
 
     "grep -q 'versionCode = 26'": "grep -q 'versionCode = 39'",
     "grep -q 'versionName = \"0.3.1\"'": "grep -q 'versionName = \"0.3.11\"'",
