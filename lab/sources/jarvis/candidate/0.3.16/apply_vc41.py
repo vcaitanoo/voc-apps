@@ -148,8 +148,7 @@ reminder = replace_regex(
         fun explicitMale(name: String): Boolean {
             val normalized = name.lowercase(Locale.ROOT)
             if (listOf("female", "feminina", "mulher", "woman", "_f00", "-f00", "#female_").any(normalized::contains)) return false
-            return listOf("male", "masculino", "homem", "#male_", "_m00", "-m00", "_m01", "-m01", "_m02", "-m02", "_m03", "-m03").any(normalized::contains) ||
-                Regex("(?:^|[_#-])m\\\\d{1,2}(?:$|[_#-])").containsMatchIn(normalized)
+            return listOf("male", "masculino", "homem", "#male_", "_m00", "-m00", "_m01", "-m01", "_m02", "-m02", "_m03", "-m03").any(normalized::contains)
         }
 
         val candidates = runCatching {
