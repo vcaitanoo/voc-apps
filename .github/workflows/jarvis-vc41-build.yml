@@ -110,7 +110,7 @@ jobs:
                 "notes": "Correção focada na voz: exige voz masculina identificada em português do Brasil (pt-BR), sem fallback para voz feminina/genérica, e remove avisos de falha de síntese. APK assinado; teste físico pendente."
             }
             catalog["updatedAt"] = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-            catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
+            catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             PY
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
