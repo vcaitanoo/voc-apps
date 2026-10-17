@@ -18,7 +18,7 @@ set -euo pipefail
 # script checks VERCEL_OIDC_TOKEN. A fresh token is requested again before
 # signing and upload, because the Gradle build may take several minutes.
 if [[ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" && -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
-  OIDC_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fkhinnoxpesnhtmmvrken.supabase.co%2Ffunctions%2Fv1%2Fjarvis-vc39-build-oidc"
+  OIDC_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fkhinnoxpesnhtmmvrken.supabase.co%2Ffunctions%2Fv1%2Fjarvis-vc38-build-oidc"
   VERCEL_OIDC_TOKEN="$(curl --connect-timeout 15 --max-time 30 -fsSL -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$OIDC_URL" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
   export VERCEL_OIDC_TOKEN
 fi
@@ -39,7 +39,7 @@ base = Path(sys.argv[1]).read_text()
 
 replacements = {
     "ENDPOINT='https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-build-oidc'":
-        'ENDPOINT="${JARVIS_BUILD_ENDPOINT:-https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-vc39-build-oidc}"',
+        'ENDPOINT="${JARVIS_BUILD_ENDPOINT:-https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-vc38-build-oidc}"',
     '.jarvis-build-vc26': '.jarvis-build-vc39',
     "APK_NAME='Jarvis-0.3.1-vc26.apk'": "APK_NAME='Jarvis-0.3.14-vc39.apk'",
     'Jarvis-0.3.1-vc26.sha256.txt': 'Jarvis-0.3.14-vc39.sha256.txt',
@@ -58,13 +58,13 @@ replacements = {
         "python3 lab/sources/jarvis/candidate/0.3.10/apply_vc35.py\n"
         "python3 lab/sources/jarvis/candidate/0.3.11/apply_vc36.py\npython3 lab/sources/jarvis/candidate/0.3.13/apply_vc38.py\npython3 lab/sources/jarvis/candidate/0.3.14/apply_vc39.py\n",
 
-    "grep -q 'versionCode = 26'": "grep -q 'versionCode = 38'",
+    "grep -q 'versionCode = 26'": "grep -q 'versionCode = 39'",
     "grep -q 'versionName = \"0.3.1\"'": "grep -q 'versionName = \"0.3.11\"'",
     "require_fixed \"name='pt.vcaitano.jarvis' versionCode='26' versionName='0.3.1'\"":
-        "require_fixed \"name='pt.vcaitano.jarvis' versionCode='38' versionName='0.3.14'\"",
+        "require_fixed \"name='pt.vcaitano.jarvis' versionCode='39' versionName='0.3.14'\"",
 
     '"version": "0.3.1"': '"version": "0.3.14"',
-    '"versionCode": 26': '"versionCode": 38',
+    '"versionCode": 26': '"versionCode": 39',
     '"apk": "Jarvis-0.3.1-vc26.apk"': '"apk": "Jarvis-0.3.14-vc39.apk"',
 }
 
@@ -104,7 +104,7 @@ if "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2" not in bas
 # e substituida pelas invariantes que interessam a VC39.
 validation = r'''
 # --- escopo da VC39 -------------------------------------------------------
-grep -q 'versionCode = 38' "$SOURCE/app/build.gradle.kts"
+grep -q 'versionCode = 39' "$SOURCE/app/build.gradle.kts"
 grep -q 'versionName = "0.3.14"' "$SOURCE/app/build.gradle.kts"
 
 # O SpeechRecognizer e a origem do bip. Nunca pode reaparecer.
@@ -171,7 +171,7 @@ base = base.replace('echo \'VC26_APK_BUILD_OK\'', 'echo \'VC39_APK_BUILD_OK\'')
 # GitHub Actions OIDC tokens are short-lived, so refresh before signing and upload.
 github_oidc_refresh = r'''
 if [[ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" && -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
-  OIDC_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fkhinnoxpesnhtmmvrken.supabase.co%2Ffunctions%2Fv1%2Fjarvis-vc39-build-oidc"
+  OIDC_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fkhinnoxpesnhtmmvrken.supabase.co%2Ffunctions%2Fv1%2Fjarvis-vc38-build-oidc"
   VERCEL_OIDC_TOKEN="$(curl --connect-timeout 15 --max-time 30 -fsSL -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$OIDC_URL" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
   export VERCEL_OIDC_TOKEN
 fi
@@ -197,7 +197,7 @@ SUPABASE_URL="$(printf '%s' "$ENDPOINT" | sed -E 's#^(https://[^/]+).*#\\1#')"
 
 echo '[11/12] Publicando os bytes exatos no armazenamento permanente...'
 if [[ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" && -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
-  OIDC_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fkhinnoxpesnhtmmvrken.supabase.co%2Ffunctions%2Fv1%2Fjarvis-vc39-build-oidc"
+  OIDC_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fkhinnoxpesnhtmmvrken.supabase.co%2Ffunctions%2Fv1%2Fjarvis-vc38-build-oidc"
   VERCEL_OIDC_TOKEN="$(curl --connect-timeout 15 --max-time 30 -fsSL -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$OIDC_URL" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
   export VERCEL_OIDC_TOKEN
 fi
@@ -240,7 +240,7 @@ cat > "$OUT/publish.json" <<EOF
   "apk": "$APK_NAME",
   "apkUrl": "$PUBLIC_URL",
   "sha256": "$APK_SHA",
-  "versionCode": 38,
+  "versionCode": 39,
   "versionName": "0.3.14",
   "publishedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
