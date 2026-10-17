@@ -117,19 +117,15 @@ reminder = REMINDER.read_text(encoding="utf-8")
 # strict PT-BR male-only rule there; never use a pitch-deepened female default.
 reminder = replace_regex(
     reminder,
-    r'''            val maleReady = configurePortugueseVoice\(engine\)
-            engine\.setSpeechRate\(0\.98f\)
-            engine\.setPitch\(if \(maleReady\) 0\.94f else 0\.80f\)''',
+    r'''            configurePortugueseVoice\(engine\)
+            engine\.setSpeechRate\(0\.96f\)
+            engine\.setPitch\(0\.90f\)''',
     '''            if (!configurePortugueseVoice(engine)) {
                 runCatching { engine.stop() }
                 runCatching { engine.shutdown() }
                 tts = null
-                if (preferSamsung) {
-                    handler.post { initializeReminderTts(text, ownerId, preferSamsung = false) }
-                } else {
-                    stopSpeechAndSelf()
-                }
-                return@OnInitListener
+                stopSpeechAndSelf()
+                return@TextToSpeech
             }
             engine.setSpeechRate(0.96f)
             engine.setPitch(0.90f)''',
@@ -137,7 +133,7 @@ reminder = replace_regex(
 )
 reminder = replace_regex(
     reminder,
-    r'    private fun configurePortugueseVoice\(engine: TextToSpeech\): Boolean \{[\s\S]*?\n    \}',
+    r'    private fun configurePortugueseVoice\(engine: TextToSpeech\)(?:: Boolean)? \{[\s\S]*?\n    \}',
     '''    private fun configurePortugueseVoice(engine: TextToSpeech): Boolean {
         val ptBr = Locale("pt", "BR")
         val languageReady = runCatching {
