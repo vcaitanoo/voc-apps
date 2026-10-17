@@ -35,17 +35,14 @@ old_init = '''            val maleReady = configurePortugueseVoice()
             tts?.setSpeechRate(0.96f)
             tts?.setPitch(0.90f)'''
 new_init = '''            val explicitMaleReady = configurePortugueseVoice()
-            val fallbackVoiceReady = !explicitMaleReady && configureFallbackPortugueseVoice()
+            if (!explicitMaleReady) configureFallbackPortugueseVoice()
 
             // Do not disable Jarvis just because Android did not label a
             // Portuguese voice as male. Prefer an installed Portuguese voice
             // and use a deeper pitch; preserve the historic pitch for a tagged male voice.
             ttsReady = true
             tts?.setSpeechRate(0.94f)
-            tts?.setPitch(if (explicitMaleReady) 0.90f else 0.66f)
-            if (!explicitMaleReady && !fallbackVoiceReady) {
-                onErrorMessage("A voz masculina preferida não está identificada neste mecanismo. Vou tentar usar a voz instalada com tom mais grave.")
-            }'''
+            tts?.setPitch(if (explicitMaleReady) 0.90f else 0.66f)'''
 replace_once(VOICE, old_init, new_init, "mandatory male voice rejection")
 
 replace_once(
@@ -103,6 +100,13 @@ replace_once(
         tts?.setPitch(if (explicitMaleReady) 0.90f else 0.66f)
         tts?.setSpeechRate(0.94f)''',
     "speak path fallback"
+)
+
+replace_once(
+    VOICE,
+    "if (attempt < 20)",
+    "if (attempt < 60)",
+    "allow slower Android TTS initialization"
 )
 
 voice = VOICE.read_text(encoding="utf-8")
