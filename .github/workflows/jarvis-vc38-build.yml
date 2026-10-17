@@ -1,4 +1,4 @@
-name: Jarvis VC38 candidate build
+name: Jarvis VC39 candidate build
 
 on:
   push:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: Build, verify and publish Jarvis 0.3.13
+    name: Build, verify and publish Jarvis 0.3.14
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -43,6 +43,7 @@ jobs:
           test -f lab/sources/jarvis/candidate/0.2.15/overrides/VoicePrint.kt
           test -f lab/sources/jarvis/candidate/0.3.11/apply_vc36.py
           test -f lab/sources/jarvis/candidate/0.3.13/apply_vc38.py
+          test -f lab/sources/jarvis/candidate/0.3.14/apply_vc39.py
           mkdir -p gl/lab/sources/jarvis
           cp -a lab/sources/jarvis/candidate gl/lab/sources/jarvis/
           cp -a lab/catalog.json gl/lab/catalog.json
@@ -50,18 +51,18 @@ jobs:
           grep -q 'ACTIONS_ID_TOKEN_REQUEST_URL' gl/lab/sources/jarvis/candidate/0.3.13/vercel_build_vc38_apk.sh
           grep -q 'EXPECTED_CERT_SHA="f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2"' gl/lab/sources/jarvis/candidate/0.3.13/vercel_build_vc38_apk.sh
           echo "GitHub canonical source commit: $GITHUB_SHA"
-          echo "Source parts and VC18..VC38 patch chain are present."
+          echo "Source parts and VC18..VC39 patch chain are present."
 
       - name: Build, validate and publish candidate
         shell: bash
         run: |
           set -euo pipefail
           cd gl
-          bash lab/sources/jarvis/candidate/0.3.13/vercel_build_vc38_apk.sh
-          test -s dist/Jarvis-0.3.13-vc38.apk
+          bash lab/sources/jarvis/candidate/0.3.14/vercel_build_vc39_apk.sh
+          test -s dist/Jarvis-0.3.14-vc39.apk
           test -s dist/publish.json
           cat dist/publish.json
-          sha256sum dist/Jarvis-0.3.13-vc38.apk
+          sha256sum dist/Jarvis-0.3.14-vc39.apk
 
       - name: Register verified candidate in VOC Lab catalog
         if: success()
@@ -81,21 +82,21 @@ jobs:
           app = next((item for item in catalog["apps"] if item.get("id") == "jarvis"), None)
           if app is None:
               raise SystemExit("Jarvis ausente de lab/catalog.json")
-          if report.get("versionCode") != 38 or report.get("versionName") != "0.3.13":
-              raise SystemExit("Relatório de publicação não é VC38 / 0.3.13")
-          if report.get("apk") != "Jarvis-0.3.13-vc38.apk":
+          if report.get("versionCode") != 39 or report.get("versionName") != "0.3.14":
+              raise SystemExit("Relatório de publicação não é VC39 / 0.3.14")
+          if report.get("apk") != "Jarvis-0.3.14-vc39.apk":
               raise SystemExit("Nome do APK inesperado")
           url = report.get("apkUrl", "")
           sha = report.get("sha256", "")
           if not url.startswith("https://") or len(sha) != 64:
               raise SystemExit("URL ou SHA-256 inválido")
           app["candidate"] = {
-              "versionCode": 38,
-              "versionName": "0.3.13",
+              "versionCode": 39,
+              "versionName": "0.3.14",
               "apkUrl": url,
               "sha256": sha.lower(),
               "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
-              "notes": "CANDIDATO VC38 / 0.3.13: correção da escuta silenciosa e voz masculina obrigatória em português. APK publicado no armazenamento permanente, SHA-256 verificado contra o binário servido e certificado validado no build. Teste físico ainda pendente; não é versão estável."
+              "notes": "CANDIDATO VC39 / 0.3.14: gestão de lembretes por voz e texto, listagem, alteração de horário, remoção direcionada e confirmação antes de apagar todos. APK publicado no armazenamento permanente, SHA-256 verificado e certificado validado no build. Teste físico ainda pendente; não é versão estável."
           }
           catalog["updatedAt"] = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
           catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -105,7 +106,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add lab/catalog.json
           if ! git diff --cached --quiet; then
-            git commit -m "Publish Jarvis VC38 candidate metadata"
+            git commit -m "Publish Jarvis VC39 candidate metadata"
             git push origin HEAD:main
           else
             echo "Catalog already contains this verified candidate."
@@ -122,15 +123,16 @@ jobs:
           from pathlib import Path
           report = json.loads(Path("gl/dist/publish.json").read_text(encoding="utf-8"))
           expected = {
-              "apk": "Jarvis-0.3.13-vc38.apk",
-              "versionCode": 38,
-              "versionName": "0.3.13",
-              "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.13-vc38.apk",
-              "sha256": "7fc8e6f264c29d881a6bfcf064aa3801e3c352d31ed261a05fe49bd202256697",
+              "apk": "Jarvis-0.3.14-vc39.apk",
+              "versionCode": 39,
+              "versionName": "0.3.14",
+              "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.14-vc39.apk",
           }
           for key, value in expected.items():
               if report.get(key) != value:
-                  raise SystemExit(f"VC38 report mismatch for {key}")
+                  raise SystemExit(f"VC39 report mismatch for {key}")
+          if not isinstance(report.get("sha256"), str) or len(report["sha256"]) != 64:
+              raise SystemExit("VC39 report has invalid SHA-256")
           PY
           OIDC_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fkhinnoxpesnhtmmvrken.supabase.co%2Ffunctions%2Fv1%2Fjarvis-vc38-build-oidc"
           VERCEL_OIDC_TOKEN="$(curl --connect-timeout 15 --max-time 30 -fsSL -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$OIDC_URL" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
@@ -140,8 +142,8 @@ jobs:
           python3 - "$RUNNER_TEMP/voc-lab-catalog-sync.json" <<'PY'
           import json, sys
           result = json.loads(open(sys.argv[1], encoding="utf-8").read())
-          if not result.get("ok") or result.get("versionCode") != 38 or result.get("versionName") != "0.3.13":
-              raise SystemExit("The live VOC Lab catalog did not confirm VC38")
+          if not result.get("ok") or result.get("versionCode") != 39 or result.get("versionName") != "0.3.14":
+              raise SystemExit("The live VOC Lab catalog did not confirm VC39")
           print("LIVE_VOC_LAB_CATALOG_SYNC_OK")
           PY
 

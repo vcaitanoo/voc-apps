@@ -7,7 +7,12 @@ import pt.vcaitano.jarvis.BuildConfig
 import java.net.HttpURLConnection
 import java.net.URL
 import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object BrainClient {
@@ -87,6 +92,7 @@ object BrainClient {
         if (!isConfigured || message.isBlank()) return null
         val cleanMessage = message.trim()
 
+        reminderManagementResponse(accessToken, cleanMessage)?.let { return it }
         reminderCancellationResponse(accessToken, cleanMessage)?.let { return it }
 
         val outboundMessage = if (cleanMessage.equals("Jarvis", ignoreCase = true)) {
@@ -145,6 +151,126 @@ object BrainClient {
         }
     }
 
+    private fun reminderManagementResponse(accessToken: String?, message: String): ChatResponse? {
+        if (accessToken.isNullOrBlank()) return null
+        val normalized = normalizeText(message)
+        val health = healthStatus()
+
+        if (looksLikeReminderListing(normalized)) {
+            val reminders = activeReminders(accessToken)
+            if (reminders.isEmpty()) return localActionResponse("Não encontrei lembretes ativos.", health)
+            val now = System.currentTimeMillis()
+            val lines = reminders.take(20).mapIndexed { index, reminder ->
+                val overdue = reminder.nextFireAtMillis < now
+                "${index + 1}. ${reminder.title}, ${formatReminderDate(reminder.nextFireAtMillis)}${if (overdue) ", em atraso" else ""}" +
+                    (reminder.details?.takeIf { it.isNotBlank() }?.let { ". $it" } ?: "")
+            }
+            val intro = if (reminders.size == 1) "Você tem um lembrete ativo: " else "Você tem ${reminders.size} lembretes ativos: "
+            val suffix = if (reminders.size > 20) " Estou mostrando os primeiros 20." else ""
+            return localActionResponse(intro + lines.joinToString(". ") + "." + suffix, health)
+        }
+
+        if (!looksLikeReminderEdit(normalized)) return null
+        val reminders = activeReminders(accessToken)
+        if (reminders.isEmpty()) return localActionResponse("Não há lembretes ativos para alterar.", health)
+        val targets = reminders.filter { reminder ->
+            normalizeText(reminder.title).split(Regex("\\s+")).filter { it.length >= 4 }
+                .any { word -> normalized.contains(word) }
+        }
+        if (targets.isEmpty()) {
+            return localActionResponse("Não consegui identificar qual lembrete você quer alterar. Diga parte do nome e o novo horário.", health)
+        }
+        if (targets.size > 1) {
+            return localActionResponse("Encontrei mais de um lembrete parecido: " +
+                targets.take(5).joinToString("; ") { "${it.title}, ${formatReminderDate(it.nextFireAtMillis)}" } +
+                ". Diga qual deles quer alterar.", health)
+        }
+
+        val target = targets.first()
+        val timeMatch = Regex("\\b(?:as|para as|pelas?)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*h?\\b").find(normalized)
+        val saysToday = Regex("\\bhoje\\b").containsMatchIn(normalized)
+        val saysTomorrow = Regex("\\bamanha\\b").containsMatchIn(normalized)
+        if (timeMatch == null && !saysToday && !saysTomorrow) {
+            return localActionResponse("Diga o novo dia ou horário, por exemplo: mude o lembrete ${target.title} para amanhã às 18h.", health)
+        }
+
+        val zone = ZoneId.systemDefault()
+        val oldDateTime = Instant.ofEpochMilli(target.nextFireAtMillis).atZone(zone).toLocalDateTime()
+        var date = when {
+            saysTomorrow -> LocalDate.now(zone).plusDays(1)
+            saysToday -> LocalDate.now(zone)
+            else -> oldDateTime.toLocalDate()
+        }
+        val time = if (timeMatch != null) {
+            val hour = timeMatch.groupValues[1].toIntOrNull()
+            val minute = timeMatch.groupValues[2].takeIf { it.isNotBlank() }?.toIntOrNull() ?: 0
+            if (hour == null || hour !in 0..23 || minute !in 0..59) {
+                return localActionResponse("Esse horário não é válido. Use, por exemplo, 18h ou 18:30.", health)
+            }
+            LocalTime.of(hour, minute)
+        } else oldDateTime.toLocalTime().withSecond(0).withNano(0)
+
+        var newDateTime = LocalDateTime.of(date, time)
+        if (!saysToday && !saysTomorrow && timeMatch != null &&
+            newDateTime.atZone(zone).toInstant().toEpochMilli() <= System.currentTimeMillis()) {
+            date = date.plusDays(1)
+            newDateTime = LocalDateTime.of(date, time)
+        }
+        val newMillis = newDateTime.atZone(zone).toInstant().toEpochMilli()
+        if (!updateReminderTime(accessToken, target.id, newMillis)) {
+            return localActionResponse("Não consegui alterar esse lembrete agora. Ele continua como estava.", health)
+        }
+        return localActionResponse("Pronto. O lembrete ${target.title} foi alterado para ${formatReminderDate(newMillis)}.", health)
+    }
+
+    private fun looksLikeReminderListing(normalized: String): Boolean {
+        val hasReminder = Regex("\\b(lembrete|lembretes|avisos?)\\b").containsMatchIn(normalized)
+        val listIntent = Regex("\\b(lista|listar|liste|mostra|mostrar|mostre|quais|agenda|relembra|relembrar|relembre)\\b").containsMatchIn(normalized) ||
+            Regex("\\b(o que tenho|tenho para fazer|tenho a fazer|proximos lembretes|lembretes de hoje|lembretes para hoje)\\b").containsMatchIn(normalized)
+        return hasReminder && listIntent
+    }
+
+    private fun looksLikeReminderEdit(normalized: String): Boolean {
+        val action = Regex("\\b(altere|alterar|altera|mude|mudar|muda|adia|adiar|adiante|remarque|remarcar|passa|passe|troque|trocar|atualize|atualizar)\\b")
+        val objectWord = Regex("\\b(lembrete|lembretes|aviso|avisos)\\b")
+        return action.containsMatchIn(normalized) && objectWord.containsMatchIn(normalized) && !looksLikeReminderCancellation(normalized)
+    }
+
+    private fun formatReminderDate(millis: Long): String {
+        val formatter = DateTimeFormatter.ofPattern("d 'de' MMMM 'às' HH:mm", Locale("pt", "PT"))
+        return runCatching { Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).format(formatter) }
+            .getOrDefault("num horário não identificado")
+    }
+
+    private fun updateReminderTime(accessToken: String, id: String, millis: Long): Boolean {
+        if (accessToken.isBlank() || id.isBlank()) return false
+        return runCatching {
+            val root = BuildConfig.SUPABASE_URL.trim().trimEnd('/')
+            val connection = (URL("$root/rest/v1/rpc/jarvis_update_reminder_time").openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = CONNECT_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
+                doOutput = true
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setRequestProperty("apikey", BuildConfig.SUPABASE_PUBLISHABLE_KEY)
+                setRequestProperty("Authorization", "Bearer $accessToken")
+            }
+            try {
+                val body = JSONObject()
+                    .put("p_id", id)
+                    .put("p_next_fire_at", Instant.ofEpochMilli(millis).toString())
+                connection.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(body.toString()) }
+                val status = connection.responseCode
+                val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+                val response = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty().trim()
+                status in 200..299 && response == "true"
+            } finally {
+                connection.disconnect()
+            }
+        }.getOrDefault(false)
+    }
+
     private fun reminderCancellationResponse(accessToken: String?, message: String): ChatResponse? {
         if (accessToken.isNullOrBlank() || !looksLikeReminderCancellation(message)) return null
 
@@ -160,6 +286,16 @@ object BrainClient {
 
         val normalizedMessage = normalizeText(message)
         val cancelAll = Regex("\\b(todos|todas|qualquer|quaisquer)\\b").containsMatchIn(normalizedMessage)
+        if (cancelAll && reminders.size > 1) {
+            val confirmed = Regex("\\b(confirmo|confirmar|confirmado|confirmada|sim apague|pode apagar|pode excluir)\\b")
+                .containsMatchIn(normalizedMessage)
+            if (!confirmed) {
+                return localActionResponse(
+                    "Isso vai apagar todos os ${reminders.size} lembretes ativos. Para confirmar, diga: confirmo apagar todos os lembretes.",
+                    health
+                )
+            }
+        }
         val targets = when {
             cancelAll -> reminders
             reminders.size == 1 -> reminders
