@@ -56,6 +56,8 @@ replace_once(
     "strict pt-BR-only male voice scoring",
 )
 
+voice = VOICE.read_text(encoding="utf-8")  # Re-read changes written by replace_once above
+
 # If the requested engine has no explicitly male PT-BR voice, continue trying
 # the next engine; after the final attempt, return quietly instead of showing
 # a voice-failure banner or accepting the engine's female default.
