@@ -110,6 +110,73 @@ for forbidden in [
         # No visible voice-failure messages in the compiled controller.
         voice = voice.replace(forbidden, "/* mensagem de voz desativada */")
 
+REMINDER = ROOT / "app/src/main/java/pt/vcaitano/jarvis/voice/ReminderSpeechService.kt"
+reminder = REMINDER.read_text(encoding="utf-8")
+
+# Scheduled reminders use a separate Android TTS service. Apply the same
+# strict PT-BR male-only rule there; never use a pitch-deepened female default.
+reminder = replace_regex(
+    reminder,
+    r'''            val maleReady = configurePortugueseVoice\(engine\)
+            engine\.setSpeechRate\(0\.98f\)
+            engine\.setPitch\(if \(maleReady\) 0\.94f else 0\.80f\)''',
+    '''            if (!configurePortugueseVoice(engine)) {
+                runCatching { engine.stop() }
+                runCatching { engine.shutdown() }
+                tts = null
+                if (preferSamsung) {
+                    handler.post { initializeReminderTts(text, ownerId, preferSamsung = false) }
+                } else {
+                    stopSpeechAndSelf()
+                }
+                return@OnInitListener
+            }
+            engine.setSpeechRate(0.96f)
+            engine.setPitch(0.90f)''',
+    "strict reminder TTS voice",
+)
+reminder = replace_regex(
+    reminder,
+    r'    private fun configurePortugueseVoice\(engine: TextToSpeech\): Boolean \{[\s\S]*?\n    \}',
+    '''    private fun configurePortugueseVoice(engine: TextToSpeech): Boolean {
+        val ptBr = Locale("pt", "BR")
+        val languageReady = runCatching {
+            engine.setLanguage(ptBr) >= TextToSpeech.LANG_AVAILABLE
+        }.getOrDefault(false)
+        if (!languageReady) return false
+
+        fun explicitMale(name: String): Boolean {
+            val normalized = name.lowercase(Locale.ROOT)
+            if (listOf("female", "feminina", "mulher", "woman", "_f00", "-f00", "#female_").any(normalized::contains)) return false
+            return listOf("male", "masculino", "homem", "#male_", "_m00", "-m00", "_m01", "-m01", "_m02", "-m02", "_m03", "-m03").any(normalized::contains) ||
+                Regex("(?:^|[_#-])m\\\\d{1,2}(?:$|[_#-])").containsMatchIn(normalized)
+        }
+
+        val candidates = runCatching {
+            engine.voices.orEmpty()
+                .filter {
+                    it.locale.language.equals("pt", ignoreCase = true) &&
+                    it.locale.country.equals("BR", ignoreCase = true) &&
+                    explicitMale(it.name)
+                }
+                .sortedWith(
+                    compareByDescending<android.speech.tts.Voice> { if (it.name.contains("#male_", ignoreCase = true)) 1 else 0 }
+                        .thenByDescending { it.quality }
+                        .thenBy { it.isNetworkConnectionRequired }
+                )
+        }.getOrDefault(emptyList())
+        val selected = candidates.firstOrNull() ?: return false
+        return runCatching {
+            engine.voice = selected
+            engine.voice?.name == selected.name &&
+                engine.voice?.locale?.language.equals("pt", ignoreCase = true) &&
+                engine.voice?.locale?.country.equals("BR", ignoreCase = true)
+        }.getOrDefault(false)
+    }''',
+    "replace reminder voice selector",
+)
+REMINDER.write_text(reminder, encoding="utf-8")
+
 VOICE.write_text(voice, encoding="utf-8")
 
 build = BUILD.read_text(encoding="utf-8")
