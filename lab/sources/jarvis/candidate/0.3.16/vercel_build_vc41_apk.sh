@@ -150,6 +150,8 @@ if grep -q 'O usuário apenas chamou você dizendo' "$BRAIN"; then
   exit 1
 fi
 
+echo '--- VC41 VoiceController.kt lines 835-860 (compile diagnostics) ---'
+nl -ba "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt" | sed -n '835,860p'
 echo 'VALIDATION_OK: escopo estrito da VC41 (VC35 mantida + persona + pt-PT)'
 '''
 
