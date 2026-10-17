@@ -162,10 +162,10 @@ object BrainClient {
             val now = System.currentTimeMillis()
             val lines = reminders.take(20).mapIndexed { index, reminder ->
                 val overdue = reminder.nextFireAtMillis < now
-                "\${index + 1}. \${reminder.title}, \${formatReminderDate(reminder.nextFireAtMillis)}\${if (overdue) ", em atraso" else ""}" +
+                "${index + 1}. ${reminder.title}, ${formatReminderDate(reminder.nextFireAtMillis)}${if (overdue) ", em atraso" else ""}" +
                     (reminder.details?.takeIf { it.isNotBlank() }?.let { ". $it" } ?: "")
             }
-            val intro = if (reminders.size == 1) "Você tem um lembrete ativo: " else "Você tem \${reminders.size} lembretes ativos: "
+            val intro = if (reminders.size == 1) "Você tem um lembrete ativo: " else "Você tem ${reminders.size} lembretes ativos: "
             val suffix = if (reminders.size > 20) " Estou mostrando os primeiros 20." else ""
             return localActionResponse(intro + lines.joinToString(". ") + "." + suffix, health)
         }
@@ -182,7 +182,7 @@ object BrainClient {
         }
         if (targets.size > 1) {
             return localActionResponse("Encontrei mais de um lembrete parecido: " +
-                targets.take(5).joinToString("; ") { "\${it.title}, \${formatReminderDate(it.nextFireAtMillis)}" } +
+                targets.take(5).joinToString("; ") { "${it.title}, ${formatReminderDate(it.nextFireAtMillis)}" } +
                 ". Diga qual deles quer alterar.", health)
         }
 
@@ -191,7 +191,7 @@ object BrainClient {
         val saysToday = Regex("\\bhoje\\b").containsMatchIn(normalized)
         val saysTomorrow = Regex("\\bamanha\\b").containsMatchIn(normalized)
         if (timeMatch == null && !saysToday && !saysTomorrow) {
-            return localActionResponse("Diga o novo dia ou horário, por exemplo: mude o lembrete \${target.title} para amanhã às 18h.", health)
+            return localActionResponse("Diga o novo dia ou horário, por exemplo: mude o lembrete ${target.title} para amanhã às 18h.", health)
         }
 
         val zone = ZoneId.systemDefault()
@@ -220,7 +220,7 @@ object BrainClient {
         if (!updateReminderTime(accessToken, target.id, newMillis)) {
             return localActionResponse("Não consegui alterar esse lembrete agora. Ele continua como estava.", health)
         }
-        return localActionResponse("Pronto. O lembrete \${target.title} foi alterado para \${formatReminderDate(newMillis)}.", health)
+        return localActionResponse("Pronto. O lembrete ${target.title} foi alterado para ${formatReminderDate(newMillis)}.", health)
     }
 
     private fun looksLikeReminderListing(normalized: String): Boolean {
@@ -290,7 +290,7 @@ object BrainClient {
                 .containsMatchIn(normalizedMessage)
             if (!confirmed) {
                 return localActionResponse(
-                    "Isso vai apagar todos os \${reminders.size} lembretes ativos. Para confirmar, diga: confirmo apagar todos os lembretes.",
+                    "Isso vai apagar todos os ${reminders.size} lembretes ativos. Para confirmar, diga: confirmo apagar todos os lembretes.",
                     health
                 )
             }
