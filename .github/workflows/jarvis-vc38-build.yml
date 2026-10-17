@@ -83,8 +83,8 @@ jobs:
           app = next((item for item in catalog["apps"] if item.get("id") == "jarvis"), None)
           if app is None:
               raise SystemExit("Jarvis ausente de lab/catalog.json")
-          if report.get("versionCode") != 39 or report.get("versionName") != "0.3.14":
-              raise SystemExit("Relatório de publicação não é VC39 / 0.3.14")
+          if report.get("versionCode") != 40 or report.get("versionName") != "0.3.15":
+              raise SystemExit("Relatório de publicação não é VC40 / 0.3.15")
           if report.get("apk") != "Jarvis-0.3.15-vc40.apk":
               raise SystemExit("Nome do APK inesperado")
           url = report.get("apkUrl", "")
@@ -107,7 +107,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add lab/catalog.json
           if ! git diff --cached --quiet; then
-            git commit -m "Publish Jarvis VC39 candidate metadata"
+            git commit -m "Publish Jarvis VC40 candidate metadata"
             git push origin HEAD:main
           else
             echo "Catalog already contains this verified candidate."
@@ -131,9 +131,9 @@ jobs:
           }
           for key, value in expected.items():
               if report.get(key) != value:
-                  raise SystemExit(f"VC39 report mismatch for {key}")
+                  raise SystemExit(f"VC40 report mismatch for {key}")
           if not isinstance(report.get("sha256"), str) or len(report["sha256"]) != 64:
-              raise SystemExit("VC39 report has invalid SHA-256")
+              raise SystemExit("VC40 report has invalid SHA-256")
           PY
           OIDC_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fkhinnoxpesnhtmmvrken.supabase.co%2Ffunctions%2Fv1%2Fjarvis-vc38-build-oidc"
           VERCEL_OIDC_TOKEN="$(curl --connect-timeout 15 --max-time 30 -fsSL -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$OIDC_URL" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
@@ -144,7 +144,7 @@ jobs:
           import json, sys
           result = json.loads(open(sys.argv[1], encoding="utf-8").read())
           if not result.get("ok") or result.get("versionCode") != 39 or result.get("versionName") != "0.3.14":
-              raise SystemExit("The live VOC Lab catalog did not confirm VC39")
+              raise SystemExit("The live VOC Lab catalog did not confirm VC40")
           print("LIVE_VOC_LAB_CATALOG_SYNC_OK")
           PY
 
