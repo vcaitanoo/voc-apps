@@ -1,19 +1,24 @@
-name: Jarvis VC40 candidate build
+name: Jarvis VC41 male Brazilian voice build
 
 on:
   push:
     branches: [main]
     paths:
-      - 'lab/sources/jarvis/candidate/0.3.15/**'
+      - 'lab/sources/jarvis/candidate/0.3.16/**'
+      - '.github/workflows/jarvis-vc38-build.yml'
   workflow_dispatch:
 
 permissions:
   contents: write
   id-token: write
 
+concurrency:
+  group: jarvis-vc41-release
+  cancel-in-progress: true
+
 jobs:
   build:
-    name: Build, verify and publish Jarvis 0.3.15
+    name: Build, verify and publish Jarvis 0.3.16 / VC41
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -34,124 +39,96 @@ jobs:
         with:
           gradle-version: '9.5.1'
 
-      - name: Prepare canonical source from GitHub
+      - name: Prepare canonical source
         shell: bash
         run: |
           set -euo pipefail
-          test -f lab/sources/jarvis/candidate/0.3.1/vercel_build_vc26_apk.sh
           test -s lab/sources/jarvis/candidate/0.2.15/source.part.00
-          test -f lab/sources/jarvis/candidate/0.2.15/overrides/VoicePrint.kt
-          test -f lab/sources/jarvis/candidate/0.3.11/apply_vc36.py
-          test -f lab/sources/jarvis/candidate/0.3.13/apply_vc38.py
+          test -f lab/sources/jarvis/candidate/0.3.1/vercel_build_vc26_apk.sh
           test -f lab/sources/jarvis/candidate/0.3.14/apply_vc39.py
-          test -f lab/sources/jarvis/candidate/0.3.15/apply_vc40.py
+          test -f lab/sources/jarvis/candidate/0.3.16/apply_vc41.py
+          test -f lab/sources/jarvis/candidate/0.3.16/vercel_build_vc41_apk.sh
           mkdir -p gl/lab/sources/jarvis
           cp -a lab/sources/jarvis/candidate gl/lab/sources/jarvis/
           cp -a lab/catalog.json gl/lab/catalog.json
           cp -a manifest.json gl/manifest.json
-          grep -q 'ACTIONS_ID_TOKEN_REQUEST_URL' gl/lab/sources/jarvis/candidate/0.3.13/vercel_build_vc38_apk.sh
-          grep -q 'EXPECTED_CERT_SHA="f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2"' gl/lab/sources/jarvis/candidate/0.3.13/vercel_build_vc38_apk.sh
-          echo "GitHub canonical source commit: $GITHUB_SHA"
-          echo "Source parts and VC18..VC39 patch chain are present."
 
-      - name: Build, validate and publish candidate
+      - name: Build, sign, verify and publish the APK
         shell: bash
         run: |
           set -euo pipefail
           cd gl
-          # Generate the VC40 wrapper from the checked-in and signed VC39 build recipe.
-          # Keep the older VC26..VC39 patch sequence and append the new VC40 patch.
-          python3 - <<'PY'
-          from pathlib import Path
-          source_path = Path("lab/sources/jarvis/candidate/0.3.14/vercel_build_vc39_apk.sh")
-          source = source_path.read_text(encoding="utf-8")
-          source = source.replace("VC39", "VC40")
-          source = source.replace("vc39", "vc40")
-          source = source.replace("0.3.14", "0.3.15")
-          source = source.replace("versionCode = 39", "versionCode = 40")
-          source = source.replace("versionCode='39'", "versionCode='40'")
-          source = source.replace('"versionCode": 39', '"versionCode": 40')
-          source = source.replace(r'\"0.3.11\"', r'\"0.3.15\"')
-          needle = "python3 lab/sources/jarvis/candidate/0.3.15/apply_vc40.py"
-          if source.count(needle) != 1:
-              raise SystemExit("VC40: expected patch-chain marker missing or duplicated")
-          source = source.replace(
-              needle,
-              "python3 lab/sources/jarvis/candidate/0.3.14/apply_vc39.py\\n" + needle,
-              1,
-          )
-          required = [
-              "Jarvis-0.3.15-vc40.apk",
-              "versionCode = 40",
-              'versionName = "0.3.15"',
-              "candidate/0.3.14/apply_vc39.py",
-              "candidate/0.3.15/apply_vc40.py",
-          ]
-          missing = [item for item in required if item not in source]
-          if missing:
-              raise SystemExit("VC40 wrapper preparation failed: " + ", ".join(missing))
-          target = Path("lab/sources/jarvis/candidate/0.3.15/vercel_build_vc40_apk.sh")
-          target.write_text(source, encoding="utf-8")
-          target.chmod(0o755)
-          print("VC40 wrapper generated from the validated VC39 recipe")
-          PY
-          bash lab/sources/jarvis/candidate/0.3.15/vercel_build_vc40_apk.sh
-          test -s dist/Jarvis-0.3.15-vc40.apk
+          bash lab/sources/jarvis/candidate/0.3.16/vercel_build_vc41_apk.sh
+          test -s dist/Jarvis-0.3.16-vc41.apk
           test -s dist/publish.json
-          cat dist/publish.json
-          sha256sum dist/Jarvis-0.3.15-vc40.apk
+          python3 - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          apk = Path("dist/Jarvis-0.3.16-vc41.apk")
+          report = json.loads(Path("dist/publish.json").read_text(encoding="utf-8"))
+          expected = {
+              "apk": "Jarvis-0.3.16-vc41.apk",
+              "versionCode": 41,
+              "versionName": "0.3.16",
+              "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.16-vc41.apk",
+          }
+          for key, value in expected.items():
+              if report.get(key) != value:
+                  raise SystemExit(f"VC41 release report mismatch for {key}: {report.get(key)!r}")
+          digest = hashlib.sha256(apk.read_bytes()).hexdigest()
+          if report.get("sha256", "").lower() != digest:
+              raise SystemExit("VC41 APK SHA-256 does not match publish.json")
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          print("VC41_LOCAL_APK_SHA256_OK=" + digest)
+          PY
 
-      - name: Register verified candidate in VOC Lab catalog
-        if: success()
+      - name: Register VC41 in the GitLab/VOC Lab source catalog
         shell: bash
         run: |
           set -euo pipefail
-          test -s gl/dist/publish.json
-          python3 - <<'PY'
-          import json
-          from datetime import datetime, timezone
-          from pathlib import Path
-
-          catalog_path = Path("lab/catalog.json")
-          report_path = Path("gl/dist/publish.json")
-          catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
-          report = json.loads(report_path.read_text(encoding="utf-8"))
-          app = next((item for item in catalog["apps"] if item.get("id") == "jarvis"), None)
-          if app is None:
-              raise SystemExit("Jarvis ausente de lab/catalog.json")
-          if report.get("versionCode") != 40 or report.get("versionName") != "0.3.15":
-              raise SystemExit("Relatório de publicação não é VC40 / 0.3.15")
-          if report.get("apk") != "Jarvis-0.3.15-vc40.apk":
-              raise SystemExit("Nome do APK inesperado")
-          url = report.get("apkUrl", "")
-          sha = report.get("sha256", "")
-          if not url.startswith("https://") or len(sha) != 64:
-              raise SystemExit("URL ou SHA-256 inválido")
-          app["candidate"] = {
-              "versionCode": 40,
-              "versionName": "0.3.15",
-              "apkUrl": url,
-              "sha256": sha.lower(),
-              "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
-              "notes": "CANDIDATO VC40 / 0.3.15: gestão de lembretes por voz e texto, listagem, alteração de horário, remoção direcionada e confirmação antes de apagar todos. APK publicado no armazenamento permanente, SHA-256 verificado e certificado validado no build. Teste físico ainda pendente; não é versão estável."
-          }
-          catalog["updatedAt"] = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-          catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-          print("Jarvis candidate catalog entry updated; stable entry preserved.")
-          PY
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add lab/catalog.json
-          if ! git diff --cached --quiet; then
-            git commit -m "Publish Jarvis VC40 candidate metadata"
-            git push origin HEAD:main
-          else
-            echo "Catalog already contains this verified candidate."
-          fi
-
+          for attempt in 1 2 3 4; do
+            git fetch origin main
+            git reset --hard origin/main
+            python3 - <<'PY'
+            import json
+            from datetime import datetime, timezone
+            from pathlib import Path
+            report = json.loads(Path("gl/dist/publish.json").read_text(encoding="utf-8"))
+            if (report.get("versionCode"), report.get("versionName"), report.get("apk")) != (41, "0.3.16", "Jarvis-0.3.16-vc41.apk"):
+                raise SystemExit("Unexpected VC41 publish metadata")
+            catalog_path = Path("lab/catalog.json")
+            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+            app = next((x for x in catalog["apps"] if x.get("id") == "jarvis"), None)
+            if app is None:
+                raise SystemExit("Jarvis app not found in lab/catalog.json")
+            app["candidate"] = {
+                "versionCode": 41,
+                "versionName": "0.3.16",
+                "apkUrl": report["apkUrl"],
+                "sha256": report["sha256"].lower(),
+                "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
+                "notes": "Correção focada na voz: exige voz masculina identificada em português do Brasil (pt-BR), sem fallback para voz feminina/genérica, e remove avisos de falha de síntese. APK assinado; teste físico pendente."
+            }
+            catalog["updatedAt"] = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+            catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            PY
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add lab/catalog.json
+            if git diff --cached --quiet; then
+              echo "VC41 catalog already registered."
+              exit 0
+            fi
+            git commit -m "Publish Jarvis VC41 male Brazilian voice candidate"
+            if git push origin HEAD:main; then
+              echo "VC41_GITHUB_CATALOG_REGISTERED"
+              exit 0
+            fi
+          done
+          echo "Could not publish VC41 catalog after four attempts." >&2
+          exit 1
 
       - name: Sync the live VOC Lab catalog in Supabase
-        if: success()
         shell: bash
         run: |
           set -euo pipefail
@@ -159,17 +136,12 @@ jobs:
           import json
           from pathlib import Path
           report = json.loads(Path("gl/dist/publish.json").read_text(encoding="utf-8"))
-          expected = {
-              "apk": "Jarvis-0.3.15-vc40.apk",
-              "versionCode": 40,
-              "versionName": "0.3.15",
-              "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.15-vc40.apk",
-          }
-          for key, value in expected.items():
-              if report.get(key) != value:
-                  raise SystemExit(f"VC40 report mismatch for {key}")
-          if not isinstance(report.get("sha256"), str) or len(report["sha256"]) != 64:
-              raise SystemExit("VC40 report has invalid SHA-256")
+          if (report.get("versionCode"), report.get("versionName")) != (41, "0.3.16"):
+              raise SystemExit("The published APK is not VC41")
+          if not report.get("apkUrl", "").endswith("Jarvis-0.3.16-vc41.apk"):
+              raise SystemExit("Unexpected published APK URL")
+          if len(report.get("sha256", "")) != 64:
+              raise SystemExit("Invalid APK SHA-256")
           PY
           OIDC_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fkhinnoxpesnhtmmvrken.supabase.co%2Ffunctions%2Fv1%2Fjarvis-vc38-build-oidc"
           VERCEL_OIDC_TOKEN="$(curl --connect-timeout 15 --max-time 30 -fsSL -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "$OIDC_URL" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
@@ -179,16 +151,16 @@ jobs:
           python3 - "$RUNNER_TEMP/voc-lab-catalog-sync.json" <<'PY'
           import json, sys
           result = json.loads(open(sys.argv[1], encoding="utf-8").read())
-          if not result.get("ok") or result.get("versionCode") != 39 or result.get("versionName") != "0.3.14":
-              raise SystemExit("The live VOC Lab catalog did not confirm VC40")
-          print("LIVE_VOC_LAB_CATALOG_SYNC_OK")
+          if not result.get("ok") or result.get("versionCode") != 41 or result.get("versionName") != "0.3.16":
+              raise SystemExit("Live VOC Lab catalog did not confirm VC41")
+          print("LIVE_VOC_LAB_CATALOG_VC41_OK")
           PY
 
       - name: Save build evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: jarvis-vc40-build-evidence
+          name: jarvis-vc41-build-evidence
           path: |
             gl/dist/**
           if-no-files-found: warn
