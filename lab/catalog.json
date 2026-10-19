@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-10-19T17:49:49Z",
+  "updatedAt": "2026-10-19T17:52:05Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -88,7 +88,7 @@
         "versionCode": 42,
         "versionName": "0.3.17",
         "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.17-vc42.apk",
-        "sha256": "94227c7b1094fb7a854c72260ea3fc7f168b3fc204470147251dcbdf25a92278",
+        "sha256": "328f9946a77fc03dbb25cdbf9c6b4ea5a8b94f72bce23679fd31e18b313365a3",
         "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
         "notes": "Correção focada na voz: exige voz masculina identificada em português do Brasil (pt-BR), sem fallback para voz feminina/genérica, e remove avisos de falha de síntese. APK assinado; teste físico pendente."
       }
