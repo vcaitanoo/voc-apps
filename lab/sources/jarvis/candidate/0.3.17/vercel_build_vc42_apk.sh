@@ -202,7 +202,7 @@ base = base.replace(signing_marker, github_oidc_refresh + "\n" + signing_marker,
 publish = """
 # O script base nao define SUPABASE_URL, mas o endpoint da edge function carrega
 # a origem: https://<ref>.supabase.co/functions/v1/<fn>
-SUPABASE_URL="$(printf '%s' "$ENDPOINT" | sed -E 's#^(https://[^/]+).*#\\1#')"
+SUPABASE_URL="${ENDPOINT%%/functions/*}"
 
 echo '[11/12] Publicando os bytes exatos no armazenamento permanente...'
 if [[ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" && -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
