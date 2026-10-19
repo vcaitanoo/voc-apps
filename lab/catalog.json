@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-10-19T20:15:11Z",
+  "updatedAt": "2026-10-19T21:56:51Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -85,12 +85,12 @@
         "notes": "Versão estável atualmente registrada no catálogo oficial."
       },
       "candidate": {
-        "versionCode": 43,
-        "versionName": "0.3.18",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.18-vc43.apk",
-        "sha256": "e349e4f1b6f1976d2536ddf515c18c59fb587fa26c5ba39a612ab1f172b91d7a",
+        "versionCode": 44,
+        "versionName": "0.3.19",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.19-vc44.apk",
+        "sha256": "a794b980f796f2c686054d11d502fbceeda2192360d8efafb904816b954cc27e",
         "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
-        "notes": "Adiciona a área Lembretes salvos no menu Configurações, com lista numerada e próxima data; permite apagar pelo botão ou por comando numérico, como “apague o lembrete número 5”. Corrige a seleção numérica e confirma a lista ativa após a exclusão. Mantém a voz masculina pt-BR da versão anterior. APK e SHA-256 verificados no armazenamento permanente; teste físico pendente, não é versão estável."
+        "notes": "Recupera a voz masculina pt-BR histórica priorizando Samsung TTS e alterna para Google/Android apenas quando identifica uma voz masculina. Adiciona prazo de inicialização e recuperação do mecanismo de voz; nunca sintetiza com voz feminina ou sem identificação masculina. APK assinado e SHA-256 verificados; teste físico pendente."
       }
     },
     {
