@@ -68,7 +68,7 @@ jobs:
           report = json.loads(Path("dist/publish.json").read_text(encoding="utf-8"))
           expected = {
               "apk": "Jarvis-0.3.17-vc42.apk",
-              "versionCode": 41,
+              "versionCode": 42,
               "versionName": "0.3.17",
               "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.17-vc42.apk",
           }
@@ -82,7 +82,7 @@ jobs:
           print("VC42_LOCAL_APK_SHA256_OK=" + digest)
           PY
 
-      - name: Register VC42 in the GitLab/VOC Lab source catalog
+      - name: Register VC42 in the GitHub/VOC Lab source catalog
         shell: bash
         run: |
           set -euo pipefail
@@ -101,7 +101,7 @@ jobs:
           if app is None:
               raise SystemExit("Jarvis app not found in lab/catalog.json")
           app["candidate"] = {
-              "versionCode": 41,
+              "versionCode": 42,
               "versionName": "0.3.17",
               "apkUrl": report["apkUrl"],
               "sha256": report["sha256"].lower(),
@@ -144,7 +144,7 @@ jobs:
           python3 - "$RUNNER_TEMP/voc-lab-catalog-sync.json" <<'PY'
           import json, sys
           result = json.loads(open(sys.argv[1], encoding="utf-8").read())
-          if not result.get("ok") or result.get("versionCode") != 41 or result.get("versionName") != "0.3.17":
+          if not result.get("ok") or result.get("versionCode") != 42 or result.get("versionName") != "0.3.17":
               raise SystemExit("Live VOC Lab catalog did not confirm VC42")
           print("LIVE_VOC_LAB_CATALOG_VC42_OK")
           PY
