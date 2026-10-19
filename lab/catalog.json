@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-10-19T17:52:05Z",
+  "updatedAt": "2026-10-19T19:48:36Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -85,10 +85,10 @@
         "notes": "Versão estável atualmente registrada no catálogo oficial."
       },
       "candidate": {
-        "versionCode": 42,
-        "versionName": "0.3.17",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.17-vc42.apk",
-        "sha256": "328f9946a77fc03dbb25cdbf9c6b4ea5a8b94f72bce23679fd31e18b313365a3",
+        "versionCode": 43,
+        "versionName": "0.3.18",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.18-vc43.apk",
+        "sha256": "e349e4f1b6f1976d2536ddf515c18c59fb587fa26c5ba39a612ab1f172b91d7a",
         "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
         "notes": "Correção focada na voz: exige voz masculina identificada em português do Brasil (pt-BR), sem fallback para voz feminina/genérica, e remove avisos de falha de síntese. APK assinado; teste físico pendente."
       }
