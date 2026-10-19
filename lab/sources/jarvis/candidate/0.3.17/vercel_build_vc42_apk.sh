@@ -59,9 +59,9 @@ replacements = {
         "python3 lab/sources/jarvis/candidate/0.3.11/apply_vc36.py\npython3 lab/sources/jarvis/candidate/0.3.13/apply_vc38.py\npython3 lab/sources/jarvis/candidate/0.3.14/apply_vc39.py\npython3 lab/sources/jarvis/candidate/0.3.17/apply_vc42.py\n",
 
     "grep -q 'versionCode = 26'": "grep -q 'versionCode = 42'",
-    "grep -q 'versionName = \"0.3.1\"'": "grep -q 'versionName = \"0.3.11\"'",
+    "grep -q 'versionName = \"0.3.1\"'": "grep -q 'versionName = \"0.3.17\"'",
     "require_fixed \"name='pt.vcaitano.jarvis' versionCode='26' versionName='0.3.1'\"":
-        "require_fixed \"name='pt.vcaitano.jarvis' versionCode='41' versionName='0.3.17'\"",
+        "require_fixed \"name='pt.vcaitano.jarvis' versionCode='42' versionName='0.3.17'\"",
 
     '"version": "0.3.1"': '"version": "0.3.17"',
     '"versionCode": 26': '"versionCode": 42',
