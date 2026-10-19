@@ -130,7 +130,7 @@ jobs:
           import json
           from pathlib import Path
           report = json.loads(Path("gl/dist/publish.json").read_text(encoding="utf-8"))
-          if (report.get("versionCode"), report.get("versionName")) != (43, "0.3.19"):
+          if (report.get("versionCode"), report.get("versionName")) != (44, "0.3.19"):
               raise SystemExit("The published APK is not VC44")
           if not report.get("apkUrl", "").endswith("Jarvis-0.3.19-vc44.apk"):
               raise SystemExit("Unexpected published APK URL")
