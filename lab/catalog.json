@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-10-19T19:49:04Z",
+  "updatedAt": "2026-10-19T20:15:11Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -91,6 +91,28 @@
         "sha256": "e349e4f1b6f1976d2536ddf515c18c59fb587fa26c5ba39a612ab1f172b91d7a",
         "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
         "notes": "Adiciona a área Lembretes salvos no menu Configurações, com lista numerada e próxima data; permite apagar pelo botão ou por comando numérico, como “apague o lembrete número 5”. Corrige a seleção numérica e confirma a lista ativa após a exclusão. Mantém a voz masculina pt-BR da versão anterior. APK e SHA-256 verificados no armazenamento permanente; teste físico pendente, não é versão estável."
+      }
+    },
+    {
+      "id": "gps-3d",
+      "name": "GPS-3D",
+      "packageName": "pt.vcaitano.gps3d",
+      "enabled": true,
+      "stable": {
+        "notes": "VERSÃO ESTÁVEL APROVADA PELO UTILIZADOR: GPS-3D 1.0.3 / VC4 (versionCode 4). O utilizador testou e confirmou que os contornos adicionais de edifícios funcionam, com grande quantidade de casas visíveis, inclusive a sua. APK validada estruturalmente, package pt.vcaitano.gps3d, assinatura VOC Lab e SHA-256 confirmados. Navegação real ainda será testada; preservar este binário como base estável e desenvolver próximas mudanças numa nova candidata VC5 ou superior. Dados Microsoft regionais via PMTiles: 551.276 footprints válidos, zooms 14–17, tile 031332322 (noroeste de Portugal); cobertura adicional ainda regional, não nacional. GPS real sem simulação e tela ligada durante navegação.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.3-be3d54eb9cd95fe2b75ee562b52dc615a439dda3a0c8a158d7cf67198a30e1ec-vc4.apk",
+        "sha256": "be3d54eb9cd95fe2b75ee562b52dc615a439dda3a0c8a158d7cf67198a30e1ec",
+        "versionCode": 4,
+        "versionName": "1.0.3",
+        "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
+      },
+      "candidate": {
+        "notes": "CANDIDATO GPS-3D VC7 / 1.0.6: corrige o acompanhamento do GPS real para evitar saltos do marcador, inicia o GPS real ao entrar e adiciona Terminar navegação sem desligar o GPS. APK assinado e SHA-256 verificados; teste físico pendente, não é versão estável.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.6-da3033babfc9d46d01e08229a8dded306420483d6787a918dd6f4a5c5e264ac5-vc7.apk",
+        "sha256": "da3033babfc9d46d01e08229a8dded306420483d6787a918dd6f4a5c5e264ac5",
+        "versionCode": 7,
+        "versionName": "1.0.6",
+        "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
   ]
