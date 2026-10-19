@@ -119,8 +119,8 @@ grep -q 'COS_STRICT=0.93' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/Vo
 
 # Voz masculina e obrigatoria - e a unica coisa que o dono pediu para preservar.
 grep -q 'explicitMale' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt"
-grep -q '0 -> "com.samsung.SMT"' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt"
-grep -q '1 -> "com.google.android.tts"' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt"
+grep -q '0 -> "com.google.android.tts"' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt"
+grep -q '1 -> "com.samsung.SMT"' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt"
 grep -q 'handleTtsPlaybackError(engineStep)' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt"
 grep -q 'ttsReady' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt"
 
