@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-10-19T22:03:47Z",
+  "updatedAt": "2026-10-22T18:13:00Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -69,7 +69,14 @@
         "signatureSha256": "07df7362d3a99e638d54ce97e35328b6ca415f44481198ff2f6cf47bbadb9269",
         "notes": "Versão estável atualmente registrada no catálogo oficial."
       },
-      "candidate": null
+      "candidate": {
+        "notes": "CANDIDATO Damas 1.0.8 / VC9: corrige bloqueio silencioso das jogadas online enquanto ligação PeerJS/WebRTC não está pronta; indica turno/estado da ligação, adiciona Reconectar e impede jogadas durante animação. Regras, tabuleiro, IA e wrapper AdMob preservados. Fonte reconstruída da linhagem documentada; APK compilado e assinatura/estrutura verificados. Teste real em dois Androids ainda pendente. Stable 1.0.6 mantida.",
+        "apkUrl": "https://bpketfzabpbxmujyozjm.supabase.co/storage/v1/object/public/damas-releases/v1.0.8/Damas-v1.0.8.apk",
+        "sha256": "6ae0e3147c446ca6fee400ae0514b25b3caa6270b665cf6525eacff649e2a0fa",
+        "versionCode": 9,
+        "versionName": "1.0.8",
+        "signatureSha256": "07df7362d3a99e638d54ce97e35328b6ca415f44481198ff2f6cf47bbadb9269"
+      }
     },
     {
       "id": "jarvis",
