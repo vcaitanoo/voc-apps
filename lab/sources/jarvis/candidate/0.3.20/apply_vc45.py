@@ -106,7 +106,7 @@ reminder = replace_once(reminder,"engine.setPitch(0.90f)","engine.setPitch(0.76f
 reminder = replace_once(
     reminder,
     "        val selected = candidates.firstOrNull() ?: return false\n",
-    '''        val lockedName = getSharedPreferences("jarvis_original_male_voice_lock", Context.MODE_PRIVATE)
+    '''        val lockedName = getSharedPreferences("jarvis_original_male_voice_lock", 0)
             .getString("voice_name", null)
         val selected = if (lockedName.isNullOrBlank()) {
             candidates.firstOrNull()
