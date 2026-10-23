@@ -1,0 +1,83 @@
+name: Diagnose Jarvis VC45 run 38
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/diagnose-jarvis-vc45-run38.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Identify failed step and relevant diagnostic lines
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          from datetime import datetime, timezone
+          repo = os.environ['GITHUB_REPOSITORY']
+          def gh(path):
+              cmd = ['gh', 'api', path]
+              res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+              if res.returncode:
+                  raise RuntimeError('GitHub Actions API failed for ' + path + ': ' + res.stderr[:500])
+              return res.stdout
+          runs = json.loads(gh(f'repos/{repo}/actions/workflows/jarvis-vc38-build.yml/runs?per_page=100'))
+          match = [x for x in runs['workflow_runs'] if x['run_number'] == 38]
+          if not match:
+              raise SystemExit('Run #38 not found in most recent 100 workflow executions')
+          run = match[0]
+          jobs = json.loads(gh(f'repos/{repo}/actions/runs/{run["id"]}/jobs?per_page=100'))['jobs']
+          report = ['# Jarvis VC45 — diagnóstico da execução #38',
+                    'Data do diagnóstico: ' + datetime.now(timezone.utc).isoformat(),
+                    f'Execução: {run["html_url"]}',
+                    f'Estado: {run["status"]} / {run["conclusion"]}',
+                    '']
+          for job in jobs:
+              report.append(f'## Job: {job["name"]} — {job["conclusion"]}')
+              for step in job.get('steps', []):
+                  report.append(f'- {step["name"]}: {step["status"]} / {step["conclusion"]}')
+              if job.get('conclusion') == 'failure':
+                  report.append('')
+                  report.append('### Extrato de erro (sem tokens ou credenciais)')
+                  out = subprocess.run(['gh','api',f'repos/{repo}/actions/jobs/{job["id"]}/logs'], capture_output=True, text=True, check=False)
+                  safe = []
+                  patterns = [r'::error',r'Error:',r'ERROR:',r'FATAL',r'Traceback',r'failed',r'FAILURE:',r'exit code',r'not found',r'exit status',r'VC45:',r'expected',r'No such file',r'permission denied',r'not available',r'Invalid',r'missing']
+                  for line in out.stdout.splitlines():
+                      if any(re.search(p,line,re.IGNORECASE) for p in patterns):
+                          line=re.sub(r'(?i)(authorization|bearer|token|secret|password|apikey|key)=?[^\s]{12,}', r'\1=[REDACTED]', line)
+                          if len(line) <= 450 and not any(x in line.lower() for x in ['actions_id_token','vercel_oidc_token','service_role','jwt','eyj']):
+                              safe.append(line)
+                  report.extend(['```text', *(safe[-28:] or ['Nenhuma linha de erro capturada; consultar o painel do GitHub Actions.']),'```'])
+                  report.append('')
+          open('docs/CI_JARVIS_VC45_RUN38.md','w',encoding='utf-8').write('\n'.join(report)+'\n')
+          print('\n'.join(report[:35]))
+          PY
+      - name: Store diagnosis in private repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
+          git add docs/CI_JARVIS_VC45_RUN38.md
+          if git diff --cached --quiet; then
+            echo "Diagnostic report unchanged"
+          else
+            git commit -m "docs(ci): record Jarvis VC45 workflow #38 failure diagnosis"
+            git push origin main
+          fi
