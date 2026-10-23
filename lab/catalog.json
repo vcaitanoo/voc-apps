@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATO GPS-3D VC25 / 1.0.24 (2026-10-23): navegação com recuperação de progresso GPS além da antiga janela de 260m; câmara sem congelamento ao carregar camadas; deteção e recuperação de GPS/posição desatualizada; velocidade, distância, próximo passo e tempo não são apresentados como atuais sem posição recente; painel de alternativas recolhido ao iniciar condução; manobras em português corrigidas; rua, freguesia, concelho e botões Menu/Terminar legíveis; funções de portagens e trânsito sem suporte removidas do painel. Preservados postos premium VC24, edifícios 3D, menus, rotas, favoritos e versão estável VC4. Compilação Gradle, assinatura, manifesto, SHA-256 e testes automatizados verificados; execução física no Android e navegação em estrada ainda NÃO testadas.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.24-979bfcf7e27049312096a5fbfcee76442c19dd97b131494d8fd6fa663958edc3-vc25.apk",
-        "sha256": "979bfcf7e27049312096a5fbfcee76442c19dd97b131494d8fd6fa663958edc3",
-        "versionCode": 25,
-        "versionName": "1.0.24",
+        "notes": "CANDIDATO GPS-3D VC26 / 1.0.25 (23/10/2026): máscara reversível de footprints amarelas em toda a área operacional dos postos oficiais DGEG e na posição final do modelo, incluindo contornos, mosaicos carregados tardiamente e footprints sem ID; casas vizinhas preservadas. GPS recupera de erros temporários do watch sem desmontar o observador, segue mais rapidamente ao detetar deslocação fiável; preserva todos os recursos e correções da VC25. Testes automatizados, Gradle, assinatura, manifesto, versão/package e SHA-256 validados; execução real em Android ainda pendente. Estável VC4 intacta.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.25-30b6b91c8b1ad4bfa016d0d5938bdc783fc140417c737f98e1eada0df09e7829-vc26.apk",
+        "sha256": "30b6b91c8b1ad4bfa016d0d5938bdc783fc140417c737f98e1eada0df09e7829",
+        "versionCode": 26,
+        "versionName": "1.0.25",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
