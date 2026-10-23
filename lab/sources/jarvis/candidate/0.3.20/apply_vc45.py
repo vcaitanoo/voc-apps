@@ -51,37 +51,28 @@ voice = replace_once(voice,"tts?.setPitch(0.90f)","tts?.setPitch(0.76f)","reply 
 # Once a verified male pt-BR voice has been selected, pin its Android Voice
 # identifier and provider in persistent app preferences. Never silently switch
 # to a different voice when a provider or its voice list changes.
-voice = replace_once(
-    voice,
-    "        val selected = male\n",
-    '''        val originalLock = appContext.getSharedPreferences("jarvis_original_male_voice_lock", Context.MODE_PRIVATE)
-        val lockedVoiceName = originalLock.getString("voice_name", null)
-        val selected = if (lockedVoiceName.isNullOrBlank()) {
-            male
-        } else {
-            runCatching {
-                engine.voices.orEmpty().firstOrNull {
-                    it.name == lockedVoiceName &&
-                    it.locale.language.equals("pt", ignoreCase = true) &&
-                    it.locale.country.equals("BR", ignoreCase = true)
-                }
-            }.getOrNull()
-        }
-''',
-    "sticky voice ID selection",
-)
+# Keep VC44's existing explicit-male selector intact. Only enforce an
+# existing pinned voice at the *confirmed voice application* boundary.
+# A previous patch hard-coded "val selected = male" as an exact anchor and
+# aborted CI #38 before Kotlin compilation when VC44 formatted it differently.
 voice = replace_once(
     voice,
     "            if (applied) return true\n",
     '''            if (applied) {
+                val originalLock = appContext.getSharedPreferences(
+                    "jarvis_original_male_voice_lock", Context.MODE_PRIVATE
+                )
+                val lockedVoiceName = originalLock.getString("voice_name", null)
                 val confirmed = engine.voice
                 val ptBrConfirmed = confirmed != null &&
                     confirmed.name == selected.name &&
                     confirmed.locale.language.equals("pt", ignoreCase = true) &&
                     confirmed.locale.country.equals("BR", ignoreCase = true)
                 if (!ptBrConfirmed) return false
+                // Never replace a previously accepted male voice by a
+                // different male/female TTS provider voice without consent.
+                if (!lockedVoiceName.isNullOrBlank() && selected.name != lockedVoiceName) return false
                 if (lockedVoiceName.isNullOrBlank()) {
-                    // Pin only after the voice passed explicit-male selection.
                     val engineId = when (activeTtsEngineStep) {
                         0 -> engine.defaultEngine
                         1 -> "com.samsung.SMT"
