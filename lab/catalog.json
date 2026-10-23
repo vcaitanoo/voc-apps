@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATO GPS-3D VC8 / 1.0.7: novo menu A em grelha sem rolagem horizontal; painel de navegação compacto com rua, freguesia e concelho; remove o modo Norte e mantém a orientação para a frente; guarda Favoritos/Recentes; câmara com zoom adaptativo; atalhos para Casas/Edifícios 3D e IA Satélite regional; alternativas com prioridades (mais rápida, curta e menos manobras); cache limitada dos mapas já consultados e restauração da última rota. Evitar portagens e trânsito ao vivo ainda não estão disponíveis no fornecedor atual; não são descarregadas regiões inteiras para uso offline. APK release compilado, assinatura e SHA-256 verificados; teste físico pendente, não é versão estável.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.7-1d72953c7687cc58d799ee347cbfe369a5d6b41d5bd7e9eff9d8ef55cadc2d80-vc8.apk",
-        "sha256": "1d72953c7687cc58d799ee347cbfe369a5d6b41d5bd7e9eff9d8ef55cadc2d80",
-        "versionCode": 8,
-        "versionName": "1.0.7",
+        "notes": "CANDIDATO GPS-3D VC25 / 1.0.24 (2026-10-23): navegação com recuperação de progresso GPS além da antiga janela de 260m; câmara sem congelamento ao carregar camadas; deteção e recuperação de GPS/posição desatualizada; velocidade, distância, próximo passo e tempo não são apresentados como atuais sem posição recente; painel de alternativas recolhido ao iniciar condução; manobras em português corrigidas; rua, freguesia, concelho e botões Menu/Terminar legíveis; funções de portagens e trânsito sem suporte removidas do painel. Preservados postos premium VC24, edifícios 3D, menus, rotas, favoritos e versão estável VC4. Compilação Gradle, assinatura, manifesto, SHA-256 e testes automatizados verificados; execução física no Android e navegação em estrada ainda NÃO testadas.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.24-979bfcf7e27049312096a5fbfcee76442c19dd97b131494d8fd6fa663958edc3-vc25.apk",
+        "sha256": "979bfcf7e27049312096a5fbfcee76442c19dd97b131494d8fd6fa663958edc3",
+        "versionCode": 25,
+        "versionName": "1.0.24",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
