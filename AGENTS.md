@@ -32,3 +32,11 @@ Estas regras aplicam-se a trabalhos no repositório vcaitanoo/voc-apps e aos apl
 Atualize docs/CONTINUITY.md após mudanças relevantes. Mantenha o pacote portátil alinhado com o último estado verificado e sem segredos. Consulte docs/VOC_LAB_WORKFLOW.md para o fluxo detalhado e docs/APP_INVENTORY.md para o snapshot dos apps.
 
 O AGENTS.md na raiz é a instrução de projeto a ser carregada quando Codex trabalha dentro deste repositório. Os documentos de docs/ são referências complementares e precisam ser lidos explicitamente. A orientação oficial do Codex descreve o carregamento de AGENTS.md no início do trabalho: https://developers.openai.com/cookbook/examples/gpt-5/codex_prompting_guide.
+
+## Voz masculina original — regra de regressão Jarvis
+- O utilizador confirmou voz masculina funcional na linhagem original Jarvis 0.2.5. Os parâmetros documentados foram `pt-BR`, `setSpeechRate(0.98f)` e `setPitch(0.76f)`. Nunca mudar por conveniência durante alterações de interface, IA, microfone, lembretes ou atualizações Android.
+- A primeira versão a fixar identidade de voz no ramo de distribuição é a candidata `0.3.20`/`VC45`, que sucede diretamente à `0.3.19`/`VC44` instalada pelo utilizador. Código: `lab/sources/jarvis/candidate/0.3.20/apply_vc45.py`. Nunca construir esta versão a partir do source antigo `vcaitanoo/jarvis` VC9.
+- O motor Android da configuração histórica é prioritário, depois Samsung/Google quando detetam *explicitamente* voz masculina pt-BR. Persistir identidade de voz e motor, validar a identidade selecionada ao falar e não usar fallback feminino ou masculino diferente sem autorização.
+- Usar a identidade do mesmo TTS também na fala dos lembretes, quando disponível. Nunca confundir alteração de pitch com identificação de voz masculina.
+- A versão é candidata até teste real no Samsung. Verificar Kotlin/Gradle, instalação, assinatura original `f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2`, áudio efetivo no aparelho e ausência de regressões antes de a considerar confirmada.
+- Toda nova build deve incluir testes/invariantes automáticos que impeçam a regressão para pitch `0.90f` ou velocidade `0.96f` na saída da voz original, salvo escolha expressa do utilizador.
