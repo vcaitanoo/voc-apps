@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATO GPS-3D VC26 / 1.0.25 (23/10/2026): máscara reversível de footprints amarelas em toda a área operacional dos postos oficiais DGEG e na posição final do modelo, incluindo contornos, mosaicos carregados tardiamente e footprints sem ID; casas vizinhas preservadas. GPS recupera de erros temporários do watch sem desmontar o observador, segue mais rapidamente ao detetar deslocação fiável; preserva todos os recursos e correções da VC25. Testes automatizados, Gradle, assinatura, manifesto, versão/package e SHA-256 validados; execução real em Android ainda pendente. Estável VC4 intacta.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.25-30b6b91c8b1ad4bfa016d0d5938bdc783fc140417c737f98e1eada0df09e7829-vc26.apk",
-        "sha256": "30b6b91c8b1ad4bfa016d0d5938bdc783fc140417c737f98e1eada0df09e7829",
-        "versionCode": 26,
-        "versionName": "1.0.25",
+        "notes": "CANDIDATO GPS-3D VC28 / 1.0.27 (23/10/2026). Exclui as footprints amarelas completas sobre bombas de combustível DGEG, incluindo máscaras de mosaicos PMTiles, fonte GeoJSON de reserva filtrada antes da extrusão e posições finais dos modelos. Restaura a imagem opção 3 aprovada por SHA-256 em launcher Android legacy/adaptive e como ícone compacto dentro do mapa. Mantém navegação e funções atuais. Testes CI, compilação Gradle, certificado, manifesto, versão e SHA-256 do APK verificados; execução e visualização no telemóvel ainda por confirmar. Estável VC4 intacta.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.27-45ffd74f12c8f336baa25bbc57d24cce8679ba197f9b7e3c86d9dc79f13208cd-vc28.apk",
+        "sha256": "45ffd74f12c8f336baa25bbc57d24cce8679ba197f9b7e3c86d9dc79f13208cd",
+        "versionCode": 28,
+        "versionName": "1.0.27",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
