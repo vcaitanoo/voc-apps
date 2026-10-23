@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-10-22T18:13:00Z",
+  "updatedAt": "2026-10-23T23:23:27Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -92,12 +92,12 @@
         "notes": "Versão estável atualmente registrada no catálogo oficial."
       },
       "candidate": {
-        "versionCode": 44,
-        "versionName": "0.3.19",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.19-vc44.apk",
-        "sha256": "4beb1370341735db5727a5ba7ad1d2125e70e73d52b8c403389c6b5275952b26",
+        "versionCode": 45,
+        "versionName": "0.3.20",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.20-vc45.apk",
+        "sha256": "6de967bbe65cf330b00c381624ab43f4016c9a27a9c680b61588336b0ee40c81",
         "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
-        "notes": "Recupera a voz masculina pt-BR histórica priorizando Samsung TTS e alterna para Google/Android apenas quando identifica uma voz masculina. Adiciona prazo de inicialização e recuperação do mecanismo de voz; nunca sintetiza com voz feminina ou sem identificação masculina. APK assinado e SHA-256 verificados; teste físico pendente."
+        "notes": "VC45 / 0.3.20: sobre a VC44 instalada; restaura os parâmetros da voz masculina brasileira (velocidade 0.98, pitch 0.76), tenta motor Android original, grava identidade de voz aprovada, bloqueia trocas silenciosas; assinatura e SHA-256 verificados estruturalmente; teste físico pendente."
       }
     },
     {
