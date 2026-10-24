@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-10-23T23:23:27Z",
+  "updatedAt": "2026-10-24T05:13:32Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -92,12 +92,12 @@
         "notes": "Versão estável atualmente registrada no catálogo oficial."
       },
       "candidate": {
-        "versionCode": 45,
-        "versionName": "0.3.20",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.20-vc45.apk",
-        "sha256": "6de967bbe65cf330b00c381624ab43f4016c9a27a9c680b61588336b0ee40c81",
+        "versionCode": 46,
+        "versionName": "0.3.21",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.21-vc46.apk",
+        "sha256": "cb9dd89fb0938d348aec039d1a9cbae06616343eab7186848a469c94cd25b9f0",
         "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
-        "notes": "VC45 / 0.3.20: sobre a VC44 instalada; restaura os parâmetros da voz masculina brasileira (velocidade 0.98, pitch 0.76), tenta motor Android original, grava identidade de voz aprovada, bloqueia trocas silenciosas; assinatura e SHA-256 verificados estruturalmente; teste físico pendente."
+        "notes": "VC46 / 0.3.21: base exata na 0.3.20; restaura voz masculina da nuvem original com MP3 válido e reprodução Android MediaPlayer, preserva a voz masculina local e regras de escuta, menus, lembretes e biometria; assinatura e SHA-256 validados estruturalmente; teste físico pendente."
       }
     },
     {
