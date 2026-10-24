@@ -1,0 +1,70 @@
+name: Diagnose Jarvis VC46 build result
+
+on:
+  workflow_run:
+    workflows: ["Jarvis VC46 historical male voice recovery build"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_run' }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve step results and sanitize errors
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,subprocess,re
+          from datetime import datetime,timezone
+          repo=os.environ["GITHUB_REPOSITORY"]
+          run=os.environ["TARGET_RUN_ID"]
+          def api(url):
+              r=subprocess.run(["gh","api",url],capture_output=True,text=True)
+              if r.returncode:raise SystemExit("GitHub API unavailable: "+r.stderr[:220])
+              return json.loads(r.stdout)
+          jobs=api(f"repos/{repo}/actions/runs/{run}/jobs?per_page=100").get("jobs",[])
+          lines=["# Jarvis VC46 — resultado real da compilação",
+                 "Consultado: "+datetime.now(timezone.utc).isoformat(),
+                 f"Execução: https://github.com/{repo}/actions/runs/{run}", ""]
+          for j in jobs:
+              lines.append(f"## {j['name']}: {j.get('conclusion')}")
+              for step in j.get("steps",[]):
+                  lines.append(f"- {step['name']}: {step.get('conclusion')}")
+              if j.get("conclusion")=="failure":
+                  p=subprocess.run(["gh","run","view",run,"--repo",repo,"--log-failed"],capture_output=True,text=True)
+                  take=[]
+                  for ln in p.stdout.splitlines():
+                      if re.search(r"(VC46:|VC46_SOURCE_OK|ERROR|FAILURE|cannot|Unresolved reference|e: file|expected|Process completed|fatal|not found|compileKotlin)",ln,re.I):
+                          if re.search(r"(jwt|authorization|Bearer|secret|password|SERVICE_ROLE|ACTIONS_ID_TOKEN|OIDC_TOKEN|api.?key)",ln,re.I):continue
+                          take.append(ln[:350])
+                  lines.extend(["", "### Erros observados", "```text", *(take[-24:] or ["Consultar logs no GitHub Actions"]), "```"])
+          report="\n".join(lines)+"\n"
+          open("docs/CI_JARVIS_VC46_RESULT.md","w",encoding="utf-8").write(report)
+          print("\n".join(lines[:20]))
+          PY
+      - name: Persist build diagnosis
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
+          git add docs/CI_JARVIS_VC46_RESULT.md
+          if git diff --cached --quiet; then
+            echo "No diagnostic changes"
+          else
+            git commit -m "ci(jarvis): record VC46 build result and failed step"
+            git push origin main
+          fi
