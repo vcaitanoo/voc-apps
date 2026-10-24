@@ -1,6 +1,10 @@
 name: Diagnose Jarvis VC46 build result
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/diagnose-jarvis-vc46.yml'
   workflow_run:
     workflows: ["Jarvis VC46 historical male voice recovery build"]
     types: [completed]
@@ -13,7 +17,7 @@ permissions:
 jobs:
   report:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_run' }}
+    if: ${{ github.event_name == 'workflow_run' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -27,11 +31,16 @@ jobs:
           import json,os,subprocess,re
           from datetime import datetime,timezone
           repo=os.environ["GITHUB_REPOSITORY"]
-          run=os.environ["TARGET_RUN_ID"]
+          run=os.environ.get("TARGET_RUN_ID","")
           def api(url):
               r=subprocess.run(["gh","api",url],capture_output=True,text=True)
               if r.returncode:raise SystemExit("GitHub API unavailable: "+r.stderr[:220])
               return json.loads(r.stdout)
+          if not run:
+              latest=api(f"repos/{repo}/actions/workflows/jarvis-vc38-build.yml/runs?per_page=1")
+              runs=latest.get("workflow_runs",[])
+              if not runs: raise SystemExit("No recent Jarvis build found")
+              run=str(runs[0]["id"])
           jobs=api(f"repos/{repo}/actions/runs/{run}/jobs?per_page=100").get("jobs",[])
           lines=["# Jarvis VC46 — resultado real da compilação",
                  "Consultado: "+datetime.now(timezone.utc).isoformat(),
