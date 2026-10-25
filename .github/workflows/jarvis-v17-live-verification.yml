@@ -1,4 +1,4 @@
-name: Jarvis v19 AI and Web live verification
+name: Jarvis v21 AI and Web live verification
 
 on:
   push:
@@ -28,9 +28,10 @@ jobs:
           tests=[
             ("Conversa comum",{"messages":[{"role":"user","content":"Explique a diferença entre um mapa e uma fotografia em uma frase."}]}),
             ("Tesla carro voador / pesquisa automatica sem login",{"messages":[{"role":"user","content":"O que você sabe sobre o carro voador da Tesla? Ele existe mesmo?"}]}),
-            ("Tesla pergunta sobre noticias sem login",{"messages":[{"role":"user","content":"Quais novidades a Tesla anunciou recentemente?"}]})
+            ("Tesla pergunta sobre noticias sem login",{"messages":[{"role":"user","content":"Quais novidades a Tesla anunciou recentemente?"}]}),
+            ("Apuracao do segundo turno",{"messages":[{"role":"user","content":"Qual a apuração da votação no Brasil agora?"}]})
           ]
-          lines=["# Jarvis v19 — teste real do servidor em produção","",
+          lines=["# Jarvis v21 — teste real do servidor em produção","",
                  "UTC: "+datetime.now(timezone.utc).isoformat(),
                  "GitHub Action: "+os.environ.get("GITHUB_RUN_ID",""),""]
           failures=0
@@ -52,8 +53,9 @@ jobs:
               sources=result.get("sources") or []
               length=len(result.get("text") or "")
               attempted=result.get("webSearchAttempted") is True
-              valid=provider in ("groq","openrouter") and length>=25
+              valid=provider in ("groq","openrouter") and length>=25 and not (chr(60) in str(result.get("text","")) and "browser_search" in str(result.get("text","")))
               if label=="Conversa comum":valid=valid and mode=="ai-direct"
+              elif label=="Apuracao do segundo turno":valid=valid and attempted and mode in ("ai-web-sources","ai-web-unavailable")
               else:valid=valid and attempted and mode=="ai-web-sources" and len(sources)>=1
               lines.append("## "+label+": "+("PASS" if valid else "FAIL"))
               lines.append("Mode: "+str(mode)+"; model provider: "+str(provider)+"; sources="+str(len(sources))+"; text-length="+str(length)+"; attempt="+str(attempted))
@@ -64,7 +66,7 @@ jobs:
               lines.append("## "+label+": ERROR "+str(e)[:160]);failures+=1
           lines.append("Overall: "+("PASS" if failures==0 else "FAIL")+"; failures="+str(failures))
           output="\n".join(lines)+"\n"
-          open("docs/JARVIS_V19_AI_WEB_LIVE_VERIFICATION.md","w",encoding="utf-8").write(output)
+          open("docs/JARVIS_V21_AI_WEB_LIVE_VERIFICATION.md","w",encoding="utf-8").write(output)
           print(output)
           PY
       - name: Persist objective test evidence to GitHub
@@ -72,16 +74,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ ! -f docs/JARVIS_V19_AI_WEB_LIVE_VERIFICATION.md ]; then
+          if [ ! -f docs/JARVIS_V21_AI_WEB_LIVE_VERIFICATION.md ]; then
              mkdir -p docs
-             echo 'Live verification script failed before creating its report.' > docs/JARVIS_V19_AI_WEB_LIVE_VERIFICATION.md
+             echo 'Live verification script failed before creating its report.' > docs/JARVIS_V21_AI_WEB_LIVE_VERIFICATION.md
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin main
-          git add docs/JARVIS_V19_AI_WEB_LIVE_VERIFICATION.md
+          git add docs/JARVIS_V21_AI_WEB_LIVE_VERIFICATION.md
           if ! git diff --cached --quiet; then
-            git commit -m 'test(jarvis): record actual AI and web results from deployed v19'
+            git commit -m 'test(jarvis): record actual AI and web results from deployed v21'
             git pull --rebase origin main
             git push origin HEAD:main
           fi
