@@ -359,6 +359,7 @@ async function directOpenAI(
   timeoutMs: number,
   webSearch = false,
   temperature = 0.85,
+  strictFinalOnly = false,
 ) {
   if (!key) throw new Error(`${provider} unavailable`);
   const headers: Record<string, string> = {
@@ -387,6 +388,19 @@ async function directOpenAI(
     body.reasoning = { exclude: true };
     if (webSearch) body.plugins = [{ id: "web", max_results: 3 }];
   }
+  if (strictFinalOnly) {
+    // A free model sometimes *describes* a browser tool call as plain text.
+    // Retry the SAME real model with a minimal final-answer-only prompt.
+    // Real internet research was already completed by jarvisCurrentEvidence.
+    body.temperature = 0.25;
+    body.max_tokens = 650;
+    body.presence_penalty = 0;
+    body.frequency_penalty = 0;
+    body.messages = [
+      {role:"system",content:"Você é o Jarvis. Responda em português brasileiro, em duas a cinco frases naturais. Não existem ferramentas ou funções disponíveis para você. O servidor já realizou qualquer busca na web necessária e incluiu os resultados na conversa. NÃO simule comandos de browser, marcadores internos, XML ou JSON; produza EXCLUSIVAMENTE sua resposta final. Se as fontes não confirmarem a apuração, diga claramente o que não foi possível verificar sem inventar votos ou vencedores."},
+      ...messages
+    ];
+  }
 
   const response = await fetchTimeout(
     url,
@@ -412,26 +426,41 @@ async function directOpenAI(
 }
 
 async function directAI(messages: any[]) {
-  // v18 live tests consistently used OpenRouter after the slower Groq
-  // fallback. Read both credentials concurrently; use the provider proven to
-  // respond first and fail over without delaying every normal conversation.
-  const [openrouter,groq] = await Promise.all([
+  const [openrouter, groq] = await Promise.all([
     backendSecret("OPENROUTER_API_KEY"),
     backendSecret("GROQ_API_KEY"),
   ]);
-  if(openrouter) {
+  let openrouterError = "";
+  if (openrouter) {
     try {
       return await directOpenAI(
         OPENROUTER_URL, openrouter, OPENROUTER_MODEL, messages,
         "openrouter", 12_000
       );
-    } catch(err) {
-      console.warn("OpenRouter temporarily unavailable",err instanceof Error?err.message:"unknown");
+    } catch (error) {
+      openrouterError = error instanceof Error ? error.message : "unknown";
+      console.warn("Jarvis primary model rejected",openrouterError);
     }
   }
-  return await directOpenAI(
-    GROQ_URL, groq, GROQ_MODEL, messages, "groq", 9_000
-  );
+  // Prefer switching models over repeating potentially invalid synthetic calls.
+  if (groq) {
+    try {
+      return await directOpenAI(
+        GROQ_URL, groq, GROQ_MODEL, messages, "groq", 9_000
+      );
+    } catch (error) {
+      console.warn("Jarvis alternate model unavailable",error instanceof Error ? error.message : "unknown");
+    }
+  }
+  // Last resort is another TRUE LLM request, not returning XML-like tool code.
+  // Only trigger this extra work if the first two real providers failed.
+  if (openrouter) {
+    return await directOpenAI(
+      OPENROUTER_URL, openrouter, OPENROUTER_MODEL, messages,
+      "openrouter", 12_000, false, 0.25, true
+    );
+  }
+  throw new Error("No real AI provider available; primary error: " + openrouterError);
 }
 
 
