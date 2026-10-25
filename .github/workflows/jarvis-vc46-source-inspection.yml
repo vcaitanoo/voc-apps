@@ -69,6 +69,10 @@ jobs:
              "JarvisListeningService.kt": (base/"voice/JarvisListeningService.kt",["fun start(context:", "override fun onStartCommand", "override fun onTaskRemoved", "override fun onDestroy", "private fun startBackgroundController", "private fun startForegroundNow"]),
              "BrainClient.kt": (base/"network/BrainClient.kt", ["fun chat(", "fun chat", "fun synthesizeSpeech", "/v1/chat", "JSONObject()", "getMessages", "val body"]),
           }
+          for f in base.glob("**/*Provider*.kt"):
+              targets["provider/"+f.name] = (f, ["data class AiRequest", "fun chat(", "GatewayAiProvider", "BrainClient.chat", "val messages", "userMessage", "webSearch", "interface AiProvider"])
+          for f in base.glob("**/*AiRequest*.kt"):
+              targets["requests/"+f.name] = (f, ["data class AiRequest", "userMessage", "requiresInternet"])
           for f in base.glob("**/*Agent*.kt"):
               targets["agent/"+f.name] = (f, ["class ", "suspend fun", "fun handle(", "BrainClient", "webSearch", "system"])
           report=["# Exact VC47 source inspection", "", "Recovered from verified canonical VC18–VC47 patch chain. Contains only targeted unmodified code excerpts.", ""]
@@ -82,7 +86,7 @@ jobs:
                   for i in matching[:2]:
                       end=min(len(lines),i+(115 if "configurePortuguese" in needle or "onStartCommand" in needle else 72))
                       report.extend(["```kotlin", *[f"{j+1}: {lines[j]}" for j in range(max(0,i-3),end)], "```"])
-          Path("docs/VC47_CHAT_SOURCE_INSPECTION.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          Path("docs/VC47_AGENT_PROVIDER_SOURCE.md").write_text("\n".join(report)+"\n",encoding="utf-8")
           print("VC47_SOURCE_INSPECTION_OK",len(report))
           PY
       - name: Save source audit in GitHub
@@ -91,7 +95,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/VC47_CHAT_SOURCE_INSPECTION.md
+          git add docs/VC47_AGENT_PROVIDER_SOURCE.md
           if ! git diff --cached --quiet; then
             git commit -m "audit(jarvis): snapshot precise VC47 voice and Android background lifecycle paths"
             git pull --rebase origin main
