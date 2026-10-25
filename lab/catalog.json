@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-10-25T12:46:59Z",
+  "updatedAt": "2026-10-25T14:50:44Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -92,12 +92,12 @@
         "notes": "Versão estável atualmente registrada no catálogo oficial."
       },
       "candidate": {
-        "versionCode": 47,
-        "versionName": "0.3.22",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.22-vc47.apk",
-        "sha256": "0ce3000bcd3cbb71da55810b4c4105968bb2921fc3552df32938b2483737f710",
+        "versionCode": 48,
+        "versionName": "0.3.23",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.23-vc48.apk",
+        "sha256": "900a45b115dae8365568333a5aa7298667422bf83de514807e322f3b002f17e8",
         "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
-        "notes": "VC47 / 0.3.22: protege o serviço de microfone contra encerramento ao deixar a aplicação; adiciona teste e seleção explícita de voz brasileira masculina para motores sem metadados de género. Mantém a voz masculina da nuvem e as funcionalidades da VC46. Build assinado, teste no dispositivo pendente."
+        "notes": "VC48 / 0.3.23: restaura a conversa real com IA preservando ate 12 turnos recentes para entender perguntas de seguimento; elimina respostas eleitorais fixas no backend. Voz masculina, escuta, lembretes, interface e assinatura historica preservados. APK assinado, teste real no aparelho pendente."
       }
     },
     {
