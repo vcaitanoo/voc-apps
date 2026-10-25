@@ -36,7 +36,10 @@ function getMessages(input: any) {
       message &&
       ["system", "user", "assistant"].includes(message.role) &&
       typeof message.content === "string" &&
-      message.content.trim()
+      message.content.trim() &&
+      // A leaked fake tool call from a previous version is not dialogue.
+      // Never feed that text back into a new language-model conversation.
+      (message.role !== "assistant" || !containsUnexecutedToolCall(message.content))
     )
     .map((message: any) => ({
       role: message.role,
