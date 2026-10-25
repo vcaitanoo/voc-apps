@@ -84,23 +84,52 @@ main=replace_once(
         chatBusy = true''',
     "capture UI conversation",
 )
-oldCall="BrainClient.chat(token, text)"
-oldRenew="BrainClient.chat(renewed, text)"
-if oldCall not in main and oldRenew not in main:
-    raise SystemExit("VC48 cannot find MainActivity BrainClient.chat sites")
-main=main.replace(oldCall,"BrainClient.chat(token, text, conversation = conversationForBrain)")
-main=main.replace(oldRenew,"BrainClient.chat(renewed, text, conversation = conversationForBrain)")
-if "BrainClient.chat(" not in main:
-    raise SystemExit("VC48 conversation dispatcher lost")
-if "conversationForBrain" not in main:
-    raise SystemExit("VC48 conversation capture missing")
+# Published VC47 routes requests via JarvisAgent (NOT directly to BrainClient).
+oldCall="agent.handle(token, text)"
+if main.count(oldCall)!=1:raise SystemExit("VC48 missing real MainActivity agent.handle dispatcher")
+main=main.replace(oldCall,"agent.handle(token, text, conversationForBrain)",1)
+main=main.replace(".map {\n                (if (it.role == \"jarvis\") \"assistant\" else \"user\") to it.text\n            }", ".map {\n                (if (it.role == \"jarvis\") \"assistant\" else \"user\") to it.text\n            }")
+if "agent.handle(token, text, conversationForBrain)" not in main:
+    raise SystemExit("VC48 failed to wire UI history to real agent")
 MAIN.write_text(main,encoding="utf-8")
+
+
+# Preserve tools and reminder routing: recent conversation is forwarded only
+# when the orchestrator chooses the AI provider, never used to score tool intent.
+agents=list(APP.glob("src/main/java/**/JarvisAgent.kt"))
+providers=list(APP.glob("src/main/java/**/AiProvider.kt"))
+if len(agents)!=1 or len(providers)!=1:
+    raise SystemExit("VC48 agent/provider paths not unique")
+AGENT=agents[0]; PROVIDER=providers[0]
+agent=AGENT.read_text(encoding="utf-8")
+agent=replace_once(agent,
+    "fun handle(accessToken: String?, rawMessage: String): AgentResponse? {",
+    "fun handle(accessToken: String?, rawMessage: String, conversation: List<Pair<String, String>> = emptyList()): AgentResponse? {",
+    "agent history parameter")
+agent=replace_once(agent,
+    "requiresInternet = InternetNeedDetector.requiresInternet(message)",
+    "requiresInternet = InternetNeedDetector.requiresInternet(message),\n                conversation = conversation",
+    "agent history forwarded to AI request")
+AGENT.write_text(agent,encoding="utf-8")
+
+provider=PROVIDER.read_text(encoding="utf-8")
+provider=replace_once(provider,
+    "val requiresInternet: Boolean = false\n)",
+    "val requiresInternet: Boolean = false,\n    val conversation: List<Pair<String, String>> = emptyList()\n)",
+    "AiRequest schema compatible with all existing callers")
+provider=replace_once(provider,
+    "webSearch = request.requiresInternet",
+    "webSearch = request.requiresInternet,\n            conversation = request.conversation",
+    "full history reaches BrainClient via GatewayAiProvider")
+PROVIDER.write_text(provider,encoding="utf-8")
 
 check=[
     ('versionCode = 48' in build and 'versionName = "0.3.23"' in build,"version"),
     ('conversation: List<Pair<String, String>>' in brain,"nonbreaking chat signature"),
     ('earlier.takeLast(12).forEach' in brain,"history forwarding"),
     ('conversationForBrain' in main,"snapshot"),
+    ('conversation = request.conversation' in provider,"AI provider forwards turns"),
+    ('agent.handle(token, text, conversationForBrain)' in main,"real UI route"),
     ('VoiceController' in main and 'voiceController.deliverResponse(response.text)' in main,"male voice output untouched"),
     ('JarvisListeningService' in main and 'override fun onPause()' in main,"background listening still intact"),
 ]
