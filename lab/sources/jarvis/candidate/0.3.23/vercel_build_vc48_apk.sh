@@ -160,7 +160,7 @@ grep -Fq 'readyEngine.setPitch(0.76f)' "$SOURCE/app/src/main/java/pt/vcaitano/ja
 # VC48: real AI conversation with persistent context
 grep -Fq 'conversationForBrain' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/MainActivity.kt"
 grep -Fq 'earlier.takeLast(12).forEach' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/network/BrainClient.kt"
-grep -Fq 'fun chat(accessToken: String?, message: String, conversation:' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/network/BrainClient.kt"
+grep -Fq 'conversation: List<Pair<String, String>>' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/network/BrainClient.kt"
 grep -Fq 'override fun onPause()' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/MainActivity.kt"
 grep -Fq 'availableJarvisVoices.forEach' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/MainActivity.kt"
 grep -Fq 'fun chooseBrazilianVoice' "$SOURCE/app/src/main/java/pt/vcaitano/jarvis/voice/VoiceController.kt"
