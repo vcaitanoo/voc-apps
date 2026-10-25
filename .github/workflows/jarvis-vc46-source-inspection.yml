@@ -1,0 +1,96 @@
+name: Inspect exact Jarvis VC46 background and voice source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/jarvis-vc46-source-inspection.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover exact published VC46 source from canonical patch chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p gl/lab/sources/jarvis
+          cp -a lab/sources/jarvis/candidate gl/lab/sources/jarvis/
+          cd gl
+          mkdir -p .vc46-inspect/source
+          cat lab/sources/jarvis/candidate/0.2.15/source.part.* > .vc46-inspect/source.b64
+          base64 -d .vc46-inspect/source.b64 > .vc46-inspect/source.zip
+          echo '1370f787b2488ef3ccaf5c20ec88ccf2b96442c51407a308e5304fe8a9ae2f55  .vc46-inspect/source.zip' | sha256sum -c -
+          unzip -q .vc46-inspect/source.zip -d .vc46-inspect/source
+          cp lab/sources/jarvis/candidate/0.2.15/overrides/VoicePrint.kt .vc46-inspect/source/app/src/main/java/pt/vcaitano/jarvis/voice/VoicePrint.kt
+          ln -s .vc46-inspect/source jarvis0215
+          python3 lab/sources/jarvis/candidate/0.2.16/apply_vc18.py
+          python3 lab/sources/jarvis/candidate/0.2.17/apply_vc19.py
+          python3 lab/sources/jarvis/candidate/0.2.18/apply_vc20.py
+          python3 lab/sources/jarvis/candidate/0.2.19/apply_vc21.py
+          python3 lab/sources/jarvis/candidate/0.2.21/apply_vc22_voice_repair.py
+          python3 lab/sources/jarvis/candidate/0.2.21/apply_vc23.py
+          python3 lab/sources/jarvis/candidate/0.2.22/apply_vc24.py
+          python3 lab/sources/jarvis/candidate/0.3.0/apply_vc25.py
+          python3 lab/sources/jarvis/candidate/0.3.1/apply_vc26.py
+          python3 lab/sources/jarvis/candidate/0.3.2/apply_vc27.py
+          python3 lab/sources/jarvis/candidate/0.3.3/apply_vc28.py
+          python3 lab/sources/jarvis/candidate/0.3.4/apply_vc29.py
+          python3 lab/sources/jarvis/candidate/0.3.6/apply_vc31.py
+          python3 lab/sources/jarvis/candidate/0.3.7/apply_vc32.py
+          python3 lab/sources/jarvis/candidate/0.3.8/apply_vc33.py
+          python3 lab/sources/jarvis/candidate/0.3.9/apply_vc34.py
+          python3 lab/sources/jarvis/candidate/0.3.10/apply_vc35.py
+          python3 lab/sources/jarvis/candidate/0.3.11/apply_vc36.py
+          python3 lab/sources/jarvis/candidate/0.3.13/apply_vc38.py
+          python3 lab/sources/jarvis/candidate/0.3.14/apply_vc39.py
+          python3 lab/sources/jarvis/candidate/0.3.17/apply_vc42.py
+          python3 lab/sources/jarvis/candidate/0.3.18/apply_vc43.py
+          python3 lab/sources/jarvis/candidate/0.3.19/apply_vc44.py
+          python3 lab/sources/jarvis/candidate/0.3.20/apply_vc45.py
+          python3 lab/sources/jarvis/candidate/0.3.21/apply_vc46.py
+      - name: Extract exact source lines for lifecycle and speech paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path("gl/.vc46-inspect/source/app/src/main/java/pt/vcaitano/jarvis")
+          targets={
+             "MainActivity.kt": (base/"MainActivity.kt", ["override fun onPause", "override fun onStop", "override fun onResume", "override fun onDestroy","private fun SystemScreen"]),
+             "VoiceController.kt": (base/"voice/VoiceController.kt", ["fun handoffToBackground", "fun resumeForegroundListening", "fun startContinuousListening", "fun destroy", "fun deliverResponse", "private fun initializeTextToSpeech", "private fun configurePortugueseVoice", "private fun speakWithLocalFallback", "private fun playVerifiedMaleMp3"]),
+             "JarvisListeningService.kt": (base/"voice/JarvisListeningService.kt",["fun start(context:", "override fun onStartCommand", "override fun onTaskRemoved", "override fun onDestroy", "private fun startBackgroundController", "private fun startForegroundNow"]),
+             "BrainClient.kt": (base/"network/BrainClient.kt", ["fun synthesizeSpeech","private val voiceBaseUrl"]),
+          }
+          report=["# Exact VC46 source inspection", "", "Recovered from verified canonical VC18–VC46 patch chain. Contains only targeted unmodified code excerpts.", ""]
+          for name,(path,needles) in targets.items():
+              lines=path.read_text(encoding="utf-8").splitlines()
+              report.append("## "+name)
+              report.append("File lines: "+str(len(lines)))
+              for needle in needles:
+                  matching=[i for i,line in enumerate(lines) if needle in line]
+                  report.append(f"### {needle} — matches={len(matching)}")
+                  for i in matching[:2]:
+                      end=min(len(lines),i+(115 if "configurePortuguese" in needle or "onStartCommand" in needle else 72))
+                      report.extend(["```kotlin", *[f"{j+1}: {lines[j]}" for j in range(max(0,i-3),end)], "```"])
+          Path("docs/VC46_SOURCE_INSPECTION.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("VC46_SOURCE_INSPECTION_OK",len(report))
+          PY
+      - name: Save source audit in GitHub
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/VC46_SOURCE_INSPECTION.md
+          if ! git diff --cached --quiet; then
+            git commit -m "audit(jarvis): snapshot precise VC46 voice and Android background lifecycle paths"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
