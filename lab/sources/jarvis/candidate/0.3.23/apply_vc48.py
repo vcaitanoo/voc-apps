@@ -35,33 +35,32 @@ if "accessToken:" not in existing_params or "message:" not in existing_params:
 signature = matches[0].group(0)
 replacement = signature.replace(existing_params, existing_params.rstrip() + ", conversation: List<Pair<String, String>> = emptyList()")
 brain = brain.replace(signature, replacement, 1)
-brain=replace_once(brain,
-    '''        val messages = JSONArray().put(
-            JSONObject().put("role", "user").put("content", outboundMessage)
-        )
-        val body = JSONObject().put("messages", messages)''',
-    '''        // Include recent chat turns so phrases like "então hoje é o segundo
-        // turno?" or "e o resultado?" have a referent. This is still local,
-        // user-owned history; never share another user's conversation.
-        val messages = JSONArray()
-        val earlier = conversation
-            .filter { (role, text) ->
-                (role == "user" || role == "assistant") && text.isNotBlank()
-            }.takeLast(14).toMutableList()
-        // MainActivity already appended the current user turn to its UI store.
-        if (earlier.lastOrNull()?.first == "user" &&
-            earlier.lastOrNull()?.second?.trim() == cleanMessage) {
-            earlier.removeAt(earlier.lastIndex)
-        }
-        earlier.takeLast(12).forEach { (role, turn) ->
-            messages.put(JSONObject()
-                .put("role", role)
-                .put("content", turn.trim().take(1_800)))
-        }
-        messages.put(JSONObject().put("role", "user").put("content", outboundMessage))
-        val body = JSONObject().put("messages", messages)''',
-    "multi-turn conversation body",
-)
+# Add prior turns immediately before the actual network call, without assuming
+# the exact JSON body-building layout in this newer version of BrainClient.
+network_anchor = 'val (status, response) = request(baseUrl, "POST", "/v1/chat", accessToken, body.toString())'
+if brain.count(network_anchor) != 1:
+    candidates=[line.strip() for line in brain.splitlines() if "/v1/chat" in line]
+    raise SystemExit("VC48: cannot locate real chat request " + repr(candidates[:8]))
+brain = brain.replace(network_anchor, '''val previousTurns = JSONArray()
+            val earlier = conversation
+                .filter { (role, text) ->
+                    (role == "user" || role == "assistant") && text.isNotBlank()
+                }.takeLast(14).toMutableList()
+            if (earlier.lastOrNull()?.first == "user" &&
+                earlier.lastOrNull()?.second?.trim() == cleanMessage) {
+                earlier.removeAt(earlier.lastIndex)
+            }
+            earlier.takeLast(12).forEach { (role, turn) ->
+                previousTurns.put(JSONObject()
+                    .put("role", role)
+                    .put("content", turn.trim().take(1_800)))
+            }
+            val pendingTurns = body.optJSONArray("messages") ?: JSONArray()
+            for (index in 0 until pendingTurns.length()) {
+                previousTurns.put(pendingTurns.get(index))
+            }
+            body.put("messages", previousTurns)
+            ''' + network_anchor, 1)
 BRAIN.write_text(brain,encoding="utf-8")
 
 main=MAIN.read_text(encoding="utf-8")
