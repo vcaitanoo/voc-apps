@@ -1,0 +1,87 @@
+name: Jarvis v17 AI and Web live verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/jarvis-v17-live-verification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify real deployed gateway without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs
+          python3 - <<'PY'
+          import json,os,urllib.request,urllib.error
+          from datetime import datetime,timezone
+          url="https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-gateway-v2"
+          tests=[
+            ("Conversa comum",{"messages":[{"role":"user","content":"Explique a diferença entre um mapa e uma fotografia em uma frase."}]}),
+            ("Tesla carro voador / pesquisa automatica sem login",{"messages":[{"role":"user","content":"O que você sabe sobre o carro voador da Tesla? Ele existe mesmo?"}]}),
+            ("Tesla pergunta sobre noticias sem login",{"messages":[{"role":"user","content":"Quais novidades a Tesla anunciou recentemente?"}]})
+          ]
+          lines=["# Jarvis v17 — teste real do servidor em produção","",
+                 "UTC: "+datetime.now(timezone.utc).isoformat(),
+                 "GitHub Action: "+os.environ.get("GITHUB_RUN_ID",""),""]
+          failures=0
+          try:
+            with urllib.request.urlopen(url+"/health",timeout=18) as r:
+              h=json.load(r)
+            ready=h.get("webSearchAutomaticForPublicFacts") is True and h.get("webSearchRequiresSession") is False
+            lines.append("Health: "+("PASS" if ready else "FAIL")+"; automatic web="+str(h.get("webSearchAutomaticForPublicFacts"))+"; session required="+str(h.get("webSearchRequiresSession")))
+            if not ready:failures+=1
+          except Exception as e:
+            lines.append("Health error: "+str(e)[:150]);failures+=1
+          for label,body in tests:
+            try:
+              request=urllib.request.Request(url+"/v1/chat",data=json.dumps(body).encode(),headers={"Content-Type":"application/json"},method="POST")
+              with urllib.request.urlopen(request,timeout=42) as r:
+                result=json.load(r)
+              mode=result.get("mode")
+              provider=result.get("provider")
+              sources=result.get("sources") or []
+              length=len(result.get("text") or "")
+              attempted=result.get("webSearchAttempted") is True
+              valid=provider in ("groq","openrouter") and length>=25
+              if label=="Conversa comum":valid=valid and mode=="ai-direct"
+              else:valid=valid and attempted and mode=="ai-web-sources" and len(sources)>=1
+              lines.append("## "+label+": "+("PASS" if valid else "FAIL"))
+              lines.append("Mode: "+str(mode)+"; model provider: "+str(provider)+"; sources="+str(len(sources))+"; text-length="+str(length)+"; attempt="+str(attempted))
+              lines.extend("- source host: "+x.split("/")[2] for x in sources[:4] if "//" in x)
+              lines.append("")
+              if not valid:failures+=1
+            except Exception as e:
+              lines.append("## "+label+": ERROR "+str(e)[:160]);failures+=1
+          lines.append("Overall: "+("PASS" if failures==0 else "FAIL")+"; failures="+str(failures))
+          output="\n".join(lines)+"\n"
+          open("docs/JARVIS_V17_AI_WEB_LIVE_VERIFICATION.md","w",encoding="utf-8").write(output)
+          print(output)
+          PY
+      - name: Persist objective test evidence to GitHub
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f docs/JARVIS_V17_AI_WEB_LIVE_VERIFICATION.md ]; then
+             mkdir -p docs
+             echo 'Live verification script failed before creating its report.' > docs/JARVIS_V17_AI_WEB_LIVE_VERIFICATION.md
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git add docs/JARVIS_V17_AI_WEB_LIVE_VERIFICATION.md
+          if ! git diff --cached --quiet; then
+            git commit -m 'test(jarvis): record actual AI and web results from deployed v17'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
