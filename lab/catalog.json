@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-10-24T05:13:32Z",
+  "updatedAt": "2026-10-25T12:46:59Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -92,12 +92,12 @@
         "notes": "Versão estável atualmente registrada no catálogo oficial."
       },
       "candidate": {
-        "versionCode": 46,
-        "versionName": "0.3.21",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.21-vc46.apk",
-        "sha256": "cb9dd89fb0938d348aec039d1a9cbae06616343eab7186848a469c94cd25b9f0",
+        "versionCode": 47,
+        "versionName": "0.3.22",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.22-vc47.apk",
+        "sha256": "0ce3000bcd3cbb71da55810b4c4105968bb2921fc3552df32938b2483737f710",
         "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
-        "notes": "VC46 / 0.3.21: base exata na 0.3.20; restaura voz masculina da nuvem original com MP3 válido e reprodução Android MediaPlayer, preserva a voz masculina local e regras de escuta, menus, lembretes e biometria; assinatura e SHA-256 validados estruturalmente; teste físico pendente."
+        "notes": "VC47 / 0.3.22: protege o serviço de microfone contra encerramento ao deixar a aplicação; adiciona teste e seleção explícita de voz brasileira masculina para motores sem metadados de género. Mantém a voz masculina da nuvem e as funcionalidades da VC46. Build assinado, teste no dispositivo pendente."
       }
     },
     {
