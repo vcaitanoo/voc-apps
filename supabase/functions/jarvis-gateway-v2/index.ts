@@ -422,18 +422,26 @@ async function jarvisCurrentEvidence(question:string):Promise<JarvisCitation[]>{
   try{
     const r=await fetchTimeout("https://api.tavily.com/search",{
       method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json"},
-      body:JSON.stringify({query,search_depth:"basic",topic:"general",max_results:5,include_answer:false,include_raw_content:false})
+      body:JSON.stringify({query,search_depth:"basic",topic:"general",max_results:8,include_answer:false,include_raw_content:false})
     },11000);
     if(!r.ok)throw new Error("Search returned "+r.status);
     const data=await r.json() as {results?:Array<{url?:string;title?:string;content?:string}>};
     const usable:JarvisCitation[]=[];
+    const seenHosts=new Set<string>();
+    const lowQuality=/^(?:www\.)?(?:youtube\.com|youtu\.be|facebook\.com|instagram\.com|tiktok\.com|pinterest\.com|coinmarketcap\.com)$/i;
     for(const item of data.results??[]){
       let u:URL;try{u=new URL(item.url??"");}catch{continue;}
       if(u.protocol!=="https:")continue;
-      if(official&&u.hostname!=="tse.jus.br"&&!u.hostname.endsWith(".tse.jus.br"))continue;
+      const host=u.hostname.toLowerCase().replace(/^www\./,"");
+      if(lowQuality.test(host)||seenHosts.has(host))continue;
+      if(official&&host!=="tse.jus.br"&&!host.endsWith(".tse.jus.br"))continue;
       const excerpt=(item.content??"").replace(/\s+/g," ").slice(0,850);
       if(excerpt.length<40)continue;
-      usable.push({url:u.href,title:(item.title??"Fonte").slice(0,140),excerpt});
+      const title=(item.title??"Fonte").slice(0,140);
+      // Avoid unrelated results when a company is the subject of the request.
+      if(/\btesla\b/i.test(question)&&!/tesla|roadster|cybercab|elon musk/i.test(title+" "+excerpt))continue;
+      usable.push({url:u.href,title,excerpt});
+      seenHosts.add(host);
     }
     return usable.slice(0,4);
   }catch(e){
