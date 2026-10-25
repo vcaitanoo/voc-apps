@@ -135,10 +135,13 @@ s=swap(s,
 s=swap(s,
 'private fun runOnMain(block:()->Unit){if(Looper.myLooper()==Looper.getMainLooper())block()else handler.post(block)}',
 '''private fun runOnMain(block:()->Unit){
-        val safe = { runCatching(block).onFailure {
-            android.util.Log.w("JarvisVoice","Foreground notification update rejected",it)
-        } }
-        if(Looper.myLooper()==Looper.getMainLooper())safe() else handler.post(safe)
+        val safe: () -> Unit = {
+            runCatching(block).onFailure {
+                android.util.Log.w("JarvisVoice","Foreground notification update rejected",it)
+            }
+            Unit
+        }
+        if(Looper.myLooper()==Looper.getMainLooper())safe() else handler.post { safe() }
     }''',"safe onMain notifications")
 SERVICE.write_text(s,encoding="utf-8")
 
