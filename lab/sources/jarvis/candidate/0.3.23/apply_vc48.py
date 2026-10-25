@@ -75,7 +75,7 @@ main=replace_once(
 
         // Snapshot before starting the background request. The server receives
         // recent user/Jarvis turns, not an isolated sentence without context.
-        val conversationForBrain = messages.toList().takeLast(16)
+        val conversationForBrain = messages.toList().dropLast(1).takeLast(16)
             .filter { it.role == "user" || it.role == "jarvis" }
             .map {
                 (if (it.role == "jarvis") "assistant" else "user") to it.text
