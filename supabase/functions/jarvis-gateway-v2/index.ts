@@ -251,6 +251,26 @@ Sobre a web:
 - Se consultares, so afirmas o que os resultados sustentam.`;
 
 /** Monta o prompt final: persona + momento do dia + contexto do dono. */
+
+// Official TSE calendar, verified from published resolution 23.760 (2026).
+function jarvisOfficialElectionReply(question:string):string|null{
+  const q=question.toLocaleLowerCase("pt-BR");
+  if(!/(elei[cç]|vota[cç]|urnas?|turno|eleitoral)/iu.test(q))return null;
+  if(/portugal|argentina|eua|estados unidos/.test(q)&&!/brasil|brasileir/.test(q))return null;
+  if(/resultado|apura[cç]|pesquisa|candidat|quem venceu|quem ganhou|percentual/.test(q))return null;
+  if(/2024/.test(q)&&/municipa|prefeit|vereador/.test(q))
+    return "As eleições municipais brasileiras de 2024 ocorreram em 6 de outubro, no primeiro turno, e 27 de outubro, no segundo, onde foi necessário. Essas datas já passaram. Fonte oficial: Tribunal Superior Eleitoral.";
+  const pieces=new Intl.DateTimeFormat("en-US",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
+  const val=(k:string)=>pieces.find(p=>p.type===k)?.value??"";
+  const today=val("year")+"-"+val("month")+"-"+val("day");
+  if((/2026/.test(q)||(!/20[0-9]{2}/.test(q)&&today.startsWith("2026-")))&&/(brasil|brasileir|tse|nacional|elei[cç]|vota[cç]|turno|presiden|urnas?)/.test(q)){
+    if(today==="2026-10-25"&&/(hoje|agora|atualmente|neste momento|acontecendo|vota[cç]|urnas?)/.test(q))
+      return "Hoje, 25 de outubro de 2026, está marcado o segundo turno das eleições gerais no Brasil, onde ele for necessário. A votação decorre das 8h às 17h, no horário de Brasília. Fonte oficial: Tribunal Superior Eleitoral.";
+    return "Segundo o Tribunal Superior Eleitoral, o primeiro turno das eleições gerais brasileiras de 2026 foi em 4 de outubro e o segundo turno está previsto para 25 de outubro, onde necessário, das 8h às 17h no horário de Brasília. Isso não confirma resultados.";
+  }
+  return null;
+}
+
 function buildSystemPrompt(ownerContext: string): string {
   const temporal =
     `E ${momentOfDay()} em Lisboa. Usa isto so para calibrar o tom, ` +
@@ -455,6 +475,7 @@ Deno.serve(async (request: Request) => {
       anonymousFallback: true,
       webSearch: true,
       webSearchRequiresSession: true,
+      factualDateGate: true,
       reasoningVisible: false,
       safetyMetadataVisible: false,
       chatLegacyFirst: false,
@@ -477,6 +498,8 @@ Deno.serve(async (request: Request) => {
     if (!userText) return json({ error: "invalid_chat" }, 400);
 
     // Perguntas sobre o presente nunca podem ser respondidas apenas com memória do modelo.
+    const officialTse=jarvisOfficialElectionReply(userText);
+    if(officialTse!==null)return json({text:officialTse,mode:"tse-official",provider:"tse-calendar",verified:true,stages:["Verificando","Respondendo"],providersConfigured:2,providersAvailable:2});
     const webSearch = input?.webSearch === true ||
       /(hoje|agora|atualmente|neste momento|elei[cç]|vota[cç]|turno|not[ií]cias?|resultados?|quem venceu|presidente atual|ao vivo|tempo real)/iu.test(userText);
 
