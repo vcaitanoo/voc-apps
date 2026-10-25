@@ -83,3 +83,11 @@ O AGENTS.md na raiz é a instrução de projeto a ser carregada quando Codex tra
 - A integração real foi confirmada em GitHub Actions run `40206309050`, com relatório `docs/JARVIS_V19_AI_WEB_LIVE_VERIFICATION.md`: (1) conversa normal `ai-direct` com `provider=openrouter`; (2) pergunta sobre carro voador da Tesla `ai-web-sources`, três URLs, `provider=openrouter`, sem login; (3) notícias Tesla `ai-web-sources`, quatro URLs, `provider=openrouter`, sem login. Todos PASS.
 - Não afirmar que o Groq respondeu nesses testes: esteve disponível como fallback mas os resultados comprovados foram do OpenRouter. Não dizer que uma voz ou navegação foram verificadas no Samsung — só o backend e as pesquisas foram testados automaticamente.
 - Preservar `webSearchAutomaticForPublicFacts`, `webSearchRequiresSession=false`, contexto conversacional, ausência de respostas fixas, proteção de consultas pessoais e voz masculina aprovada.
+
+## Jarvis — bloqueio de comandos internos de ferramenta (gateway v21)
+- Em 25/10/2026, o usuário mostrou o Jarvis exibindo tags internas de chamada de `browser_search`, incluindo parâmetros de consulta e `tool_call`, em vez de responder sobre a apuração eleitoral. Isto é uma falha de **saída textual do modelo**, não execução válida de ferramenta.
+- O backend `jarvis-gateway-v2` v21 bloqueia qualquer conteúdo com assinatura de chamada sintética de ferramenta antes de chegar ao APK/TTS; o fallback tenta o próximo provedor de IA real, não publica códigos internos.
+- Mensagens antigas do assistente com marcação de ferramenta são removidas do histórico reenviado à IA, evitando contaminação.
+- A pesquisa verdadeira é feita pela função backend `jarvisCurrentEvidence` via Tavily, e os trechos são dados externos, nunca instruções. O modelo deve elaborar uma resposta em linguagem natural, sem XML, JSON de chamada de função, ou instruções para um browser inexistente.
+- Testar conversas gerais e consultas à apuração das eleições brasileiras, incluindo perguntas de seguimento. Confirmar `provider` de IA real e ausência de códigos antes de declarar êxito.
+- Não alterar voz masculina, TTS, `VoiceController`, escuta, lembretes, Android, assinatura ou APK por causa desta correção exclusivamente no servidor.
