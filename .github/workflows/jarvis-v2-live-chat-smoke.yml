@@ -1,0 +1,51 @@
+name: Jarvis real AI chat smoke test
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/jarvis-v2-live-chat-smoke.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Call real anonymous AI backend, verify non-canned provider
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-gateway-v2/v1/chat'
+          curl --fail --silent --show-error --max-time 35 -X POST "$URL" \
+            -H 'Content-Type: application/json' \
+            -d '{"messages":[{"role":"user","content":"Explique em uma frase a diferença entre um mapa e uma fotografia."}]}' \
+            -o /tmp/jarvis-ai.json
+          python3 - <<'PY'
+          import json
+          o=json.load(open('/tmp/jarvis-ai.json'))
+          mode=o.get('mode','')
+          provider=o.get('provider','')
+          text=o.get('text','')
+          print('mode:',mode,'provider:',provider,'reply-length:',len(text))
+          if mode!='ai-direct' or provider not in ('groq','openrouter') or len(text)<20:
+              raise SystemExit('Jarvis failed real model smoke test; no expected IA response')
+          print('REAL_AI_CHAT_OK')
+          PY
+      - name: Verify election questions do not invoke a fixed TSE reply
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-gateway-v2/v1/chat'
+          curl --fail --silent --show-error --max-time 35 -X POST "$URL" \
+            -H 'Content-Type: application/json' \
+            -d '{"messages":[{"role":"user","content":"Como andam as eleições no Brasil?"},{"role":"assistant","content":"A eleição está em andamento nos locais com segundo turno."},{"role":"user","content":"Então hoje é o segundo turno? Me explica."}]}' \
+            -o /tmp/jarvis-voting.json
+          python3 - <<'PY'
+          import json
+          o=json.load(open('/tmp/jarvis-voting.json'))
+          mode=o.get('mode','')
+          print('election-mode:',mode,'provider:',o.get('provider'),'text-length:',len(o.get('text','')))
+          if mode=='tse-official':raise SystemExit('CANNED_ELECTION_REGRESSION')
+          if not o.get('text'):raise SystemExit('EMPTY_FACT_RESPONSE')
+          print('NON_CANNED_ELECTION_ROUTE_OK')
+          PY
