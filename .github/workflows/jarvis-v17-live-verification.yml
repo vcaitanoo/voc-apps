@@ -1,4 +1,4 @@
-name: Jarvis v18 AI and Web live verification
+name: Jarvis v19 AI and Web live verification
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
             ("Tesla carro voador / pesquisa automatica sem login",{"messages":[{"role":"user","content":"O que você sabe sobre o carro voador da Tesla? Ele existe mesmo?"}]}),
             ("Tesla pergunta sobre noticias sem login",{"messages":[{"role":"user","content":"Quais novidades a Tesla anunciou recentemente?"}]})
           ]
-          lines=["# Jarvis v18 — teste real do servidor em produção","",
+          lines=["# Jarvis v19 — teste real do servidor em produção","",
                  "UTC: "+datetime.now(timezone.utc).isoformat(),
                  "GitHub Action: "+os.environ.get("GITHUB_RUN_ID",""),""]
           failures=0
@@ -64,7 +64,7 @@ jobs:
               lines.append("## "+label+": ERROR "+str(e)[:160]);failures+=1
           lines.append("Overall: "+("PASS" if failures==0 else "FAIL")+"; failures="+str(failures))
           output="\n".join(lines)+"\n"
-          open("docs/JARVIS_V18_AI_WEB_LIVE_VERIFICATION.md","w",encoding="utf-8").write(output)
+          open("docs/JARVIS_V19_AI_WEB_LIVE_VERIFICATION.md","w",encoding="utf-8").write(output)
           print(output)
           PY
       - name: Persist objective test evidence to GitHub
@@ -72,16 +72,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ ! -f docs/JARVIS_V18_AI_WEB_LIVE_VERIFICATION.md ]; then
+          if [ ! -f docs/JARVIS_V19_AI_WEB_LIVE_VERIFICATION.md ]; then
              mkdir -p docs
-             echo 'Live verification script failed before creating its report.' > docs/JARVIS_V18_AI_WEB_LIVE_VERIFICATION.md
+             echo 'Live verification script failed before creating its report.' > docs/JARVIS_V19_AI_WEB_LIVE_VERIFICATION.md
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin main
-          git add docs/JARVIS_V18_AI_WEB_LIVE_VERIFICATION.md
+          git add docs/JARVIS_V19_AI_WEB_LIVE_VERIFICATION.md
           if ! git diff --cached --quiet; then
-            git commit -m 'test(jarvis): record actual AI and web results from deployed v18'
+            git commit -m 'test(jarvis): record actual AI and web results from deployed v19'
             git pull --rebase origin main
             git push origin HEAD:main
           fi
