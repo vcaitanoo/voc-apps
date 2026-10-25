@@ -68,11 +68,11 @@ async function backendSecret(name: string) {
     Accept: "application/json",
   };
   if (!key.startsWith("sb_secret_")) headers.Authorization = `Bearer ${key}`;
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/jarvis_backend_secret`, {
+  const response = await fetchTimeout(`${SUPABASE_URL}/rest/v1/rpc/jarvis_backend_secret`, {
     method: "POST",
     headers,
     body: JSON.stringify({ p_name: name }),
-  });
+  }, 5_000);
   if (!response.ok) return "";
   const value = await response.json().catch(() => null);
   return typeof value === "string" ? value.trim() : "";
@@ -389,27 +389,26 @@ async function directOpenAI(
 }
 
 async function directAI(messages: any[]) {
-  const groq = await backendSecret("GROQ_API_KEY");
-  const openrouter = await backendSecret("OPENROUTER_API_KEY");
-  try {
-    return await directOpenAI(
-      GROQ_URL,
-      groq,
-      GROQ_MODEL,
-      messages,
-      "groq",
-      9_000,
-    );
-  } catch {
-    return await directOpenAI(
-      OPENROUTER_URL,
-      openrouter,
-      OPENROUTER_MODEL,
-      messages,
-      "openrouter",
-      11_000,
-    );
+  // v18 live tests consistently used OpenRouter after the slower Groq
+  // fallback. Read both credentials concurrently; use the provider proven to
+  // respond first and fail over without delaying every normal conversation.
+  const [openrouter,groq] = await Promise.all([
+    backendSecret("OPENROUTER_API_KEY"),
+    backendSecret("GROQ_API_KEY"),
+  ]);
+  if(openrouter) {
+    try {
+      return await directOpenAI(
+        OPENROUTER_URL, openrouter, OPENROUTER_MODEL, messages,
+        "openrouter", 12_000
+      );
+    } catch(err) {
+      console.warn("OpenRouter temporarily unavailable",err instanceof Error?err.message:"unknown");
+    }
   }
+  return await directOpenAI(
+    GROQ_URL, groq, GROQ_MODEL, messages, "groq", 9_000
+  );
 }
 
 
@@ -423,7 +422,7 @@ async function jarvisCurrentEvidence(question:string):Promise<JarvisCitation[]>{
     const r=await fetchTimeout("https://api.tavily.com/search",{
       method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json"},
       body:JSON.stringify({query,search_depth:"basic",topic:"general",max_results:8,include_answer:false,include_raw_content:false})
-    },11000);
+    },8500);
     if(!r.ok)throw new Error("Search returned "+r.status);
     const data=await r.json() as {results?:Array<{url?:string;title?:string;content?:string}>};
     const usable:JarvisCitation[]=[];
