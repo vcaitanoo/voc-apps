@@ -544,7 +544,9 @@ Deno.serve(async (request: Request) => {
       ...incoming.slice(-12),
     ];
 
-    if (explicitWeb && !(await hasAuthenticatedUser(request))) {
+    // Normal time-sensitive questions remain accessible in guest AI mode.
+    // Advanced open-ended web browsing still requires an account.
+    if (explicitWeb && !topical && !(await hasAuthenticatedUser(request))) {
       return json({
         text: "Para consultar informações atuais na Internet com segurança, entre na sua conta Jarvis nas Configurações e tente novamente.",
         mode: "web-auth-required",
