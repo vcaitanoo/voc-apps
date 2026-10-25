@@ -31,6 +31,33 @@ jobs:
               raise SystemExit('Jarvis failed real model smoke test; no expected IA response')
           print('REAL_AI_CHAT_OK')
           PY
+      - name: Tesla flying car needs real web results plus real model
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-gateway-v2/v1/chat'
+          curl --fail --silent --show-error --max-time 38 -X POST "$URL" \
+            -H 'Content-Type: application/json' \
+            -d '{"messages":[{"role":"user","content":"O que você sabe sobre o carro voador da Tesla? Ele existe mesmo?"}]}' \
+            -o /tmp/jarvis-tesla.json
+          python3 - <<'PY'
+          import json
+          o=json.load(open('/tmp/jarvis-tesla.json'))
+          mode=o.get('mode','')
+          provider=o.get('provider','')
+          cites=o.get('sources',[])
+          print('Tesla: mode',mode,'provider',provider,'sources',len(cites),'text-length',len(o.get('text','')))
+          print('Source domains:',[s.split('/')[2] for s in cites[:4]])
+          if provider not in ('groq','openrouter'):
+              raise SystemExit('TESLA_NO_REAL_AI_PROVIDER '+str(provider))
+          if not o.get('webSearchAttempted'):
+              raise SystemExit('TESLA_DID_NOT_SEARCH')
+          if mode!='ai-web-sources' or not cites:
+              raise SystemExit('TESLA_WEB_SEARCH_FAILED; mode='+str(mode))
+          if len(o.get('text',''))<35:
+              raise SystemExit('TESLA_RESPONSE_TOO_SHORT')
+          print('TESLA_AI_WEB_SOURCES_OK')
+          PY
       - name: Verify election questions do not invoke a fixed TSE reply
         shell: bash
         run: |
