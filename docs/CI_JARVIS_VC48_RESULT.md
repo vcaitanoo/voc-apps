@@ -1,8 +1,8 @@
 # Jarvis VC48 — resultado real da compilação
-Consultado: 2026-10-25T14:42:15.733114+00:00
-Execução: https://github.com/vcaitanoo/voc-apps/actions/runs/40203423908
+Consultado: 2026-10-25T14:42:54.838707+00:00
+Execução: https://github.com/vcaitanoo/voc-apps/actions/runs/40203463188
 
-## Build, verify and publish Jarvis 0.3.23 / VC48: cancelled
+## Build, verify and publish Jarvis 0.3.23 / VC48: failure
 - Set up job: success
 - Check out GitHub source of truth: success
 - Set up Java 17: success
@@ -16,3 +16,16 @@ Execução: https://github.com/vcaitanoo/voc-apps/actions/runs/40203423908
 - Post Set up Java 17: success
 - Post Check out GitHub source of truth: success
 - Complete job: success
+
+### Erros observados
+```text
+Build, verify and publish Jarvis 0.3.23 / VC48	UNKNOWN STEP	2026-10-25T14:42:17.4906183Z   dependency-graph-continue-on-failure: true
+Build, verify and publish Jarvis 0.3.23 / VC48	UNKNOWN STEP	2026-10-25T14:42:28.6567360Z ^[[36;1mexpected = {^[[0m
+Build, verify and publish Jarvis 0.3.23 / VC48	UNKNOWN STEP	2026-10-25T14:42:28.6569939Z ^[[36;1mfor key, value in expected.items():^[[0m
+Build, verify and publish Jarvis 0.3.23 / VC48	UNKNOWN STEP	2026-10-25T14:42:29.6220915Z VC38 source patch validated: male TTS fallback, VoicePrint gate and error recovery
+Build, verify and publish Jarvis 0.3.23 / VC48	UNKNOWN STEP	2026-10-25T14:42:29.6781319Z VC42 validated: explicit male PT-BR only; Google TTS first; female/default fallback removed; no voice-failure notices
+Build, verify and publish Jarvis 0.3.23 / VC48	UNKNOWN STEP	2026-10-25T14:42:29.8455960Z VC48 cannot find MainActivity BrainClient.chat sites
+Build, verify and publish Jarvis 0.3.23 / VC48	UNKNOWN STEP	2026-10-25T14:42:29.8514124Z ##[error]Process completed with exit code 1.
+Build, verify and publish Jarvis 0.3.23 / VC48	UNKNOWN STEP	2026-10-25T14:42:30.3924295Z (node:2454) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Build, verify and publish Jarvis 0.3.23 / VC48	UNKNOWN STEP	2026-10-25T14:42:32.7702122Z Starting process 'Gradle build daemon'. Working directory: /home/runner/.gradle/daemon/9.5.1 Command: /usr/lib/jvm/temurin-17-jdk-amd64/bin/java --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base
+```
