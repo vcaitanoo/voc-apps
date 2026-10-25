@@ -512,7 +512,8 @@ Deno.serve(async (request: Request) => {
     const explicitWeb = input?.webSearch === true;
     const previousUser = incoming.slice(0, -1).filter((m: any) => m.role === "user").slice(-2)
       .map((m: any) => String(m.content || "")).join(" ");
-    const contextForSearch = (previousUser + " " + userText).trim();
+    const elliptical = /^(?:ent[aã]o\b|e\s+|mas\s+|isso\b|esse\b|essa\b|dia do\b|quando [eé]|quero que acompanhe|acompanha|acompanhe)/iu.test(userText.trim());
+    const contextForSearch = (elliptical ? previousUser + " " : "") + userText.trim();
     const topical = /(hoje|agora|atualmente|elei[cç]|vota[cç]|turno|not[ií]cias?|resultados?|quem venceu|presidente atual|ao vivo|tempo real|apura[cç])/iu.test(contextForSearch);
     const seekingFacts = /^(como |qual |quais |quem |onde |quando |quanto |o que |me (?:diz|fala|conta)|aconteceu |acompanha|acompanhe|quero acompanhar|houve |tem |t[eê]m |ent[aã]o )/iu.test(userText.trim());
     const webSearch = explicitWeb || (topical && seekingFacts);
@@ -532,10 +533,8 @@ Deno.serve(async (request: Request) => {
     }
 
     const webRules = webSearch
-      ? "\n\nConsultaste a web. So afirmas o que os resultados sustentam; " +
-        "se nao confirmares, diz claramente que nao confirmaste. " +
-        "Cita os nomes das fontes de forma natural, sem URLs."
-      : "";
+      ? "\n\nUse as fontes consultadas para informações recentes. Entenda cada pergunta dentro do diálogo; não reutilize a resposta anterior. Não invente resultados, datas ou acompanhamento automático. Cite a fonte de modo natural, sem URLs."
+      : "\n\nConverse naturalmente, usando o histórico recente. Evite frases repetidas, respostas automáticas e explicações genéricas. Responda exatamente à intenção do último pedido.";
 
     const systemPrompt =
       buildSystemPrompt(ownerContext) + webRules;
