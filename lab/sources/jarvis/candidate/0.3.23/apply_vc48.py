@@ -89,8 +89,8 @@ oldCall="BrainClient.chat(token, text)"
 oldRenew="BrainClient.chat(renewed, text)"
 if oldCall not in main and oldRenew not in main:
     raise SystemExit("VC48 cannot find MainActivity BrainClient.chat sites")
-main=main.replace(oldCall,"BrainClient.chat(token, text, conversationForBrain)")
-main=main.replace(oldRenew,"BrainClient.chat(renewed, text, conversationForBrain)")
+main=main.replace(oldCall,"BrainClient.chat(token, text, conversation = conversationForBrain)")
+main=main.replace(oldRenew,"BrainClient.chat(renewed, text, conversation = conversationForBrain)")
 if "BrainClient.chat(" not in main:
     raise SystemExit("VC48 conversation dispatcher lost")
 if "conversationForBrain" not in main:
