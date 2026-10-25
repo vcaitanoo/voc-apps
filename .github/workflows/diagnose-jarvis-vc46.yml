@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - '.github/workflows/diagnose-jarvis-vc47.yml'
+      - '.github/workflows/diagnose-jarvis-vc46.yml'
   workflow_run:
     workflows: ["Jarvis VC47 historical male voice recovery build"]
     types: [completed]
