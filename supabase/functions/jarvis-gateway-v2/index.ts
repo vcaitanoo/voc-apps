@@ -509,8 +509,13 @@ Deno.serve(async (request: Request) => {
     if (!userText) return json({ error: "invalid_chat" }, 400);
 
     // Perguntas sobre o presente nunca podem ser respondidas apenas com memória do modelo.
-    const webSearch = input?.webSearch === true ||
-      /(hoje|agora|atualmente|neste momento|elei[cç]|vota[cç]|turno|not[ií]cias?|resultados?|quem venceu|presidente atual|ao vivo|tempo real)/iu.test(userText);
+    const explicitWeb = input?.webSearch === true;
+    const previousUser = incoming.slice(0, -1).filter((m: any) => m.role === "user").slice(-2)
+      .map((m: any) => String(m.content || "")).join(" ");
+    const contextForSearch = (previousUser + " " + userText).trim();
+    const topical = /(hoje|agora|atualmente|elei[cç]|vota[cç]|turno|not[ií]cias?|resultados?|quem venceu|presidente atual|ao vivo|tempo real|apura[cç])/iu.test(contextForSearch);
+    const seekingFacts = /^(como |qual |quais |quem |onde |quando |quanto |o que |me (?:diz|fala|conta)|aconteceu |acompanha|acompanhe|quero acompanhar|houve |tem |t[eê]m |ent[aã]o )/iu.test(userText.trim());
+    const webSearch = explicitWeb || (topical && seekingFacts);
 
     // Contexto do dono: e o que distingue "o seu Jarvis" de um stranger.
     // O userId vem do token quando ha sessao; sem sessao a conversa segue
@@ -540,7 +545,7 @@ Deno.serve(async (request: Request) => {
       ...incoming.slice(-12),
     ];
 
-    if (webSearch && !(await hasAuthenticatedUser(request))) {
+    if (explicitWeb && !(await hasAuthenticatedUser(request))) {
       return json({
         text: "Para consultar informações atuais na Internet com segurança, entre na sua conta Jarvis nas Configurações e tente novamente.",
         mode: "web-auth-required",
@@ -553,7 +558,7 @@ Deno.serve(async (request: Request) => {
     }
 
     try {
-      const citations=webSearch?await jarvisCurrentEvidence(userText):[];
+      const citations=webSearch?await jarvisCurrentEvidence(contextForSearch):[];
       if(webSearch && !citations.length)
         return json({text:"Não consegui confirmar essa informação em fontes atuais. Prefiro não inventar uma resposta. Tenta novamente daqui a pouco.",mode:"fact-check-unavailable",provider:"jarvis-evidence",verified:false,stages:["Conferindo"],providersConfigured:2,providersAvailable:2});
       if(webSearch){
