@@ -123,6 +123,17 @@ async function hasAuthenticatedUser(request: Request) {
   return response?.ok === true;
 }
 
+/**
+ * Some free OpenRouter models emit a *text description* of a browser tool call,
+ * such as <function=browser_search><parameter=query>...</tool_call>.
+ * This is not a browser request and must NEVER become spoken/displayed text.
+ */
+function containsUnexecutedToolCall(raw: string): boolean {
+  return /<\s*(?:tool_call\b|\/\s*tool_call\s*>|function\s*=\s*[\w.-]+\s*>|parameter\s*=\s*[\w.-]+\s*>)/iu.test(raw)
+    || /<\|(?:tool_call|assistant\s+to=|im_start\|assistant\s+to=)/iu.test(raw)
+    || /\{\s*"(?:tool_calls|function_call)"\s*:/iu.test(raw);
+}
+
 function sanitizeAssistantText(raw: string) {
   let text = (raw || "")
     .trim()
@@ -381,10 +392,19 @@ async function directOpenAI(
   );
   const payload: any = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(`${provider} ${response.status}`);
-  const text = sanitizeAssistantText(
-    payload?.choices?.[0]?.message?.content?.trim?.() || "",
-  );
-  if (!text) throw new Error(`${provider} empty response`);
+  const rawText = payload?.choices?.[0]?.message?.content;
+  if (typeof rawText !== "string" || !rawText.trim()) {
+    throw new Error(`${provider} empty or non-text response`);
+  }
+  if (containsUnexecutedToolCall(rawText)) {
+    // Fall through to another real LLM; never display a synthetic tool call.
+    console.warn("Jarvis blocked unresolved internal tool-call text from",provider);
+    throw new Error(`${provider} unresolved tool-call response`);
+  }
+  const text = sanitizeAssistantText(rawText);
+  if (!text || containsUnexecutedToolCall(text)) {
+    throw new Error(`${provider} invalid generated response`);
+  }
   return { text, provider, model };
 }
 
@@ -523,8 +543,8 @@ Deno.serve(async (request: Request) => {
       .map((m: any) => String(m.content || "")).join(" ");
     const elliptical = /^(?:ent[aã]o\b|e\s+|mas\s+|isso\b|esse\b|essa\b|dia do\b|quando [eé]|quero que acompanhe|acompanha|acompanhe)/iu.test(userText.trim());
     const contextForSearch = (elliptical ? previousUser + " " : "") + userText.trim();
-    const topical = /(hoje|agora|atualmente|elei[cç]|vota[cç]|turno|not[ií]cias?|resultados?|quem venceu|presidente atual|ao vivo|tempo real|apura[cç]|lan[cç]amento|lan[cç]ou|dispon[ií]vel|produto|prot[oó]tipo|tecnologia|carro voador|tesla|cybercab|ve[ií]culo|noticiado|anunciou|fabricante)/iu.test(contextForSearch);
-    const seekingFacts = /(?:\?|^(?:como |qual |quais |quem |onde |quando |quanto |o que |me (?:diz|fala|conta)|aconteceu |acompanha|acompanhe|quero acompanhar|houve |existe |tem |t[eê]m |ent[aã]o |sabe |fale sobre |explique ))/iu.test(userText.trim());
+    const topical = /(hoje|agora|atualmente|elei[cç]|vota[cç]|turno|not[ií]cias?|resultados?|quem venceu|presidente atual|ao vivo|tempo real|apura[cç]|contagem de votos|segundo turno|lan[cç]amento|lan[cç]ou|dispon[ií]vel|produto|prot[oó]tipo|tecnologia|carro voador|tesla|cybercab|ve[ií]culo|noticiado|anunciou|fabricante)/iu.test(contextForSearch);
+    const seekingFacts = /(?:\?|^(?:como |qual |quais |quem |onde |quando |quanto |o que |me (?:diz|fala|conta|atualiza|informa)|aconteceu |acompanha|acompanhe|quero acompanhar|atualize|verifique|busque|pesquise|procure|houve |existe |tem |t[eê]m |ent[aã]o |sabe |fale sobre |explique ))/iu.test(userText.trim());
     const personal = /\b(meus? lembretes?|minha agenda|meu telefone|meu celular|minhas? fotos?|minha conta|meu acesso|minhas? senhas?|minhas? mensagens?)\b/iu.test(userText);
     // The model handles the conversation. Search supplements it for questions
     // about the world; personal/device actions are not sent to web search.
@@ -544,9 +564,10 @@ Deno.serve(async (request: Request) => {
       }
     }
 
-    const webRules = webSearch
+    const webRules = (webSearch
       ? "\n\nUse as fontes consultadas para informações recentes. Entenda cada pergunta dentro do diálogo; não reutilize a resposta anterior. Não invente resultados, datas ou acompanhamento automático. Cite a fonte de modo natural, sem URLs."
-      : "\n\nConverse naturalmente, usando o histórico recente. Evite frases repetidas, respostas automáticas e explicações genéricas. Responda exatamente à intenção do último pedido.";
+      : "\n\nConverse naturalmente, usando o histórico recente. Evite frases repetidas, respostas automáticas e explicações genéricas. Responda exatamente à intenção do último pedido.")
+      + "\n\nCRÍTICO: A pesquisa web já é feita pelo próprio servidor quando necessária. Você NÃO tem ferramentas browser_search, nem pode chamar funções. Jamais escreva XML, <tool_call>, <function=...>, <parameter=...>, JSON de ferramentas, ou uma tentativa de invocação. Gere APENAS a resposta final em linguagem natural, sem formatação de chamada de ferramentas.";
 
     const systemPrompt =
       buildSystemPrompt(ownerContext) + webRules;
