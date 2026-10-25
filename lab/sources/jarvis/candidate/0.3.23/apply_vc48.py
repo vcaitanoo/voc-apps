@@ -22,12 +22,19 @@ build=replace_once(build,'versionName = "0.3.22"','versionName = "0.3.23"',"vers
 BUILD.write_text(build,encoding="utf-8")
 
 brain=BRAIN.read_text(encoding="utf-8")
-brain=replace_once(
-    brain,
-    "fun chat(accessToken: String?, message: String): ChatResponse? {",
-    "fun chat(accessToken: String?, message: String, conversation: List<Pair<String, String>> = emptyList()): ChatResponse? {",
-    "BrainClient.chat signature",
-)
+# Keep any existing optional args rather than assuming VC9's method signature.
+import re
+chat_signature = re.compile(r"fun\s+chat\s*\(([^)]*)\)\s*:\s*ChatResponse\?\s*\{")
+matches = list(chat_signature.finditer(brain))
+if len(matches) != 1:
+    candidates = [line.strip() for line in brain.splitlines() if "fun chat" in line]
+    raise SystemExit("VC48: unexpected chat declaration " + repr(candidates[:8]))
+existing_params = matches[0].group(1)
+if "accessToken:" not in existing_params or "message:" not in existing_params:
+    raise SystemExit("VC48: chat parameters changed: " + existing_params)
+signature = matches[0].group(0)
+replacement = signature.replace(existing_params, existing_params.rstrip() + ", conversation: List<Pair<String, String>> = emptyList()")
+brain = brain.replace(signature, replacement, 1)
 brain=replace_once(brain,
     '''        val messages = JSONArray().put(
             JSONObject().put("role", "user").put("content", outboundMessage)
