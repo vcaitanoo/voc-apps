@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-10-25T14:50:44Z",
+  "updatedAt": "2026-10-26T20:13:19Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -92,12 +92,12 @@
         "notes": "Versão estável atualmente registrada no catálogo oficial."
       },
       "candidate": {
-        "versionCode": 48,
-        "versionName": "0.3.23",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.23-vc48.apk",
-        "sha256": "900a45b115dae8365568333a5aa7298667422bf83de514807e322f3b002f17e8",
+        "versionCode": 49,
+        "versionName": "0.3.24",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.24-vc49.apk",
+        "sha256": "1dc5f2f85108bfbba181a2a1c74dfcdba55afe65265263fe215fc629fdc2a923",
         "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
-        "notes": "VC48 / 0.3.23: restaura a conversa real com IA preservando ate 12 turnos recentes para entender perguntas de seguimento; elimina respostas eleitorais fixas no backend. Voz masculina, escuta, lembretes, interface e assinatura historica preservados. APK assinado, teste real no aparelho pendente."
+        "notes": "VC49 / 0.3.24: corrige lembrete de hoje às 12h em linguagem natural e só confirma após agendar no Android; lembretes falados usam a voz masculina aprovada. Histórico preservado no SQLite e temas antigos recuperados; escuta inalterada. IA Groq/OpenRouter com pesquisa no backend. Teste de alarme e voz no Samsung pendente."
       }
     },
     {
