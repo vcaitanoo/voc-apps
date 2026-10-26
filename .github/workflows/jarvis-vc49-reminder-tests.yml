@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   tests:
@@ -73,3 +73,40 @@ jobs:
           cd gl/.vc49-test/source
           gradle :app:testDebugUnitTest --stacktrace --no-daemon
           echo VC49_REMINDER_TESTS_SUCCEEDED
+
+      - name: Commit unit test results for independent verification
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from datetime import datetime,timezone
+          import xml.etree.ElementTree as ET
+          path=Path("gl/.vc49-test/source/app/build/test-results/testDebugUnitTest")
+          files=list(path.glob("TEST-*ReminderParserTest*.xml"))
+          cases=errors=failures=0
+          for file in files:
+              root=ET.parse(file).getroot()
+              cases+=int(root.attrib.get("tests","0"))
+              errors+=int(root.attrib.get("errors","0"))
+              failures+=int(root.attrib.get("failures","0"))
+          passed=cases>=5 and errors==0 and failures==0
+          lines=["# Jarvis VC49 — testes JVM de lembretes","",
+                 "Registado: "+datetime.now(timezone.utc).isoformat(),
+                 "Teste: ReminderParserTest (ordem natural, hora, intervalo, horário passado, comando sem data)",
+                 "JUnit test cases: "+str(cases),
+                 "Falhas: "+str(failures)+"; erros: "+str(errors),
+                 "Resultado: "+("PASS" if passed else "FAIL — nenhum relatório completo de testes aprovado")]
+          out=Path("docs/JARVIS_VC49_REMINDER_JUNIT.md")
+          out.write_text("\n".join(lines)+"\n",encoding="utf-8")
+          print("\n".join(lines))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/JARVIS_VC49_REMINDER_JUNIT.md
+          if ! git diff --cached --quiet; then
+            git commit -m "test(jarvis): publish actual VC49 reminder unit test summary"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
