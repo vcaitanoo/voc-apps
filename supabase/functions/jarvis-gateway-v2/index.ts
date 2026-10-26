@@ -5,7 +5,8 @@ const OLD_GATEWAY = `${SUPABASE_URL}/functions/v1/jarvis-gateway`;
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
-const OPENROUTER_MODEL = "openrouter/free";
+const OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free";
+const OPENROUTER_FALLBACK_MODEL = "openrouter/free";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type",
@@ -456,12 +457,13 @@ async function directAI(messages: any[]) {
       console.warn("Jarvis alternate model unavailable",error instanceof Error ? error.message : "unknown");
     }
   }
-  // Last resort is another TRUE LLM request, not returning XML-like tool code.
-  // Only trigger this extra work if the first two real providers failed.
+  // If the pinned free model is down or rate-limited, keep the previous
+  // general free routing as a real-model fallback. The two models are NOT
+  // two independent vendors; only one vendor (OpenRouter) is healthy today.
   if (openrouter) {
     return await directOpenAI(
-      OPENROUTER_URL, openrouter, OPENROUTER_MODEL, messages,
-      "openrouter", 12_000, false, 0.25, true
+      OPENROUTER_URL, openrouter, OPENROUTER_FALLBACK_MODEL, messages,
+      "openrouter", 12_000, false, 0.65, true
     );
   }
   throw new Error("No real AI provider available; primary error: " + openrouterError);
