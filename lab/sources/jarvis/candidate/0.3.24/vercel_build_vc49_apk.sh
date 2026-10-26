@@ -56,8 +56,7 @@ replacements = {
         "python3 lab/sources/jarvis/candidate/0.3.8/apply_vc33.py\n"
         "python3 lab/sources/jarvis/candidate/0.3.9/apply_vc34.py\n"
         "python3 lab/sources/jarvis/candidate/0.3.10/apply_vc35.py\n"
-        "python3 lab/sources/jarvis/candidate/0.3.11/apply_vc36.py\npython3 lab/sources/jarvis/candidate/0.3.13/apply_vc38.py\npython3 lab/sources/jarvis/candidate/0.3.14/apply_vc39.py\npython3 lab/sources/jarvis/candidate/0.3.17/apply_vc42.py\npython3 lab/sources/jarvis/candidate/0.3.18/apply_vc43.py\npython3 lab/sources/jarvis/candidate/0.3.19/apply_vc44.py\npython3 lab/sources/jarvis/candidate/0.3.20/apply_vc45.py\npython3 lab/sources/jarvis/candidate/0.3.21/apply_vc46.py\npython3 lab/sources/jarvis/candidate/0.3.22/apply_vc47.py\npython3 lab/sources/jarvis/candidate/0.3.23/apply_vc48.py
-python3 lab/sources/jarvis/candidate/0.3.24/apply_vc49.py\n",
+        "python3 lab/sources/jarvis/candidate/0.3.11/apply_vc36.py\npython3 lab/sources/jarvis/candidate/0.3.13/apply_vc38.py\npython3 lab/sources/jarvis/candidate/0.3.14/apply_vc39.py\npython3 lab/sources/jarvis/candidate/0.3.17/apply_vc42.py\npython3 lab/sources/jarvis/candidate/0.3.18/apply_vc43.py\npython3 lab/sources/jarvis/candidate/0.3.19/apply_vc44.py\npython3 lab/sources/jarvis/candidate/0.3.20/apply_vc45.py\npython3 lab/sources/jarvis/candidate/0.3.21/apply_vc46.py\npython3 lab/sources/jarvis/candidate/0.3.22/apply_vc47.py\npython3 lab/sources/jarvis/candidate/0.3.23/apply_vc48.py\npython3 lab/sources/jarvis/candidate/0.3.24/apply_vc49.py\n",
 
     "grep -q 'versionCode = 26'": "grep -q 'versionCode = 49'",
     "grep -q 'versionName = \"0.3.1\"'": "grep -q 'versionName = \"0.3.24\"'",
