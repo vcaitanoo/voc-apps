@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-10-26T20:13:19Z",
+  "updatedAt": "2026-10-26T20:53:08Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -92,12 +92,12 @@
         "notes": "Versão estável atualmente registrada no catálogo oficial."
       },
       "candidate": {
-        "versionCode": 49,
-        "versionName": "0.3.24",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.24-vc49.apk",
-        "sha256": "1dc5f2f85108bfbba181a2a1c74dfcdba55afe65265263fe215fc629fdc2a923",
+        "versionCode": 50,
+        "versionName": "0.3.25",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/jarvis/candidate/Jarvis-0.3.25-vc50.apk",
+        "sha256": "9d3c04859cedfc39e437be91a957436c8e5eed93febcefe08483b394c014255e",
         "signatureSha256": "f1193b9ea3123a4b1ca9938f1bf070c9ce97648f492c3f47b56a195a517138c2",
-        "notes": "VC49 / 0.3.24: corrige lembrete de hoje às 12h em linguagem natural e só confirma após agendar no Android; lembretes falados usam a voz masculina aprovada. Histórico preservado no SQLite e temas antigos recuperados; escuta inalterada. IA Groq/OpenRouter com pesquisa no backend. Teste de alarme e voz no Samsung pendente."
+        "notes": "VC50 / 0.3.25: lembretes falados com frases variadas chamando o dono pelo nome e mesma voz masculina original (MP3 autorizado ou TTS masculino); notificações personalizadas. Estado real da IA (OpenRouter ativo e Groq pendente), memória local visível, pesquisas com contexto no backend. Teste de fala física pendente."
       }
     },
     {
