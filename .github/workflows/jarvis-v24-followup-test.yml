@@ -1,0 +1,78 @@
+name: Jarvis v24 contextual research regression
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/jarvis-v24-followup-test.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+jobs:
+  contextual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check real deployed Jarvis model with three-turn conversation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs
+          python3 - <<'PY'
+          from datetime import datetime,timezone
+          import json,urllib.request
+          url='https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-gateway-v2/v1/chat'
+          cases=[
+            ("Series follow-up, user did not watch", [
+              {"role":"user","content":"Me fale sobre a série Meu Nome é Farah"},
+              {"role":"assistant","content":"A série Meu Nome é Farah é uma produção turca."},
+              {"role":"user","content":"Eu não vi. Quero um resumo sobre o que se trata, mas sem spoiler."}
+            ]),
+            ("Explicit title and researched synopsis", [
+              {"role":"user","content":"Quero uma sinopse sem spoiler da série Meu Nome é Farah."}
+            ])
+          ]
+          lines=['# Jarvis v24 — pesquisa com contexto e sem spoilers',
+                 'UTC: '+datetime.now(timezone.utc).isoformat(),'']
+          failed=0
+          for label,turns in cases:
+            try:
+              r=urllib.request.Request(url,data=json.dumps({'messages':turns}).encode(),headers={'Content-Type':'application/json'},method='POST')
+              with urllib.request.urlopen(r,timeout=55) as response: data=json.load(response)
+              text=data.get('text','')
+              mode=data.get('mode','')
+              provider=data.get('provider','')
+              sources=data.get('sources',[])
+              rejected=['onde viu','onde você viu','se você assistiu','onde a viu','não tenho informações','diga onde']
+              low=text.lower()
+              quality=bool(text and len(text)>130 and len(text)<3300 and not any(q in low for q in rejected))
+              success=quality and provider in ('openrouter','groq') and mode in ('ai-web-sources','ai-web-unavailable') and data.get('webSearchAttempted')
+              lines.append('## '+label+': '+('PASS' if success else 'FAIL'))
+              lines.append('provider='+provider+'; mode='+mode+'; sources='+str(len(sources))+'; text length='+str(len(text))+'; webSearchAttempted='+str(data.get('webSearchAttempted')))
+              lines.append('response excerpt: '+text[:360].replace('\n',' '))
+              lines.append('')
+              if not success:failed+=1
+            except Exception as exc:
+              failed+=1
+              lines.append('## '+label+': ERROR '+str(exc)[:200])
+          lines.append('Overall: '+('PASS' if not failed else 'FAIL')+'; failed='+str(failed))
+          output='\n'.join(lines)+'\n'
+          open('docs/JARVIS_V24_SERIES_CONTEXT_TEST.md','w').write(output)
+          print(output)
+          if failed:raise SystemExit('Some real contextual AI tests failed')
+          PY
+      - name: Persist independent evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/JARVIS_V24_SERIES_CONTEXT_TEST.md || echo 'Test terminated before report' > docs/JARVIS_V24_SERIES_CONTEXT_TEST.md
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/JARVIS_V24_SERIES_CONTEXT_TEST.md
+          if ! git diff --cached --quiet; then
+            git commit -m 'test(jarvis): record real series-context follow-up results'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
