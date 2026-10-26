@@ -1,0 +1,101 @@
+name: Inspect exact Jarvis VC48 reminders memory
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/jarvis-vc48-reminders-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover exact published VC48 source from canonical patch chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p gl/lab/sources/jarvis
+          cp -a lab/sources/jarvis/candidate gl/lab/sources/jarvis/
+          cd gl
+          mkdir -p .vc48-inspect/source
+          cat lab/sources/jarvis/candidate/0.2.15/source.part.* > .vc48-inspect/source.b64
+          base64 -d .vc48-inspect/source.b64 > .vc48-inspect/source.zip
+          echo '1370f787b2488ef3ccaf5c20ec88ccf2b96442c51407a308e5304fe8a9ae2f55  .vc48-inspect/source.zip' | sha256sum -c -
+          unzip -q .vc48-inspect/source.zip -d .vc48-inspect/source
+          cp lab/sources/jarvis/candidate/0.2.15/overrides/VoicePrint.kt .vc48-inspect/source/app/src/main/java/pt/vcaitano/jarvis/voice/VoicePrint.kt
+          ln -s .vc48-inspect/source jarvis0215
+          python3 lab/sources/jarvis/candidate/0.2.16/apply_vc18.py
+          python3 lab/sources/jarvis/candidate/0.2.17/apply_vc19.py
+          python3 lab/sources/jarvis/candidate/0.2.18/apply_vc20.py
+          python3 lab/sources/jarvis/candidate/0.2.19/apply_vc21.py
+          python3 lab/sources/jarvis/candidate/0.2.21/apply_vc22_voice_repair.py
+          python3 lab/sources/jarvis/candidate/0.2.21/apply_vc23.py
+          python3 lab/sources/jarvis/candidate/0.2.22/apply_vc24.py
+          python3 lab/sources/jarvis/candidate/0.3.0/apply_vc25.py
+          python3 lab/sources/jarvis/candidate/0.3.1/apply_vc26.py
+          python3 lab/sources/jarvis/candidate/0.3.2/apply_vc27.py
+          python3 lab/sources/jarvis/candidate/0.3.3/apply_vc28.py
+          python3 lab/sources/jarvis/candidate/0.3.4/apply_vc29.py
+          python3 lab/sources/jarvis/candidate/0.3.6/apply_vc31.py
+          python3 lab/sources/jarvis/candidate/0.3.7/apply_vc32.py
+          python3 lab/sources/jarvis/candidate/0.3.8/apply_vc33.py
+          python3 lab/sources/jarvis/candidate/0.3.9/apply_vc34.py
+          python3 lab/sources/jarvis/candidate/0.3.10/apply_vc35.py
+          python3 lab/sources/jarvis/candidate/0.3.11/apply_vc36.py
+          python3 lab/sources/jarvis/candidate/0.3.13/apply_vc38.py
+          python3 lab/sources/jarvis/candidate/0.3.14/apply_vc39.py
+          python3 lab/sources/jarvis/candidate/0.3.17/apply_vc42.py
+          python3 lab/sources/jarvis/candidate/0.3.18/apply_vc43.py
+          python3 lab/sources/jarvis/candidate/0.3.19/apply_vc44.py
+          python3 lab/sources/jarvis/candidate/0.3.20/apply_vc45.py
+          python3 lab/sources/jarvis/candidate/0.3.21/apply_vc46.py
+          python3 lab/sources/jarvis/candidate/0.3.22/apply_vc47.py
+          python3 lab/sources/jarvis/candidate/0.3.23/apply_vc48.py
+      - name: Extract exact source lines for lifecycle and speech paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path("gl/.vc48-inspect/source/app/src/main/java/pt/vcaitano/jarvis")
+          paths=list(base.rglob("*.kt"))
+          include=lambda p: any(word in p.name for word in ("Reminder","Alarm","Memory","JarvisAgent","AiProvider","AgentTool","Routine","BrainClient"))
+          paths=[p for p in paths if include(p)]
+          report=["# Jarvis VC48 — exact reminder and memory source", "", "Generated from published candidate patch chain VC18–VC48; code only; audit, not tests.", ""]
+          for path in paths:
+              lines=path.read_text(encoding="utf-8").splitlines()
+              if len(lines)>650:
+                  lines=lines[:650]+["// TRUNCATED AFTER 650 LINES"]
+              report += ["## "+str(path.relative_to(base)), "```kotlin"] + lines + ["```", ""]
+          act=base/"MainActivity.kt"
+          lines=act.read_text(encoding="utf-8").splitlines()
+          needles=["remind", "onReceive", "alarm", "notifications", "agenda", "memor", "agent.handle", "sendMessage"]
+          selected=set()
+          for i,line in enumerate(lines):
+              if any(n in line.lower() for n in needles):
+                  for j in range(max(0,i-6),min(len(lines),i+13)):selected.add(j)
+          report+=["## MainActivity.kt selected lines","```kotlin"]+[f"{i+1}: {lines[i]}" for i in sorted(selected)]+["```"]
+          manifest=(base.parent.parent.parent.parent/"AndroidManifest.xml")
+          if manifest.exists():
+              report+=["## AndroidManifest.xml","```xml",manifest.read_text(encoding="utf-8"),"```"]
+          Path("docs/VC48_REMINDER_MEMORY_SOURCE.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("VC48_REMINDER_AUDIT_OK",len(paths),"files",len(report),"lines")
+          PY
+      - name: Save source audit in GitHub
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/VC48_REMINDER_MEMORY_SOURCE.md
+          if ! git diff --cached --quiet; then
+            git commit -m "audit(jarvis): snapshot precise VC48 reminder, receiver and memory source"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
