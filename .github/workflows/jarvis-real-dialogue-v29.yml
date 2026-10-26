@@ -1,0 +1,80 @@
+name: Jarvis dialogue and provider reality regression
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/jarvis-real-dialogue-v29.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test live cloud AI and conversation continuity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,urllib.request,re,datetime
+          url="https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-gateway-v2"
+          report=["# Live Jarvis dialogue regression", "",datetime.datetime.now(datetime.timezone.utc).isoformat(),""]
+          failed=False
+          def fetch(path,body=None):
+              d=None if body is None else json.dumps(body).encode()
+              request=urllib.request.Request(url+path,data=d,headers={"Content-Type":"application/json"})
+              with urllib.request.urlopen(request,timeout=48) as r:return json.load(r)
+          h=fetch("/health")
+          report.append("HEALTH: providersConfigured="+str(h.get("providersConfigured"))+" providersAvailable="+str(h.get("providersAvailable")))
+          dialogue=[
+            {"role":"user","content":"Me fale sobre a série Meu Nome é Fara."},
+            {"role":"assistant","content":"Talvez seja uma série chamada Meu Nome é Farah. Você já viu?"},
+            {"role":"user","content":"Não, eu não vi. Quero um resumo sobre o que se trata, mas sem spoiler."}
+          ]
+          scenarios=[
+            ("series-full-context",{"messages":dialogue}),
+            ("short-followup",{"messages":[{"role":"user","content":"Me fale sobre a série Meu Nome é Farah."},{"role":"assistant","content":"É a série turca Meu Nome é Farah (Adım Farah)."},{"role":"user","content":"É essa mesmo. Eu não vi. Resume sem spoiler, por favor."}]}),
+            ("new-series-query",{"messages":[{"role":"user","content":"Pesquise na internet uma sinopse sem spoilers da série Meu Nome é Farah."}]})
+          ]
+          rejected=("nao tenho informacoes","não tenho informações","onde a viu","onde você viu","onde viu","você já viu","ja viu","se você me disser onde","se voce me disser onde","não conheço essa série")
+          for name,payload in scenarios:
+              try:
+                  result=fetch("/v1/chat",payload)
+                  text=str(result.get("text",""))
+                  normalized=text.casefold()
+                  provider=result.get("provider")
+                  sources=result.get("sources") or []
+                  healthy=(provider in ("openrouter","groq") and len(text)>70 and
+                      not any(r in normalized for r in rejected) and
+                      bool(re.search(r"farah|tahir|istanbul|istambul|filho|turca|iraniana|m[aã]e",normalized)))
+                  report+=["## "+name+" "+("PASS" if healthy else "FAIL"),
+                       "Provider: "+str(provider)+" mode: "+str(result.get("mode"))+" sources: "+str(len(sources)),
+                       "Response: "+text[:700].replace("\n"," "),""]
+                  if not healthy:failed=True
+              except Exception as e:
+                  failed=True; report+=["## "+name+" ERROR: "+str(e)[:150],""]
+          report.append("OVERALL: "+("FAIL" if failed else "PASS"))
+          os.makedirs("docs",exist_ok=True)
+          open("docs/JARVIS_LIVE_DIALOGUE_V29.md","w",encoding="utf8").write("\n".join(report)+"\n")
+          print("\n".join(report))
+          if failed: raise SystemExit("live dialogue regression failed")
+          PY
+      - name: Persist actual results on GitHub
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f docs/JARVIS_LIVE_DIALOGUE_V29.md ]; then
+            mkdir -p docs
+            echo 'No report produced; inspect GitHub Action logs.' > docs/JARVIS_LIVE_DIALOGUE_V29.md
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/JARVIS_LIVE_DIALOGUE_V29.md
+          if ! git diff --cached --quiet; then
+            git commit -m 'test(jarvis): preserve actual context and source-grounded series response results'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
