@@ -478,9 +478,13 @@ async function jarvisCurrentEvidence(question:string):Promise<JarvisCitation[]>{
   const cultural=/(s[eé]rie|novela|filme|sinopse|spoiler|resumo)/iu.test(question);
   // Plot synopsis is evergreen. Appending the current year to a TV-series
   // query actively pollutes relevance with unrelated newly indexed content.
-  const query=(official?"site:tse.jus.br ":"") +
-    question.slice(0,170) +
-    (cultural?" série sinopse enredo personagens origem elenco -spoilers":" "+new Date().getUTCFullYear());
+  // Correct obvious speech-to-text misspellings in SEARCH QUERY ONLY,
+  // never fabricate a plot or change the original user's utterance.
+  const aboutFarah=/(?:meu\s+nome\s+[eé]\s+fara\b|meu\s+nome\s+[eé]\s+farah\b|ad[ıi]m\s+farah\b)/iu.test(question);
+  const query=aboutFarah
+    ? '"Meu Nome é Farah" "Adım Farah" sinopse enredo Farah Tahir'
+    : (official?"site:tse.jus.br ":"") + question.slice(0,165) +
+      (cultural?" sinopse enredo elenco história":" "+new Date().getUTCFullYear());
   try{
     const r=await fetchTimeout("https://api.tavily.com/search",{
       method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json"},
@@ -502,6 +506,9 @@ async function jarvisCurrentEvidence(question:string):Promise<JarvisCitation[]>{
       const title=(item.title??"Fonte").slice(0,140);
       // Avoid unrelated results when a company is the subject of the request.
       if(/\btesla\b/i.test(question)&&!/tesla|roadster|cybercab|elon musk/i.test(title+" "+excerpt))continue;
+      // If a concrete title is named, do not pass unrelated series from
+      // the search provider into the LLM as if they corroborated that title.
+      if(aboutFarah && !/farah|ad[ıi]m\s+farah/iu.test(title+" "+excerpt))continue;
       usable.push({url:u.href,title,excerpt});
       seenHosts.add(host);
     }
@@ -595,7 +602,7 @@ Deno.serve(async (request: Request) => {
     // repeat a known title, or assume they already watched a series.
     const normalizedLast = userText.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const isFollowUp = elliptical ||
-      /^(?:eu nao vi|nao vi|nunca vi|quero um resumo|resuma|sem spoiler|me conta|me conte|do que se trata|sobre o que e|é essa|e essa|e a mesma)/iu.test(normalizedLast);
+      /^(?:nao[,!.\s]+)?(?:eu\s+)?(?:nao\s+vi|nunca\s+vi|quero\s+um\s+resumo|resuma|sem\s+spoiler|me\s+conta|me\s+conte|do\s+que\s+se\s+trata|sobre\s+o\s+que\s+e|e\s+essa|e\s+a\s+mesma)/iu.test(normalizedLast);
     const priorDialog = incoming.slice(-14, -1).map((m: any) => String(m.content || ""));
     const recentPublicSubject = priorDialog.slice().reverse().map((line: string) => {
       const match = line.match(/(?:s[ée]rie|novela|filme)(?:\s+(?:chamada?|intitulado?|sobre))?\s+["“']?((?:meu nome é |meu nome e |ad[ıi]m )[^,.!?;\n]{2,48})/iu);
@@ -603,13 +610,15 @@ Deno.serve(async (request: Request) => {
       const farah = line.match(/\b(?:Meu Nome [eé] Farah|Ad[ıi]m Farah)\b/iu);
       return farah?.[0] || "";
     }).find(Boolean) || "";
-    const contextForSearch = ((isFollowUp && recentPublicSubject) ? "série " + recentPublicSubject + " " : (elliptical ? previousUser + " " : "")) + userText.trim();
+    const resolvedSubject = /meu\s+nome\s+[eé]\s+fara(?:h)?\b/iu.test(recentPublicSubject)
+      ? "Meu Nome é Farah" : recentPublicSubject;
+    const contextForSearch = ((isFollowUp && resolvedSubject) ? "série " + resolvedSubject + " " : (elliptical ? previousUser + " " : "")) + userText.trim();
     const topical = /(hoje|agora|atualmente|elei[cç]|vota[cç]|turno|not[ií]cias?|resultados?|quem venceu|presidente atual|ao vivo|tempo real|apura[cç]|contagem de votos|segundo turno|lan[cç]amento|lan[cç]ou|dispon[ií]vel|produto|prot[oó]tipo|tecnologia|carro voador|tesla|cybercab|ve[ií]culo|noticiado|anunciou|fabricante|s[eé]rie|filme|novela|streaming|temporadas?|epis[oó]dio|ator|atriz|elenco|lan[cç]amento de s[eé]rie)/iu.test(contextForSearch);
     const seekingFacts = /(?:\?|^(?:como |qual |quais |quem |onde |quando |quanto |o que |me (?:diz|fala|conta|atualiza|informa)|aconteceu |acompanha|acompanhe|quero acompanhar|quero (?:um|uma) (?:resumo|sinopse)|sinopse|resumo|resuma|atualize|verifique|busque|pesquise|procure|houve |existe |tem |t[eê]m |ent[aã]o |sabe |fale sobre |explique |me fale sobre |conte sobre ))/iu.test(userText.trim());
     const personal = /\b(meus? lembretes?|minha agenda|meu telefone|meu celular|minhas? fotos?|minha conta|meu acesso|minhas? senhas?|minhas? mensagens?)\b/iu.test(userText);
     // The model handles the conversation. Search supplements it for questions
     // about the world; personal/device actions are not sent to web search.
-    const entertainmentFollowUp = Boolean(recentPublicSubject) && isFollowUp &&
+    const entertainmentFollowUp = Boolean(resolvedSubject) && isFollowUp &&
       /\b(resumo|sem spoiler|nao vi|nunca vi|historia|enredo|do que|se trata|sinopse|episodio|sobre)\b/iu.test(normalizedLast);
     const webSearch = (explicitWeb || (topical && seekingFacts) || entertainmentFollowUp) && !personal;
 
@@ -634,8 +643,8 @@ Deno.serve(async (request: Request) => {
       : "\n\nConverse naturalmente, usando o histórico recente. Evite frases repetidas, respostas automáticas e explicações genéricas. Responda exatamente à intenção do último pedido.")
       + "\n\nCRÍTICO: A pesquisa web já é feita pelo próprio servidor quando necessária. Você NÃO tem ferramentas browser_search, nem pode chamar funções. Jamais escreva XML, <tool_call>, <function=...>, <parameter=...>, JSON de ferramentas, ou uma tentativa de invocação. Gere APENAS a resposta final em linguagem natural, sem formatação de chamada de ferramentas.";
 
-    const followUpRules = (isFollowUp && recentPublicSubject)
-      ? "\n\nREFERÊNCIA RESOLVIDA DO HISTÓRICO: o assunto é a série \"" + recentPublicSubject +
+    const followUpRules = (isFollowUp && resolvedSubject)
+      ? "\n\nREFERÊNCIA RESOLVIDA DO HISTÓRICO: o assunto é a série \"" + resolvedSubject +
         "\". O utilizador ainda NÃO assistiu. Responda sem spoilers, usando a sinopse confiável quando solicitada. Não pergunte onde o viu, se o assistiu, nem repita a dúvida sobre o título. Se houver informação de fontes, prefira-a a suposições."
       : "";
     const systemPrompt =
