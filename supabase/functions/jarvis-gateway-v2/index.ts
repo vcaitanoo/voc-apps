@@ -597,7 +597,7 @@ Deno.serve(async (request: Request) => {
     const priorDialog = incoming.slice(-14, -1).map((m: any) => String(m.content || ""));
     const recentPublicSubject = priorDialog.slice().reverse().map((line: string) => {
       const match = line.match(/(?:s[ée]rie|novela|filme)(?:\s+(?:chamada?|intitulado?|sobre))?\s+["“']?((?:meu nome é |meu nome e |ad[ıi]m )[^,.!?;\n]{2,48})/iu);
-      if (match) return match[1].replace(/["”']+$/, "").trim();
+      if (match) return match[1].replace(/["”']+$/, "").replace(/\s+(?:é\s+(?:uma|um)|foi\s|tem\s|no momento\b|na plataforma\b).*$/iu,"").trim();
       const farah = line.match(/\b(?:Meu Nome [eé] Farah|Ad[ıi]m Farah)\b/iu);
       return farah?.[0] || "";
     }).find(Boolean) || "";
