@@ -3,7 +3,7 @@ name: Jarvis v27 contextual research regression
 on:
   push:
     branches: [main]
-    paths: ['.github/workflows/jarvis-v27-followup-test.yml']
+    paths: ['.github/workflows/jarvis-v24-followup-test.yml']
   workflow_dispatch:
 
 permissions:
