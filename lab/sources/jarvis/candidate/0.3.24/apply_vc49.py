@@ -165,7 +165,7 @@ p=R/"src/test/java/pt/vcaitano/jarvis/agent/reminder/ReminderParserTest.kt";p.pa
 # Keep full conversation across app restarts, rather than deleting every
 # message beyond 80. SQLite persists history; the UI only loads recent turns.
 # Older turns can still be recovered as lexical context, on-device.
-store=base/"chat/ConversationStore.kt"
+store=root/"chat/ConversationStore.kt"
 STORE=r'''package pt.vcaitano.jarvis.chat
 
 import android.content.ContentValues
@@ -284,7 +284,7 @@ object ConversationStore {
 '''
 store.write_text(STORE,encoding="utf-8")
 
-activity=base/"MainActivity.kt"
+activity=root/"MainActivity.kt"
 def fix_context(s):
     before='''        val conversationForBrain = messages.toList().dropLast(1).takeLast(16)
             .filter { it.role == "user" || it.role == "jarvis" }
