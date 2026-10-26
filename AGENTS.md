@@ -96,3 +96,11 @@ O AGENTS.md na raiz é a instrução de projeto a ser carregada quando Codex tra
 - A resposta da IA nunca pode conter marcações internas de invocação de ferramentas. O backend rejeita essas saídas e tenta outro modelo. Se ambos falharem, há uma última tentativa real do OpenRouter com instrução de resposta final curta e sem comandos.
 - Teste confirmado em 2026-10-25: quatro casos aprovados no relatório docs/JARVIS_V22_AI_WEB_LIVE_VERIFICATION.md, incluindo consulta de apuração eleitoral brasileira com fonte TSE e resposta natural. Servidor v22 ACTIVE com fonte igual ao GitHub.
 - Preservar a voz masculina, escuta, lembretes e APK. Alterações de pesquisa devem ocorrer apenas no backend, sem mexer no TTS Android.
+
+## Jarvis VC49 — lembretes, memória e voz
+- Trabalhar exclusivamente no GitHub e atualizar candidatas pelo VOC Lab, mantendo o certificado de assinatura anterior e a stable intacta.
+- Reminders: não prometer agendamento sem execução real no ReminderRepository e AlarmManager. Reconhecer também "somente hoje, ao 12h me lembre de entrar no Codex"; rejeitar horário explicitamente passado. Se o alarme falhar, não manter estado de agendado. Solicitar autorização de alarmes exatos e notificações quando for preciso.
+- A voz dos lembretes deve reutilizar o motor e o nome TTS aprovados pelo utilizador. Preservar a voz masculina original e não tocar no VoiceController ao corrigir IA ou armazenamento.
+- A VC49 migra o histórico de SharedPreferences com retenção de 80 mensagens para SQLite local duradouro, sem apagar turnos antigos automaticamente. O sistema deve recuperar trechos anteriores relevantes para a conversa e manter o histórico local mesmo após atualizar o APK. Não confundir armazenamento local com sincronização entre aparelhos.
+- A IA usa OpenRouter e Groq como alternativa, pesquisa web Tavily, contexto recente e memória local. Personalidade variada em PT-BR, sem respostas fixas nem falsos avisos de ações feitas.
+- Não afirmar teste físico de alarmes, voz, notificações, tempo real ou memória antes do teste no Samsung. Registar teste unitário Android, compilação, assinatura, SHA-256 e publicação na CI.
