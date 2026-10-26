@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATA VC29 / 1.0.28. Remove edifícios amarelos que intersetam o posto premium antes da renderização PMTiles/GeoJSON; preserva os vizinhos. Remove a logótipo flutuante e conserva o ícone Android original. Corrige acompanhamento, progresso e recuperação GPS. Testes automatizados, renderização MapLibre, Gradle, APK, assinatura e hashes aprovados. Android físico/condução pendentes. Estável VC4 preservada.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.28-a8d97970f66a97822ca927635754e84da2a386f955a388aa1ebe267bef9f8188-vc29.apk",
-        "sha256": "a8d97970f66a97822ca927635754e84da2a386f955a388aa1ebe267bef9f8188",
-        "versionCode": 29,
-        "versionName": "1.0.28",
+        "notes": "CANDIDATA VC39 / 1.0.38. Casas 3D assentadas no relevo com moradias e prédios variados. Preserva pátios e componentes. Postos, mercados, GPS, menus e ícone intactos. Testes automatizados e APK verificados; teste físico pendente. Estável VC4 preservada.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.38-ee8224ae2cf241ddcf0e58ec470a662383fc6dda5f5374437bba93e66728011c-vc39.apk",
+        "sha256": "ee8224ae2cf241ddcf0e58ec470a662383fc6dda5f5374437bba93e66728011c",
+        "versionCode": 39,
+        "versionName": "1.0.38",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
