@@ -12,7 +12,12 @@ def patch(path,fn):
     new=fn(old)
     if new==old: raise SystemExit("VC49 unchanged "+str(path))
     path.write_text(new,encoding="utf-8")
-patch(R/"build.gradle.kts",lambda s:one(one(s,"versionCode = 48","versionCode = 49","versionCode"),'versionName = "0.3.23"','versionName = "0.3.24"',"versionName"))
+def patch_build(s):
+    s=one(one(s,"versionCode = 48","versionCode = 49","versionCode"),'versionName = "0.3.23"','versionName = "0.3.24"',"versionName")
+    if "testImplementation(" not in s:
+        s=one(s,"dependencies {",'dependencies {\n    testImplementation("junit:junit:4.13.2")',"JUnit dependency")
+    return s
+patch(R/"build.gradle.kts",patch_build)
 parser=r'''package pt.vcaitano.jarvis.agent.reminder
 
 import java.time.ZonedDateTime
@@ -114,13 +119,13 @@ def fix_speech(s):
         } else {
             candidates.firstOrNull { it.name == lockedName }
         } ?: return false''',
-'''        val selected = if(lockedName.isNullOrBlank())candidates.firstOrNull()
+'''        val selected = (if(lockedName.isNullOrBlank())candidates.firstOrNull()
         else runCatching {engine.voices.orEmpty()}.getOrDefault(emptySet())
             .firstOrNull {
                 it.name==lockedName &&
                 it.locale.language.equals("pt",true) &&
                 it.locale.country.equals("BR",true)
-            } ?: return false''',"user approved voice without gender label")
+            }) ?: return false''',"user approved voice without gender label")
     s=one(s,'            ContextCompat.startForegroundService(context, intent)',
     '''            runCatching { ContextCompat.startForegroundService(context, intent) }
                 .onFailure { android.util.Log.w("JarvisReminder","Speech service denied",it) }''',"FGS safety")
