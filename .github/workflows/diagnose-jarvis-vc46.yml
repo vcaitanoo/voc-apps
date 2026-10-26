@@ -1,4 +1,4 @@
-name: Diagnose Jarvis VC49 build result
+name: Diagnose Jarvis VC50 build result
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
     paths:
       - '.github/workflows/diagnose-jarvis-vc46.yml'
   workflow_run:
-    workflows: ["Jarvis VC49 historical male voice recovery build"]
+    workflows: ["Jarvis VC50 historical male voice recovery build"]
     types: [completed]
   workflow_dispatch:
 
@@ -42,7 +42,7 @@ jobs:
               if not runs: raise SystemExit("No recent Jarvis build found")
               run=str(runs[0]["id"])
           jobs=api(f"repos/{repo}/actions/runs/{run}/jobs?per_page=100").get("jobs",[])
-          lines=["# Jarvis VC49 — resultado real da compilação",
+          lines=["# Jarvis VC50 — resultado real da compilação",
                  "Consultado: "+datetime.now(timezone.utc).isoformat(),
                  f"Execução: https://github.com/{repo}/actions/runs/{run}", ""]
           for j in jobs:
@@ -53,12 +53,12 @@ jobs:
                   p=subprocess.run(["gh","run","view",run,"--repo",repo,"--log-failed"],capture_output=True,text=True)
                   take=[]
                   for ln in p.stdout.splitlines():
-                      if re.search(r"(VC49:|VC49_SOURCE_OK|ERROR|FAILURE|cannot|Unresolved reference|e: file|expected|Process completed|fatal|not found|compileKotlin)",ln,re.I):
+                      if re.search(r"(VC50:|VC50_SOURCE_OK|ERROR|FAILURE|cannot|Unresolved reference|e: file|expected|Process completed|fatal|not found|compileKotlin)",ln,re.I):
                           if re.search(r"(jwt|authorization|Bearer|secret|password|SERVICE_ROLE|ACTIONS_ID_TOKEN|OIDC_TOKEN|api.?key)",ln,re.I):continue
                           take.append(ln[:350])
                   lines.extend(["", "### Erros observados", "```text", *(take[-24:] or ["Consultar logs no GitHub Actions"]), "```"])
           report="\n".join(lines)+"\n"
-          open("docs/CI_JARVIS_VC49_RESULT.md","w",encoding="utf-8").write(report)
+          open("docs/CI_JARVIS_VC50_RESULT.md","w",encoding="utf-8").write(report)
           print("\n".join(lines[:20]))
           PY
       - name: Persist build diagnosis
@@ -70,10 +70,10 @@ jobs:
           git fetch origin main
           git checkout main
           git pull --ff-only origin main
-          git add docs/CI_JARVIS_VC49_RESULT.md
+          git add docs/CI_JARVIS_VC50_RESULT.md
           if git diff --cached --quiet; then
             echo "No diagnostic changes"
           else
-            git commit -m "ci(jarvis): record VC49 build result and failed step"
+            git commit -m "ci(jarvis): record VC50 build result and failed step"
             git push origin main
           fi
