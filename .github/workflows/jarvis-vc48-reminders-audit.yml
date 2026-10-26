@@ -65,7 +65,7 @@ jobs:
           from pathlib import Path
           base=Path("gl/.vc48-inspect/source/app/src/main/java/pt/vcaitano/jarvis")
           paths=list(base.rglob("*.kt"))
-          include=lambda p: any(word in p.name for word in ("Reminder","Alarm","Memory","JarvisAgent","AiProvider","AgentTool","Routine","BrainClient"))
+          include=lambda p: any(word in p.name for word in ("Reminder","Alarm","Memory","JarvisAgent","AiProvider","AgentTool","Routine","BrainClient","Tools","ConversationStore","EventSync","JarvisDatabase","InternetNeedDetector"))
           paths=[p for p in paths if include(p)]
           report=["# Jarvis VC48 — exact reminder and memory source", "", "Generated from published candidate patch chain VC18–VC48; code only; audit, not tests.", ""]
           for path in paths:
