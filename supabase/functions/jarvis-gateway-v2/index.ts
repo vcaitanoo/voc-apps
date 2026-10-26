@@ -553,7 +553,8 @@ Deno.serve(async (request: Request) => {
       service: "jarvis-gateway-v2",
       chatMode: "ai-direct-resilient",
       providersConfigured: 2,
-      providersAvailable: 2,
+      // Actual Groq completions returned HTTP 401 on Oct 26; credentials need renewal.
+      providersAvailable: 1,
       memory: true,
       anonymousFallback: true,
       webSearch: true,
