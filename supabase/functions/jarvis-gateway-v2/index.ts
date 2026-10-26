@@ -581,14 +581,14 @@ Deno.serve(async (request: Request) => {
     // Resolve references to the last public subject, including "eu não vi",
     // "é essa", "sem spoiler" and similar follow-ups. Do NOT ask the owner to
     // repeat a known title, or assume they already watched a series.
-    const normalizedLast = userText.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
+    const normalizedLast = userText.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const isFollowUp = elliptical ||
       /^(?:eu nao vi|nao vi|nunca vi|quero um resumo|resuma|sem spoiler|me conta|me conte|do que se trata|sobre o que e|é essa|e essa|e a mesma)/iu.test(normalizedLast);
     const priorDialog = incoming.slice(-14, -1).map((m: any) => String(m.content || ""));
     const recentPublicSubject = priorDialog.slice().reverse().map((line: string) => {
-      const match = line.match(/(?:s[ée]rie|novela|filme)(?:\\s+(?:chamada?|intitulado?|sobre))?\\s+["“']?((?:meu nome é |meu nome e |ad[ıi]m )[^,.!?;\\n]{2,48})/iu);
+      const match = line.match(/(?:s[ée]rie|novela|filme)(?:\s+(?:chamada?|intitulado?|sobre))?\s+["“']?((?:meu nome é |meu nome e |ad[ıi]m )[^,.!?;\n]{2,48})/iu);
       if (match) return match[1].replace(/["”']+$/, "").trim();
-      const farah = line.match(/\\b(?:Meu Nome [eé] Farah|Ad[ıi]m Farah)\\b/iu);
+      const farah = line.match(/\b(?:Meu Nome [eé] Farah|Ad[ıi]m Farah)\b/iu);
       return farah?.[0] || "";
     }).find(Boolean) || "";
     const contextForSearch = ((isFollowUp && recentPublicSubject) ? "série " + recentPublicSubject + " " : (elliptical ? previousUser + " " : "")) + userText.trim();
@@ -598,7 +598,7 @@ Deno.serve(async (request: Request) => {
     // The model handles the conversation. Search supplements it for questions
     // about the world; personal/device actions are not sent to web search.
     const entertainmentFollowUp = Boolean(recentPublicSubject) && isFollowUp &&
-      /\\b(resumo|sem spoiler|nao vi|nunca vi|historia|enredo|do que|se trata|sinopse|episodio|sobre)\\b/iu.test(normalizedLast);
+      /\b(resumo|sem spoiler|nao vi|nunca vi|historia|enredo|do que|se trata|sinopse|episodio|sobre)\b/iu.test(normalizedLast);
     const webSearch = (explicitWeb || (topical && seekingFacts) || entertainmentFollowUp) && !personal;
 
     // Contexto do dono: e o que distingue "o seu Jarvis" de um stranger.
@@ -623,7 +623,7 @@ Deno.serve(async (request: Request) => {
       + "\n\nCRÍTICO: A pesquisa web já é feita pelo próprio servidor quando necessária. Você NÃO tem ferramentas browser_search, nem pode chamar funções. Jamais escreva XML, <tool_call>, <function=...>, <parameter=...>, JSON de ferramentas, ou uma tentativa de invocação. Gere APENAS a resposta final em linguagem natural, sem formatação de chamada de ferramentas.";
 
     const followUpRules = (isFollowUp && recentPublicSubject)
-      ? "\\n\\nREFERÊNCIA RESOLVIDA DO HISTÓRICO: o assunto é a série \"" + recentPublicSubject +
+      ? "\n\nREFERÊNCIA RESOLVIDA DO HISTÓRICO: o assunto é a série \"" + recentPublicSubject +
         "\". O utilizador ainda NÃO assistiu. Responda sem spoilers, usando a sinopse confiável quando solicitada. Não pergunte onde o viu, se o assistiu, nem repita a dúvida sobre o título. Se houver informação de fontes, prefira-a a suposições."
       : "";
     const systemPrompt =
