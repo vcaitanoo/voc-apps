@@ -161,4 +161,146 @@ class ReminderParserTest {
 }
 '''
 p=R/"src/test/java/pt/vcaitano/jarvis/agent/reminder/ReminderParserTest.kt";p.parent.mkdir(parents=True,exist_ok=True);p.write_text(tests,encoding="utf-8")
+
+# Keep full conversation across app restarts, rather than deleting every
+# message beyond 80. SQLite persists history; the UI only loads recent turns.
+# Older turns can still be recovered as lexical context, on-device.
+store=base/"chat/ConversationStore.kt"
+STORE=r'''package pt.vcaitano.jarvis.chat
+
+import android.content.ContentValues
+import android.content.Context
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteOpenHelper
+import org.json.JSONArray
+import java.security.MessageDigest
+import java.text.Normalizer
+import java.util.Locale
+
+data class ChatMessage(
+    val role:String,
+    val text:String,
+    val createdAt:Long=System.currentTimeMillis()
+)
+
+object ConversationStore {
+    private const val PREFS="jarvis_conversation"
+    private const val KEY_MESSAGES="messages"
+    private const val MIGRATED="sqlite_history_migrated"
+    private val lock=Any()
+    private var helper:HistoryDb?=null
+    private class HistoryDb(ctx:Context):SQLiteOpenHelper(
+        ctx.applicationContext,"jarvis-conversation.db",null,1
+    ){
+        override fun onCreate(db:SQLiteDatabase){
+            db.execSQL("CREATE TABLE history (seq INTEGER PRIMARY KEY AUTOINCREMENT, digest TEXT UNIQUE NOT NULL, role TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL)")
+            db.execSQL("CREATE INDEX history_created ON history(created_at DESC)")
+        }
+        override fun onUpgrade(db:SQLiteDatabase,oldVersion:Int,newVersion:Int)=Unit
+    }
+    private fun db(context:Context):SQLiteDatabase{
+        if(helper==null)helper=HistoryDb(context)
+        return helper!!.writableDatabase
+    }
+    private fun digest(message:ChatMessage):String{
+        val bytes=MessageDigest.getInstance("SHA-256").digest(
+            (message.createdAt.toString()+"\n"+message.role+"\n"+message.text).toByteArray(Charsets.UTF_8)
+        )
+        return bytes.take(16).joinToString("") { "%02x".format(it.toInt() and 255) }
+    }
+    private fun insert(db:SQLiteDatabase,m:ChatMessage){
+        if(m.text.isBlank() || m.role !in setOf("user","jarvis","system"))return
+        db.insertWithOnConflict("history",null,ContentValues().apply{
+            put("digest",digest(m)); put("role",m.role)
+            put("body",m.text);put("created_at",m.createdAt)
+        },SQLiteDatabase.CONFLICT_IGNORE)
+    }
+    private fun migrate(context:Context, database:SQLiteDatabase){
+        val prefs=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
+        if(prefs.getBoolean(MIGRATED,false))return
+        val old=runCatching { JSONArray(prefs.getString(KEY_MESSAGES,"[]")?:"[]") }.getOrElse {JSONArray()}
+        database.beginTransaction()
+        try{
+            for(i in 0 until old.length()){
+                val v=old.optJSONObject(i)?:continue
+                insert(database,ChatMessage(
+                    role=v.optString("role"),text=v.optString("text"),
+                    createdAt=v.optLong("created_at",System.currentTimeMillis())
+                ))
+            }
+            database.setTransactionSuccessful()
+        }finally{database.endTransaction()}
+        prefs.edit().putBoolean(MIGRATED,true).apply()
+    }
+    fun load(context:Context):List<ChatMessage> = synchronized(lock){
+        val database=db(context);migrate(context,database)
+        val list=mutableListOf<ChatMessage>()
+        database.rawQuery("SELECT role,body,created_at FROM history ORDER BY seq DESC LIMIT 180",null).use {c->
+            while(c.moveToNext())list+=ChatMessage(c.getString(0),c.getString(1),c.getLong(2))
+        }
+        list.asReversed()
+    }
+    fun save(context:Context,messages:List<ChatMessage>){
+        synchronized(lock){
+            val database=db(context);migrate(context,database)
+            // The old messages have already been stored. Only upsert the tail.
+            messages.takeLast(12).forEach{insert(database,it)}
+        }
+    }
+    fun relevant(context:Context,query:String,limit:Int=4):List<ChatMessage> = synchronized(lock){
+        val tokens=keywords(query)
+        if(tokens.isEmpty())return@synchronized emptyList()
+        val database=db(context);migrate(context,database)
+        val ranked=mutableListOf<Pair<ChatMessage,Double>>()
+        database.rawQuery("SELECT role,body,created_at FROM history ORDER BY seq DESC LIMIT 3000",null).use{c->
+            var inspected=0
+            while(c.moveToNext()){
+                inspected++
+                // Do not inject last ~8 conversation turns again.
+                if(inspected<=8)continue
+                val role=c.getString(0);if(role !in setOf("user","jarvis"))continue
+                val item=ChatMessage(role,c.getString(1),c.getLong(2))
+                val shared=tokens.intersect(keywords(item.text)).size
+                if(shared>0)ranked+=item to (shared.toDouble()/tokens.size + 0.04/(1.0+inspected/100.0))
+            }
+        }
+        ranked.sortedByDescending{it.second}.take(limit.coerceIn(1,6))
+            .map{it.first}.sortedBy{it.createdAt}
+    }
+    private fun keywords(input:String):Set<String>{
+        val value=Normalizer.normalize(input,Normalizer.Form.NFD)
+            .replace(Regex("\\p{M}+"),"").lowercase(Locale.ROOT)
+        val stop=setOf("que","para","voce","eu","essa","esse","isso","quando","falamos","fala","uma","com","meu","minha","sobre","agora","hoje","mesmo","qual","lembrar")
+        return value.split(Regex("[^a-z0-9]+")).filter{it.length>=3 && it !in stop}.toSet()
+    }
+    fun clear(context:Context){
+        synchronized(lock){
+            db(context).delete("history",null,null)
+            context.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
+                .edit().remove(KEY_MESSAGES).putBoolean(MIGRATED,true).apply()
+        }
+    }
+}
+'''
+store.write_text(STORE,encoding="utf-8")
+
+activity=base/"MainActivity.kt"
+def fix_context(s):
+    before='''        val conversationForBrain = messages.toList().dropLast(1).takeLast(16)
+            .filter { it.role == "user" || it.role == "jarvis" }
+            .map {
+                (if (it.role == "jarvis") "assistant" else "user") to it.text
+            }'''
+    after='''        val recentForBrain = messages.toList().dropLast(1).takeLast(8)
+            .filter { it.role == "user" || it.role == "jarvis" }
+            .map { (if (it.role == "jarvis") "assistant" else "user") to it.text }
+        val olderRelevant = ConversationStore.relevant(this, text, 4)
+            .filter { it.role == "user" || it.role == "jarvis" }
+            .map { (if (it.role == "jarvis") "assistant" else "user") to it.text }
+        val conversationForBrain = (olderRelevant + recentForBrain)
+            .distinct().takeLast(12)'''
+    return one(s,before,after,"restore forgotten older conversation")
+patch(activity,fix_context)
+print("VC49_DURABLE_MEMORY_READY: SQLite unlimited conversation history, searchable old turns")
+
 print("VC49_REMINDER_CODE_READY parser/local alarm/male TTS plus five tests")
