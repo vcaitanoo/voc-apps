@@ -609,6 +609,72 @@ object BrainClient {
 }
 ```
 
+## chat/ConversationStore.kt
+```kotlin
+package pt.vcaitano.jarvis.chat
+
+import android.content.Context
+import org.json.JSONArray
+import org.json.JSONObject
+
+data class ChatMessage(
+    val role: String,
+    val text: String,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+object ConversationStore {
+    private const val PREFS = "jarvis_conversation"
+    private const val KEY_MESSAGES = "messages"
+    private const val MAX_MESSAGES = 80
+
+    fun load(context: Context): List<ChatMessage> {
+        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_MESSAGES, "[]") ?: "[]"
+        val array = runCatching { JSONArray(raw) }.getOrElse { JSONArray() }
+        val messages = mutableListOf<ChatMessage>()
+
+        for (index in 0 until array.length()) {
+            val item = array.optJSONObject(index) ?: continue
+            val role = item.optString("role")
+            val text = item.optString("text")
+            if (role.isBlank() || text.isBlank()) continue
+            messages += ChatMessage(
+                role = role,
+                text = text,
+                createdAt = item.optLong("created_at", System.currentTimeMillis())
+            )
+        }
+
+        return messages.takeLast(MAX_MESSAGES)
+    }
+
+    fun save(context: Context, messages: List<ChatMessage>) {
+        val array = JSONArray()
+        messages.takeLast(MAX_MESSAGES).forEach { message ->
+            array.put(
+                JSONObject()
+                    .put("role", message.role)
+                    .put("text", message.text)
+                    .put("created_at", message.createdAt)
+            )
+        }
+
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_MESSAGES, array.toString())
+            .apply()
+    }
+
+    fun clear(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_MESSAGES)
+            .apply()
+    }
+}
+```
+
 ## agent/JarvisAgent.kt
 ```kotlin
 package pt.vcaitano.jarvis.agent
@@ -901,6 +967,64 @@ class ReminderReceiver : BroadcastReceiver() {
             }
         )
     }
+}
+```
+
+## system/EventSyncWorker.kt
+```kotlin
+package pt.vcaitano.jarvis.system
+
+import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.Worker
+import androidx.work.WorkerParameters
+import org.json.JSONArray
+import pt.vcaitano.jarvis.auth.AuthSessionStore
+import pt.vcaitano.jarvis.auth.SupabaseAuthClient
+import pt.vcaitano.jarvis.network.BrainClient
+import java.util.concurrent.TimeUnit
+
+class EventSyncWorker(appContext: Context, workerParams: WorkerParameters) : Worker(appContext, workerParams) {
+    companion object { private const val SYNC_PREFS="jarvis_sync_state"; private const val LAST_REMINDER_SYNC="last_reminder_sync_ms"; private const val REMINDER_SYNC_INTERVAL_MS=5*60*1000L }
+    override fun doWork(): Result {
+        if (!BrainClient.isConfigured) return Result.retry()
+        var session=AuthSessionStore.load(applicationContext) ?: return Result.success()
+        if (session.needsRefresh()) {
+            val refreshed=runCatching { SupabaseAuthClient.refresh(session.refreshToken) }.getOrNull()?.session
+            if (refreshed==null){ AuthSessionStore.clear(applicationContext); return Result.success() }
+            AuthSessionStore.save(applicationContext, refreshed); session=refreshed
+        }
+        syncRemindersIfDue(session.accessToken)
+        val events=DeviceEventBuffer.snapshot(applicationContext); if(events.length()==0) return Result.success()
+        val remaining=JSONArray(); for(index in 0 until events.length()){ val event=events.optJSONObject(index)?:continue; if(!BrainClient.postEvent(session.accessToken,event)) remaining.put(event) }
+        DeviceEventBuffer.replace(applicationContext,remaining); return if(remaining.length()==0) Result.success() else Result.retry()
+    }
+    private fun syncRemindersIfDue(accessToken:String){
+        val prefs=applicationContext.getSharedPreferences(SYNC_PREFS,Context.MODE_PRIVATE); val now=System.currentTimeMillis(); val last=prefs.getLong(LAST_REMINDER_SYNC,0L)
+        if(last>0 && now-last<REMINDER_SYNC_INTERVAL_MS) return
+        val reminders=BrainClient.activeReminders(accessToken); if(reminders.isNotEmpty()) ReminderScheduler.sync(applicationContext,reminders)
+        prefs.edit().putLong(LAST_REMINDER_SYNC,now).apply()
+    }
+}
+
+object EventSyncScheduler {
+    private const val IMMEDIATE_WORK="jarvis-event-sync"; private const val PERIODIC_WORK="jarvis-event-sync-periodic"; private const val NOTIFICATION_PERMISSION_REQUEST=7104; private const val BATCH_DELAY_SECONDS=8L
+    private val networkConstraints=Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+    fun enqueue(context:Context){ val request=OneTimeWorkRequestBuilder<EventSyncWorker>().setConstraints(networkConstraints).setInitialDelay(BATCH_DELAY_SECONDS,TimeUnit.SECONDS).build(); WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(IMMEDIATE_WORK,ExistingWorkPolicy.KEEP,request) }
+    fun ensurePeriodic(context:Context){ requestNotificationPermissionIfNeeded(context); val request=PeriodicWorkRequestBuilder<EventSyncWorker>(15,TimeUnit.MINUTES).setConstraints(networkConstraints).build(); WorkManager.getInstance(context.applicationContext).enqueueUniquePeriodicWork(PERIODIC_WORK,ExistingPeriodicWorkPolicy.KEEP,request) }
+    private fun requestNotificationPermissionIfNeeded(context:Context){ if(Build.VERSION.SDK_INT<Build.VERSION_CODES.TIRAMISU) return; if(ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)return; val activity=context as? Activity?:return; ActivityCompat.requestPermissions(activity,arrayOf(Manifest.permission.POST_NOTIFICATIONS),NOTIFICATION_PERMISSION_REQUEST) }
 }
 ```
 
@@ -1479,6 +1603,187 @@ class ToolRegistry(private val tools: List<AgentTool>) {
 }
 ```
 
+## agent/tools/CoreTools.kt
+```kotlin
+package pt.vcaitano.jarvis.agent.tools
+
+import android.content.Intent
+import pt.vcaitano.jarvis.agent.model.ActionRisk
+import pt.vcaitano.jarvis.agent.model.MemoryType
+import pt.vcaitano.jarvis.agent.reminder.ReminderParser
+import java.text.Normalizer
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
+
+class DateTimeTool : AgentTool {
+    override val name = "get_date_time"
+    override val risk = ActionRisk.LOW
+
+    override fun score(input: String): Double {
+        val text = normalize(input)
+        return when {
+            Regex("\\bque horas|\\bqual (?:e|é) a hora|\\bhora agora").containsMatchIn(text) -> 0.99
+            Regex("\\bque dia|\\bdata de hoje|\\bdia de hoje").containsMatchIn(text) -> 0.93
+            else -> 0.0
+        }
+    }
+
+    override fun execute(input: String, context: ToolContext): ToolResult {
+        val now = ZonedDateTime.now()
+        val text = normalize(input)
+        return if (text.contains("hora")) {
+            ToolResult("Agora são ${now.format(DateTimeFormatter.ofPattern("HH:mm"))}.", "Consultando hora local")
+        } else {
+            val date = now.toLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(Locale("pt", "BR")))
+            ToolResult("Hoje é $date.", "Consultando data local")
+        }
+    }
+}
+
+class ReminderTool : AgentTool {
+    override val name = "create_or_reschedule_reminder"
+    override val risk = ActionRisk.MEDIUM
+
+    override fun score(input: String): Double {
+        val text = normalize(input)
+        return when {
+            ReminderParser.parse(input) != null -> 1.0
+            Regex("\\b(lista|mostra|quais).{0,18}lembretes?\\b").containsMatchIn(text) -> 0.94
+            Regex("\\b(cancela|apaga|remove|esquece).{0,18}lembretes?\\b").containsMatchIn(text) -> 0.92
+            else -> 0.0
+        }
+    }
+
+    override fun execute(input: String, context: ToolContext): ToolResult {
+        val normalized = normalize(input)
+        if (Regex("\\b(lista|mostra|quais).{0,18}lembretes?\\b").containsMatchIn(normalized)) {
+            val scheduled = context.reminders.scheduled()
+            if (scheduled.isEmpty()) return ToolResult("Você não tem lembretes agendados.")
+            val formatter = DateTimeFormatter.ofPattern("dd/MM 'às' HH:mm")
+            val list = scheduled.take(8).joinToString("; ") { reminder ->
+                val at = Instant.ofEpochMilli(reminder.scheduledAt).atZone(ZoneId.systemDefault()).format(formatter)
+                "${reminder.title}, $at"
+            }
+            return ToolResult("Você tem ${scheduled.size} lembrete${if (scheduled.size == 1) "" else "s"}: $list.")
+        }
+
+        if (Regex("\\b(cancela|apaga|remove|esquece).{0,18}lembretes?\\b").containsMatchIn(normalized)) {
+            val scheduled = context.reminders.scheduled()
+            if (scheduled.isEmpty()) return ToolResult("Não há lembretes locais ativos para cancelar.")
+            if (scheduled.size > 1 && !Regex("\\b(todos|todas)\\b").containsMatchIn(normalized)) {
+                return ToolResult("Há mais de um lembrete. Diga qual você quer cancelar.")
+            }
+            scheduled.forEach { context.reminders.cancel(it.id) }
+            return ToolResult(if (scheduled.size == 1) "Pronto. Cancelei o lembrete." else "Pronto. Cancelei ${scheduled.size} lembretes.")
+        }
+
+        val parsed = ReminderParser.parse(input) ?: return ToolResult("Não consegui identificar o horário do lembrete.")
+        val content = parsed.content
+        val entry = if (parsed.followUp && content == null) {
+            context.reminders.rescheduleCurrent(parsed.triggerAtMillis)
+                ?: return ToolResult("Não encontrei um lembrete atual. Diga também o que devo lembrar.")
+        } else {
+            context.reminders.create(content ?: return ToolResult("Diga o que devo lembrar."), parsed.triggerAtMillis)
+        }
+        context.memories.save(
+            type = MemoryType.REMINDER,
+            content = entry.title,
+            source = "user_command",
+            confidence = 1.0,
+            importance = 0.82
+        )
+        val whenText = Instant.ofEpochMilli(entry.scheduledAt)
+            .atZone(ZoneId.systemDefault())
+            .format(DateTimeFormatter.ofPattern("dd/MM 'às' HH:mm"))
+        return ToolResult(
+            if (parsed.followUp) "Está bem. Vou lembrar você novamente em $whenText."
+            else "Combinado. Vou lembrar você de ${entry.title} em $whenText.",
+            "Agendando lembrete"
+        )
+    }
+}
+
+class DailySummaryTool : AgentTool {
+    override val name = "daily_summary"
+    override val risk = ActionRisk.LOW
+
+    override fun score(input: String): Double {
+        val text = normalize(input)
+        return if (
+            Regex("\\b(repassa|resume|resumo).{0,14}(meu|o meu)?\\s*dia\\b|\\bo que (?:eu )?tenho para hoje\\b")
+                .containsMatchIn(text)
+        ) 0.98 else 0.0
+    }
+
+    override fun execute(input: String, context: ToolContext): ToolResult {
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone)
+        val reminders = context.reminders.scheduled().filter {
+            Instant.ofEpochMilli(it.scheduledAt).atZone(zone).toLocalDate() == today
+        }
+        val routines = context.routines.dueOn(today)
+        val tasks = context.memories.active().filter { it.type == MemoryType.TASK || it.type == MemoryType.EVENT }.take(5)
+        if (reminders.isEmpty() && routines.isEmpty() && tasks.isEmpty()) {
+            return ToolResult("Não encontrei lembretes, tarefas ou rotinas para hoje.", "Montando resumo do dia")
+        }
+        val pieces = buildList {
+            if (reminders.isNotEmpty()) add("${reminders.size} lembrete${if (reminders.size == 1) "" else "s"}: ${reminders.joinToString { it.title }}")
+            if (tasks.isNotEmpty()) add("tarefas ou eventos: ${tasks.joinToString { it.content }}")
+            if (routines.isNotEmpty()) add("rotinas de hoje: ${routines.joinToString { it.content }}")
+        }
+        return ToolResult("Vítor, para hoje encontrei ${pieces.joinToString("; ")}.", "Montando resumo do dia")
+    }
+}
+
+class OpenAppTool : AgentTool {
+    override val name = "open_app"
+    override val risk = ActionRisk.LOW
+
+    override fun score(input: String): Double = if (
+        Regex("^\\s*(?:abre|abra|abrir|inicia|abrir o app)\\s+", RegexOption.IGNORE_CASE).containsMatchIn(input)
+    ) 0.97 else 0.0
+
+    override fun execute(input: String, context: ToolContext): ToolResult {
+        val requested = Regex("^\\s*(?:abre|abra|abrir|inicia|abrir o app)\\s+(.+?)\\s*[.!?]*$", RegexOption.IGNORE_CASE)
+            .find(input)?.groupValues?.get(1)?.trim()?.removePrefix("o ")?.removePrefix("a ")
+            ?: return ToolResult("Diga qual aplicativo você quer abrir.")
+        val packageManager = context.androidContext.packageManager
+        val knownPackage = knownApps[normalize(requested)]
+        val launchIntent = knownPackage?.let(packageManager::getLaunchIntentForPackage)
+            ?: packageManager.queryIntentActivities(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),
+                0
+            ).firstOrNull { info ->
+                normalize(info.loadLabel(packageManager).toString()) == normalize(requested)
+            }?.activityInfo?.packageName?.let(packageManager::getLaunchIntentForPackage)
+
+        if (launchIntent == null) return ToolResult("Não encontrei $requested instalado neste telefone.")
+        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.androidContext.startActivity(launchIntent)
+        return ToolResult("Abrindo $requested.")
+    }
+
+    companion object {
+        private val knownApps = mapOf(
+            "youtube" to "com.google.android.youtube",
+            "whatsapp" to "com.whatsapp",
+            "maps" to "com.google.android.apps.maps",
+            "google maps" to "com.google.android.apps.maps"
+        )
+    }
+}
+
+internal fun normalize(value: String): String = Normalizer
+    .normalize(value, Normalizer.Form.NFD)
+    .replace(Regex("\\p{M}+"), "")
+    .lowercase(Locale.ROOT)
+```
+
 ## agent/ai/AiProvider.kt
 ```kotlin
 package pt.vcaitano.jarvis.agent.ai
@@ -1548,6 +1853,41 @@ class FallbackAiProvider(private val providers: List<AiProvider>) : AiProvider {
         }
         return null
     }
+}
+```
+
+## agent/web/InternetNeedDetector.kt
+```kotlin
+package pt.vcaitano.jarvis.agent.web
+
+import java.text.Normalizer
+import java.util.Locale
+
+/**
+ * Marca pedidos que dependem de dados atuais. A decisão fica separada do
+ * provedor de IA para que nenhum modelo responda cotações, notícias ou clima
+ * recente apenas com conhecimento de treinamento.
+ */
+object InternetNeedDetector {
+    private val explicitSearch = Regex(
+        "\\b(pesquisa|pesquise|procura|procure|busca|busque|na internet|na web)\\b"
+    )
+    private val currentInformation = Regex(
+        "\\b(hoje|agora|atual|atualmente|amanha|noticia|noticias|aconteceu|" +
+            "tempo|clima|chover|chuva|previsao|cotacao|cambio|euro|dolar|" +
+            "placar|resultado|preco|transito|trafego)\\b"
+    )
+
+    fun requiresInternet(text: String): Boolean {
+        val normalized = normalize(text)
+        return explicitSearch.containsMatchIn(normalized) ||
+            currentInformation.containsMatchIn(normalized)
+    }
+
+    internal fun normalize(value: String): String = Normalizer
+        .normalize(value, Normalizer.Form.NFD)
+        .replace(Regex("\\p{M}+"), "")
+        .lowercase(Locale.ROOT)
 }
 ```
 
@@ -1744,6 +2084,361 @@ class LocalMemoryRepository(private val database: JarvisDatabase) : MemoryReposi
         private val recommendationTokens = setOf("indica", "recomenda", "sugere", "filme", "musica", "livro", "comer")
         private val scheduleTokens = setOf("hoje", "amanha", "dia", "semana", "sabado", "domingo", "segunda", "terca", "quarta", "quinta", "sexta")
         private val profileTokens = setOf("nome", "moro", "cidade", "trabalho", "idade", "sou")
+    }
+}
+```
+
+## agent/data/JarvisDatabase.kt
+```kotlin
+package pt.vcaitano.jarvis.agent.data
+
+import android.content.ContentValues
+import android.content.Context
+import android.database.Cursor
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteOpenHelper
+import pt.vcaitano.jarvis.agent.model.MemoryEntry
+import pt.vcaitano.jarvis.agent.model.MemoryType
+import pt.vcaitano.jarvis.agent.model.RecurrenceKind
+import pt.vcaitano.jarvis.agent.model.ReminderEntry
+import pt.vcaitano.jarvis.agent.model.ReminderState
+import pt.vcaitano.jarvis.agent.model.RoutineEntry
+import java.time.DayOfWeek
+
+/** Banco local estruturado do agente. Não armazena o histórico inteiro como
+ * contexto; cada entidade tem ciclo de vida, tipo e metadados próprios. */
+class JarvisDatabase(context: Context) : SQLiteOpenHelper(
+    context.applicationContext,
+    DATABASE_NAME,
+    null,
+    DATABASE_VERSION
+) {
+    private val codec = SecureTextCodec()
+
+    override fun onConfigure(db: SQLiteDatabase) {
+        super.onConfigure(db)
+        db.setForeignKeyConstraintsEnabled(true)
+        db.enableWriteAheadLogging()
+    }
+
+    override fun onCreate(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE memories (
+                id TEXT PRIMARY KEY NOT NULL,
+                type TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                source TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                last_used_at INTEGER,
+                importance REAL NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1
+            )
+            """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX memories_active_type ON memories(active, type)")
+        db.execSQL("CREATE INDEX memories_updated_at ON memories(updated_at DESC)")
+
+        db.execSQL(
+            """
+            CREATE TABLE routines (
+                id TEXT PRIMARY KEY NOT NULL,
+                memory_id TEXT NOT NULL,
+                content TEXT NOT NULL,
+                recurrence_kind TEXT NOT NULL,
+                recurrence_interval INTEGER NOT NULL,
+                weekdays TEXT NOT NULL,
+                day_of_month INTEGER,
+                hour INTEGER,
+                minute INTEGER,
+                start_epoch_day INTEGER NOT NULL,
+                created_at INTEGER NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1,
+                FOREIGN KEY(memory_id) REFERENCES memories(id) ON DELETE CASCADE
+            )
+            """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX routines_active ON routines(active)")
+
+        db.execSQL(
+            """
+            CREATE TABLE reminders (
+                id TEXT PRIMARY KEY NOT NULL,
+                title TEXT NOT NULL,
+                details TEXT,
+                scheduled_at INTEGER NOT NULL,
+                state TEXT NOT NULL,
+                parent_id TEXT,
+                recurrence_minutes INTEGER,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                last_fired_at INTEGER
+            )
+            """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX reminders_state_time ON reminders(state, scheduled_at)")
+
+        db.execSQL(
+            """
+            CREATE TABLE agent_context (
+                context_key TEXT PRIMARY KEY NOT NULL,
+                context_value TEXT NOT NULL,
+                updated_at INTEGER NOT NULL,
+                expires_at INTEGER
+            )
+            """.trimIndent()
+        )
+    }
+
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+
+    @Synchronized
+    fun upsertMemory(entry: MemoryEntry) {
+        writableDatabase.insertWithOnConflict(
+            "memories",
+            null,
+            ContentValues().apply {
+                put("id", entry.id)
+                put("type", entry.type.name)
+                put("content", codec.encode(entry.content))
+                put("created_at", entry.createdAt)
+                put("updated_at", entry.updatedAt)
+                put("source", entry.source)
+                put("confidence", entry.confidence)
+                putNullableLong("last_used_at", entry.lastUsedAt)
+                put("importance", entry.importance)
+                put("active", if (entry.active) 1 else 0)
+            },
+            SQLiteDatabase.CONFLICT_REPLACE
+        )
+    }
+
+    @Synchronized
+    fun activeMemories(limit: Int = 300): List<MemoryEntry> {
+        return readableDatabase.query(
+            "memories",
+            null,
+            "active = 1",
+            null,
+            null,
+            null,
+            "updated_at DESC",
+            limit.coerceIn(1, 1_000).toString()
+        ).use { cursor -> buildList { while (cursor.moveToNext()) memory(cursor)?.let(::add) } }
+    }
+
+    @Synchronized
+    fun touchMemories(ids: Collection<String>, usedAt: Long = System.currentTimeMillis()) {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            ids.forEach { id ->
+                db.update(
+                    "memories",
+                    ContentValues().apply { put("last_used_at", usedAt) },
+                    "id = ?",
+                    arrayOf(id)
+                )
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    @Synchronized
+    fun upsertRoutine(entry: RoutineEntry) {
+        writableDatabase.insertWithOnConflict(
+            "routines",
+            null,
+            ContentValues().apply {
+                put("id", entry.id)
+                put("memory_id", entry.memoryId)
+                put("content", codec.encode(entry.content))
+                put("recurrence_kind", entry.kind.name)
+                put("recurrence_interval", entry.interval)
+                put("weekdays", entry.weekdays.joinToString(",") { it.value.toString() })
+                putNullableInt("day_of_month", entry.dayOfMonth)
+                putNullableInt("hour", entry.hour)
+                putNullableInt("minute", entry.minute)
+                put("start_epoch_day", entry.startEpochDay)
+                put("created_at", entry.createdAt)
+                put("active", if (entry.active) 1 else 0)
+            },
+            SQLiteDatabase.CONFLICT_REPLACE
+        )
+    }
+
+    @Synchronized
+    fun activeRoutines(): List<RoutineEntry> {
+        return readableDatabase.query(
+            "routines",
+            null,
+            "active = 1",
+            null,
+            null,
+            null,
+            "created_at ASC"
+        ).use { cursor -> buildList { while (cursor.moveToNext()) routine(cursor)?.let(::add) } }
+    }
+
+    @Synchronized
+    fun upsertReminder(entry: ReminderEntry) {
+        writableDatabase.insertWithOnConflict(
+            "reminders",
+            null,
+            ContentValues().apply {
+                put("id", entry.id)
+                put("title", codec.encode(entry.title))
+                if (entry.details == null) putNull("details") else put("details", codec.encode(entry.details))
+                put("scheduled_at", entry.scheduledAt)
+                put("state", entry.state.name)
+                if (entry.parentId == null) putNull("parent_id") else put("parent_id", entry.parentId)
+                putNullableInt("recurrence_minutes", entry.recurrenceMinutes)
+                put("created_at", entry.createdAt)
+                put("updated_at", entry.updatedAt)
+                putNullableLong("last_fired_at", entry.lastFiredAt)
+            },
+            SQLiteDatabase.CONFLICT_REPLACE
+        )
+    }
+
+    @Synchronized
+    fun reminder(id: String): ReminderEntry? {
+        return readableDatabase.query(
+            "reminders",
+            null,
+            "id = ?",
+            arrayOf(id),
+            null,
+            null,
+            null,
+            "1"
+        ).use { cursor -> if (cursor.moveToFirst()) reminder(cursor) else null }
+    }
+
+    @Synchronized
+    fun reminders(states: Set<ReminderState> = setOf(ReminderState.SCHEDULED)): List<ReminderEntry> {
+        if (states.isEmpty()) return emptyList()
+        val placeholders = states.joinToString(",") { "?" }
+        return readableDatabase.query(
+            "reminders",
+            null,
+            "state IN ($placeholders)",
+            states.map { it.name }.toTypedArray(),
+            null,
+            null,
+            "scheduled_at ASC"
+        ).use { cursor -> buildList { while (cursor.moveToNext()) reminder(cursor)?.let(::add) } }
+    }
+
+    @Synchronized
+    fun setContext(key: String, value: String, expiresAt: Long?) {
+        writableDatabase.insertWithOnConflict(
+            "agent_context",
+            null,
+            ContentValues().apply {
+                put("context_key", key)
+                put("context_value", codec.encode(value))
+                put("updated_at", System.currentTimeMillis())
+                putNullableLong("expires_at", expiresAt)
+            },
+            SQLiteDatabase.CONFLICT_REPLACE
+        )
+    }
+
+    @Synchronized
+    fun context(key: String, now: Long = System.currentTimeMillis()): String? {
+        return readableDatabase.query(
+            "agent_context",
+            arrayOf("context_value", "expires_at"),
+            "context_key = ?",
+            arrayOf(key),
+            null,
+            null,
+            null,
+            "1"
+        ).use { cursor ->
+            if (!cursor.moveToFirst()) return@use null
+            val expiresAt = cursor.nullableLong("expires_at")
+            if (expiresAt != null && expiresAt < now) {
+                writableDatabase.delete("agent_context", "context_key = ?", arrayOf(key))
+                null
+            } else runCatching { codec.decode(cursor.text("context_value")) }.getOrNull()
+        }
+    }
+
+    private fun memory(cursor: Cursor): MemoryEntry? = runCatching {
+        MemoryEntry(
+            id = cursor.text("id"),
+            type = MemoryType.valueOf(cursor.text("type")),
+            content = codec.decode(cursor.text("content")),
+            createdAt = cursor.long("created_at"),
+            updatedAt = cursor.long("updated_at"),
+            source = cursor.text("source"),
+            confidence = cursor.double("confidence"),
+            lastUsedAt = cursor.nullableLong("last_used_at"),
+            importance = cursor.double("importance"),
+            active = cursor.int("active") == 1
+        )
+    }.getOrNull()
+
+    private fun routine(cursor: Cursor): RoutineEntry? = runCatching {
+        RoutineEntry(
+            id = cursor.text("id"),
+            memoryId = cursor.text("memory_id"),
+            content = codec.decode(cursor.text("content")),
+            kind = RecurrenceKind.valueOf(cursor.text("recurrence_kind")),
+            interval = cursor.int("recurrence_interval"),
+            weekdays = cursor.text("weekdays").split(',').mapNotNull {
+                it.toIntOrNull()?.let(DayOfWeek::of)
+            }.toSet(),
+            dayOfMonth = cursor.nullableInt("day_of_month"),
+            hour = cursor.nullableInt("hour"),
+            minute = cursor.nullableInt("minute"),
+            startEpochDay = cursor.long("start_epoch_day"),
+            createdAt = cursor.long("created_at"),
+            active = cursor.int("active") == 1
+        )
+    }.getOrNull()
+
+    private fun reminder(cursor: Cursor): ReminderEntry? = runCatching {
+        ReminderEntry(
+            id = cursor.text("id"),
+            title = codec.decode(cursor.text("title")),
+            details = cursor.nullableText("details")?.let(codec::decode),
+            scheduledAt = cursor.long("scheduled_at"),
+            state = ReminderState.valueOf(cursor.text("state")),
+            parentId = cursor.nullableText("parent_id"),
+            recurrenceMinutes = cursor.nullableInt("recurrence_minutes"),
+            createdAt = cursor.long("created_at"),
+            updatedAt = cursor.long("updated_at"),
+            lastFiredAt = cursor.nullableLong("last_fired_at")
+        )
+    }.getOrNull()
+
+    private fun Cursor.index(name: String) = getColumnIndexOrThrow(name)
+    private fun Cursor.text(name: String) = getString(index(name))
+    private fun Cursor.nullableText(name: String) = index(name).let { if (isNull(it)) null else getString(it) }
+    private fun Cursor.int(name: String) = getInt(index(name))
+    private fun Cursor.nullableInt(name: String) = index(name).let { if (isNull(it)) null else getInt(it) }
+    private fun Cursor.long(name: String) = getLong(index(name))
+    private fun Cursor.nullableLong(name: String) = index(name).let { if (isNull(it)) null else getLong(it) }
+    private fun Cursor.double(name: String) = getDouble(index(name))
+
+    private fun ContentValues.putNullableInt(key: String, value: Int?) {
+        if (value == null) putNull(key) else put(key, value)
+    }
+
+    private fun ContentValues.putNullableLong(key: String, value: Long?) {
+        if (value == null) putNull(key) else put(key, value)
+    }
+
+    companion object {
+        private const val DATABASE_NAME = "jarvis-agent.db"
+        private const val DATABASE_VERSION = 1
     }
 }
 ```
