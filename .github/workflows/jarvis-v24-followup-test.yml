@@ -1,4 +1,4 @@
-name: Jarvis v27 contextual research regression
+name: Jarvis v28 contextual research regression
 
 on:
   push:
@@ -33,7 +33,7 @@ jobs:
               {"role":"user","content":"Quero uma sinopse sem spoiler da série Meu Nome é Farah."}
             ])
           ]
-          lines=['# Jarvis v27 — pesquisa com contexto e sem spoilers',
+          lines=['# Jarvis v28 — pesquisa com contexto e sem spoilers',
                  'UTC: '+datetime.now(timezone.utc).isoformat(),'']
           failed=0
           for label,turns in cases:
@@ -53,7 +53,7 @@ jobs:
                 quality=quality and not ("com a mãe" in low and "filho" not in low)
               success=quality and provider in ('openrouter','groq') and mode in ('ai-web-sources','ai-web-unavailable') and data.get('webSearchAttempted')
               lines.append('## '+label+': '+('PASS' if success else 'FAIL'))
-              lines.append('provider='+provider+'; mode='+mode+'; sources='+str(len(sources))+'; text length='+str(len(text))+'; webSearchAttempted='+str(data.get('webSearchAttempted')))
+              lines.append('provider='+provider+'; model='+str(data.get('model'))+'; mode='+mode+'; sources='+str(len(sources))+'; text length='+str(len(text))+'; webSearchAttempted='+str(data.get('webSearchAttempted')))
               lines.append('response excerpt: '+text[:360].replace('\n',' '))
               lines.append('')
               if not success:failed+=1
@@ -62,7 +62,7 @@ jobs:
               lines.append('## '+label+': ERROR '+str(exc)[:200])
           lines.append('Overall: '+('PASS' if not failed else 'FAIL')+'; failed='+str(failed))
           output='\n'.join(lines)+'\n'
-          open('docs/JARVIS_V27_SERIES_CONTEXT_TEST.md','w').write(output)
+          open('docs/JARVIS_V28_SERIES_CONTEXT_TEST.md','w').write(output)
           print(output)
           if failed:raise SystemExit('Some real contextual AI tests failed')
           PY
@@ -71,10 +71,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -f docs/JARVIS_V27_SERIES_CONTEXT_TEST.md || echo 'Test terminated before report' > docs/JARVIS_V27_SERIES_CONTEXT_TEST.md
+          test -f docs/JARVIS_V28_SERIES_CONTEXT_TEST.md || echo 'Test terminated before report' > docs/JARVIS_V28_SERIES_CONTEXT_TEST.md
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/JARVIS_V27_SERIES_CONTEXT_TEST.md
+          git add docs/JARVIS_V28_SERIES_CONTEXT_TEST.md
           if ! git diff --cached --quiet; then
             git commit -m 'test(jarvis): record real series-context follow-up results'
             git pull --rebase origin main
