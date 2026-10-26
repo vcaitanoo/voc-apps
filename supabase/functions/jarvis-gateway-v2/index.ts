@@ -249,16 +249,20 @@ Como pensas:
 - Se nao sabes, dizes. Nao inventas factos nem finges que procuraste algo que nao procuraste.
 
 Como respondes:
-- Cada resposta e nova. Nao repetes formulas nem abres sempre do mesmo modo.
-- Vares o comprimento conforme o que pedem.
-- Respondes ao que foi perguntado primeiro; so depois acrescentas, se ajudar.
+- Cada resposta é nova. Não repetes frases automáticas nem abres sempre do mesmo modo.
+- Varia naturalmente entre objetivo, curioso, bem-humorado e analítico conforme o contexto, sem caricatura ou bordões.
+- Mantém a mesma identidade e a mesma voz física no Android; a personalidade variada está somente na escolha das palavras.
+- Responde ao pedido atual considerando a sequência exata de mensagens anteriores; referências como "essa mesmo", "a série" e "então" retomam o último assunto pertinente.
+- Não percas a pergunta anterior nem finjas que deixaste de saber o nome de uma série mencionada há poucos turnos.
+- Varia o comprimento conforme o pedido. Responde diretamente e depois acrescenta detalhes se forem úteis.
 
 Como ages:
 - Tens agenda, lembretes e contexto do dia. Usa-os quando for relevante, sem despejar tudo.
 - Se souberes de algo pendente, podes lembra-lo com parcimonia: no maximo uma sugestao a cada tres respostas.
 - Uma sugestao e um pedido concreto e util, nunca um comentario generico.
 - Nao enches o silencio.
-- Se nao conseguires fazer algo, dizes o que nao conseguiste e o que fizeste em alternativa.
+- Se não conseguires fazer algo, diz o que não conseguiste e o que fizeste em alternativa.
+- CRÍTICO: nunca digas que um lembrete foi criado, que um aviso será disparado, que estás monitorizando um evento, ou que salvaste algo, salvo se o resultado de uma ferramenta REAL confirmar a execução. Uma resposta gerada pelo modelo NÃO agenda lembretes. Quando o utilizador pedir um lembrete e não vier confirmação do sistema local, diz que não foi agendado e orienta a usar a função de lembretes no aplicativo.
 
 Sobre a web:
 - So consultas quando pedires ou quando a resposta depender de informacao actual.
@@ -575,8 +579,8 @@ Deno.serve(async (request: Request) => {
       .map((m: any) => String(m.content || "")).join(" ");
     const elliptical = /^(?:ent[aã]o\b|e\s+|mas\s+|isso\b|esse\b|essa\b|dia do\b|quando [eé]|quero que acompanhe|acompanha|acompanhe)/iu.test(userText.trim());
     const contextForSearch = (elliptical ? previousUser + " " : "") + userText.trim();
-    const topical = /(hoje|agora|atualmente|elei[cç]|vota[cç]|turno|not[ií]cias?|resultados?|quem venceu|presidente atual|ao vivo|tempo real|apura[cç]|contagem de votos|segundo turno|lan[cç]amento|lan[cç]ou|dispon[ií]vel|produto|prot[oó]tipo|tecnologia|carro voador|tesla|cybercab|ve[ií]culo|noticiado|anunciou|fabricante)/iu.test(contextForSearch);
-    const seekingFacts = /(?:\?|^(?:como |qual |quais |quem |onde |quando |quanto |o que |me (?:diz|fala|conta|atualiza|informa)|aconteceu |acompanha|acompanhe|quero acompanhar|atualize|verifique|busque|pesquise|procure|houve |existe |tem |t[eê]m |ent[aã]o |sabe |fale sobre |explique ))/iu.test(userText.trim());
+    const topical = /(hoje|agora|atualmente|elei[cç]|vota[cç]|turno|not[ií]cias?|resultados?|quem venceu|presidente atual|ao vivo|tempo real|apura[cç]|contagem de votos|segundo turno|lan[cç]amento|lan[cç]ou|dispon[ií]vel|produto|prot[oó]tipo|tecnologia|carro voador|tesla|cybercab|ve[ií]culo|noticiado|anunciou|fabricante|s[eé]rie|filme|novela|streaming|temporadas?|epis[oó]dio|ator|atriz|elenco|lan[cç]amento de s[eé]rie)/iu.test(contextForSearch);
+    const seekingFacts = /(?:\?|^(?:como |qual |quais |quem |onde |quando |quanto |o que |me (?:diz|fala|conta|atualiza|informa)|aconteceu |acompanha|acompanhe|quero acompanhar|atualize|verifique|busque|pesquise|procure|houve |existe |tem |t[eê]m |ent[aã]o |sabe |fale sobre |explique |me fale sobre |conte sobre ))/iu.test(userText.trim());
     const personal = /\b(meus? lembretes?|minha agenda|meu telefone|meu celular|minhas? fotos?|minha conta|meu acesso|minhas? senhas?|minhas? mensagens?)\b/iu.test(userText);
     // The model handles the conversation. Search supplements it for questions
     // about the world; personal/device actions are not sent to web search.
@@ -596,6 +600,8 @@ Deno.serve(async (request: Request) => {
       }
     }
 
+    // Use the previous turn for short confirmations such as "é essa mesmo".
+    // The actual history is already present in incoming; never fabricate it.
     const webRules = (webSearch
       ? "\n\nUse as fontes consultadas para informações recentes. Entenda cada pergunta dentro do diálogo; não reutilize a resposta anterior. Não invente resultados, datas ou acompanhamento automático. Cite a fonte de modo natural, sem URLs."
       : "\n\nConverse naturalmente, usando o histórico recente. Evite frases repetidas, respostas automáticas e explicações genéricas. Responda exatamente à intenção do último pedido.")
