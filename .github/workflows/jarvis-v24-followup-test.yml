@@ -1,9 +1,9 @@
-name: Jarvis v24 contextual research regression
+name: Jarvis v27 contextual research regression
 
 on:
   push:
     branches: [main]
-    paths: ['.github/workflows/jarvis-v24-followup-test.yml']
+    paths: ['.github/workflows/jarvis-v27-followup-test.yml']
   workflow_dispatch:
 
 permissions:
@@ -33,7 +33,7 @@ jobs:
               {"role":"user","content":"Quero uma sinopse sem spoiler da série Meu Nome é Farah."}
             ])
           ]
-          lines=['# Jarvis v24 — pesquisa com contexto e sem spoilers',
+          lines=['# Jarvis v27 — pesquisa com contexto e sem spoilers',
                  'UTC: '+datetime.now(timezone.utc).isoformat(),'']
           failed=0
           for label,turns in cases:
@@ -47,6 +47,10 @@ jobs:
               rejected=['onde viu','onde você viu','se você assistiu','onde a viu','não tenho informações','diga onde']
               low=text.lower()
               quality=bool(text and len(text)>130 and len(text)<3300 and not any(q in low for q in rejected))
+              # The genuine series follows a mother with a seriously ill son;
+              # tests guard against older made-up synopsis about moving with her mother.
+              if "Meu Nome é Farah" in " ".join(t["content"] for t in turns):
+                quality=quality and not ("com a mãe" in low and "filho" not in low)
               success=quality and provider in ('openrouter','groq') and mode in ('ai-web-sources','ai-web-unavailable') and data.get('webSearchAttempted')
               lines.append('## '+label+': '+('PASS' if success else 'FAIL'))
               lines.append('provider='+provider+'; mode='+mode+'; sources='+str(len(sources))+'; text length='+str(len(text))+'; webSearchAttempted='+str(data.get('webSearchAttempted')))
@@ -58,7 +62,7 @@ jobs:
               lines.append('## '+label+': ERROR '+str(exc)[:200])
           lines.append('Overall: '+('PASS' if not failed else 'FAIL')+'; failed='+str(failed))
           output='\n'.join(lines)+'\n'
-          open('docs/JARVIS_V24_SERIES_CONTEXT_TEST.md','w').write(output)
+          open('docs/JARVIS_V27_SERIES_CONTEXT_TEST.md','w').write(output)
           print(output)
           if failed:raise SystemExit('Some real contextual AI tests failed')
           PY
@@ -67,10 +71,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -f docs/JARVIS_V24_SERIES_CONTEXT_TEST.md || echo 'Test terminated before report' > docs/JARVIS_V24_SERIES_CONTEXT_TEST.md
+          test -f docs/JARVIS_V27_SERIES_CONTEXT_TEST.md || echo 'Test terminated before report' > docs/JARVIS_V27_SERIES_CONTEXT_TEST.md
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/JARVIS_V24_SERIES_CONTEXT_TEST.md
+          git add docs/JARVIS_V27_SERIES_CONTEXT_TEST.md
           if ! git diff --cached --quiet; then
             git commit -m 'test(jarvis): record real series-context follow-up results'
             git pull --rebase origin main
