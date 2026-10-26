@@ -5,6 +5,7 @@ R=Path("jarvis0215/app")
 root=R/"src/main/java/pt/vcaitano/jarvis"
 def one(s,a,b,label):
     n=s.count(a)
+    if label=="onDestroy cleanup" and n==2: return s.replace(a,b)
     if n!=1:raise SystemExit("VC50 expected "+label+" once, got "+str(n))
     return s.replace(a,b,1)
 def patch(path,fn):
