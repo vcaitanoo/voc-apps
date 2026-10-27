@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATA VC39 / 1.0.38. Casas 3D assentadas no relevo com moradias e prédios variados. Preserva pátios e componentes. Postos, mercados, GPS, menus e ícone intactos. Testes automatizados e APK verificados; teste físico pendente. Estável VC4 preservada.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.38-ee8224ae2cf241ddcf0e58ec470a662383fc6dda5f5374437bba93e66728011c-vc39.apk",
-        "sha256": "ee8224ae2cf241ddcf0e58ec470a662383fc6dda5f5374437bba93e66728011c",
-        "versionCode": 39,
-        "versionName": "1.0.38",
+        "notes": "CANDIDATA VC40 / 1.0.39. Reduz reconstruções repetidas das casas e prepara geometria em lotes; carro/câmara sincronizados porframe, painel sem trabalho excessivo. Postos, mercados, menus e ícone preservados. Testes automatizados e APK verificados; fluidez física ainda depende de confirmação no Android. Estável VC4 preservada.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.39-ce766aa68095627cef8cf0f39ed6d25c4e1153ba9a3d176aba3300ce4c3827a3-vc40.apk",
+        "sha256": "ce766aa68095627cef8cf0f39ed6d25c4e1153ba9a3d176aba3300ce4c3827a3",
+        "versionCode": 40,
+        "versionName": "1.0.39",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
