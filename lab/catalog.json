@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATA VC44 / 1.0.43. Corrige coordenadas de toque no terreno3D em ecrãs de alta densidade. Novo sedan elétrico inspirado em Tesla, branco, maior e opaco. Mantém prioridade dos gestos sobre GPS. Antialias extra removido para reduzir carga gráfica. Postos, mercados e publicidade preservados. Testes automatizados; validação física pendente. Estável VC4 preservada.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.43-92c4fa856ededc9aef500f511c7d67444638e49506d40d9e16254a6dfbe6a82e-vc44.apk",
-        "sha256": "92c4fa856ededc9aef500f511c7d67444638e49506d40d9e16254a6dfbe6a82e",
-        "versionCode": 44,
-        "versionName": "1.0.43",
+        "notes": "CANDIDATA VC45 / 1.0.44. Gestos em rota ficam manuais até recentrar. Reconhece igrejas POI christian. Recálculo usa rumo atual e rejeita partida oposta/inversão imediata. Trânsito ao vivo e totais de portagens ainda não ativados; dependem de serviço e perfil de veículo. Postos, mercados e publicidade preservados. Testes automatizados; validação física pendente. Estável VC4 preservada.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.44-5a8d0a33e510e5417dbd182abd79ef1e7745857e47a8d4e9844600348555255f-vc45.apk",
+        "sha256": "5a8d0a33e510e5417dbd182abd79ef1e7745857e47a8d4e9844600348555255f",
+        "versionCode": 45,
+        "versionName": "1.0.44",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
