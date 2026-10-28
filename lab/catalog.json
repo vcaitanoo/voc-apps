@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATA VC41 / 1.0.40. Faixa inferior reservada para publicidade apenas durante rota ativa, com comandos acessíveis. Sem rede de anúncios integrada. Navegação e modelos preservados. Testes automatizados; estável VC4 preservada.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.40-980d041c608b4639bde7a899c6e68c9e162386181b9f9b01b6380a145bfde057-vc41.apk",
-        "sha256": "980d041c608b4639bde7a899c6e68c9e162386181b9f9b01b6380a145bfde057",
-        "versionCode": 41,
-        "versionName": "1.0.40",
+        "notes": "CANDIDATA VC42 / 1.0.41. Igrejas OSM em três tamanhos, menu minimiza com um toque e Menu flutuante removido durante rota. Menor carga gráfica e preparação de edifícios suspensa durante gestos. Postos, mercados e publicidade preservados. Testes automatizados; validação física pendente. Estável VC4 preservada.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.41-a84d1525e20d11bcf8a8397be02e7c21dcb01e5c3e4149a83acc4b7c0f15e873-vc42.apk",
+        "sha256": "a84d1525e20d11bcf8a8397be02e7c21dcb01e5c3e4149a83acc4b7c0f15e873",
+        "versionCode": 42,
+        "versionName": "1.0.41",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
