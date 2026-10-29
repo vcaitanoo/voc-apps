@@ -1,4 +1,4 @@
-name: Jarvis v30 cinematic natural dialogue regression
+name: Jarvis v31 cinematic natural dialogue regression
 on:
   push:
     branches: [main]
@@ -33,7 +33,7 @@ jobs:
               {"role":"user","content":"Jarvis, toda informação que o governo divulga é uma mentira, não é?"}
             ])
           ]
-          report=["# Jarvis v30 — conversa de referência com personalidade","",
+          report=["# Jarvis v31 — conversa de referência com personalidade","",
             "UTC: "+datetime.datetime.now(datetime.timezone.utc).isoformat(),"",
             "Aprovação mede se um LLM real respondeu sem saída interna, não se o áudio Android tem prosódia verificada.",""]
           failed=0
@@ -47,7 +47,8 @@ jobs:
               reply=(data.get("text") or "").strip()
               low=reply.lower()
               suspicious=any(t in low for t in ["<function=","<tool_call>","<parameter=","como modelo de linguagem","como uma inteligência artificial"])
-              ok=data.get("provider") in ("openrouter","groq") and len(reply)>=40 and not suspicious
+              ptpt=bool(re.search(r"\\b(?:estás|queres|podes|diz-me|estou a pensar|teu|tua)\\b",low))
+              ok=data.get("provider") in ("openrouter","groq") and len(reply)>=40 and not suspicious and not ptpt
               if not ok:failed+=1
               report.extend(["## "+name+": "+("PASS" if ok else "FAIL"),
                 "Provedor: "+str(data.get("provider"))+"; modo: "+str(data.get("mode"))+"; tamanho: "+str(len(reply)),
@@ -56,9 +57,9 @@ jobs:
               failed+=1;report.extend(["## "+name+": ERROR",str(e)[:200],""])
           report.append("Resultado: "+("PASS" if failed==0 else "FAIL")+"; falhas="+str(failed))
           os.makedirs("docs",exist_ok=True)
-          with open("docs/JARVIS_V30_CINEMATIC_DIALOGUE_TEST.md","w",encoding="utf-8") as f:f.write("\n".join(report)+"\n")
+          with open("docs/JARVIS_V31_CINEMATIC_DIALOGUE_TEST.md","w",encoding="utf-8") as f:f.write("\n".join(report)+"\n")
           print("\n".join(report))
-          if failed:raise SystemExit("Jarvis v30 dialogue failed real-model verification")
+          if failed:raise SystemExit("Jarvis v31 dialogue failed real-model verification")
           PY
       - name: Preserve results from real service
         if: always()
@@ -66,10 +67,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p docs
-          test -f docs/JARVIS_V30_CINEMATIC_DIALOGUE_TEST.md || echo 'Failed before producing live test report.' > docs/JARVIS_V30_CINEMATIC_DIALOGUE_TEST.md
+          test -f docs/JARVIS_V31_CINEMATIC_DIALOGUE_TEST.md || echo 'Failed before producing live test report.' > docs/JARVIS_V31_CINEMATIC_DIALOGUE_TEST.md
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/JARVIS_V30_CINEMATIC_DIALOGUE_TEST.md
+          git add docs/JARVIS_V31_CINEMATIC_DIALOGUE_TEST.md
           if ! git diff --cached --quiet; then
             git commit -m 'test(jarvis): record actual cinematic conversational model responses'
             git pull --rebase origin main
