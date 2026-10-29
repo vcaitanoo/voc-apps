@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATA VC45 / 1.0.44. Gestos em rota ficam manuais até recentrar. Reconhece igrejas POI christian. Recálculo usa rumo atual e rejeita partida oposta/inversão imediata. Trânsito ao vivo e totais de portagens ainda não ativados; dependem de serviço e perfil de veículo. Postos, mercados e publicidade preservados. Testes automatizados; validação física pendente. Estável VC4 preservada.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.44-5a8d0a33e510e5417dbd182abd79ef1e7745857e47a8d4e9844600348555255f-vc45.apk",
-        "sha256": "5a8d0a33e510e5417dbd182abd79ef1e7745857e47a8d4e9844600348555255f",
-        "versionCode": 45,
-        "versionName": "1.0.44",
+        "notes": "CANDIDATA VC46 / 1.0.45: corrige atraso dos cliques. Botões não iniciam varreduras das casas; leitura e geração de edifícios cedem tempo à interface e ao GPS. Modelos e visual preservados. Testes de resposta com mosaicos reais e CPU reduzida passaram; teste físico pendente. Estável VC4 preservada. Trânsito ao vivo e totais de portagens continuam pendentes.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.45-7cdf2c0cf5872ac622c672ea386bc3d2712f7ebdabaf296e31642ac9d634a963-vc46.apk",
+        "sha256": "7cdf2c0cf5872ac622c672ea386bc3d2712f7ebdabaf296e31642ac9d634a963",
+        "versionCode": 46,
+        "versionName": "1.0.45",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
