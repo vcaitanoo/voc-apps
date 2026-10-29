@@ -1,0 +1,77 @@
+name: Jarvis v30 cinematic natural dialogue regression
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/jarvis-cinematic-dialogue-v30.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  live-chat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test real dialogue not canned text or fake tool calls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,urllib.request,os,datetime,re
+          base="https://khinnoxpesnhtmmvrken.supabase.co/functions/v1/jarvis-gateway-v2"
+          tests=[
+            ("open-hypothetical",[
+              {"role":"user","content":"Jarvis, o que você faria se alguém quisesse esconder uma verdade importante?"}
+            ]),
+            ("meaningful-followup",[
+              {"role":"user","content":"Jarvis, o que você faria se alguém quisesse esconder uma verdade importante?"},
+              {"role":"assistant","content":"Eu procuraria primeiro as versões conflitantes e as evidências de cada uma. Esconder a verdade pode deixar rastros."},
+              {"role":"user","content":"E se todo mundo acreditasse na mesma versão? Isso provaria que ela é verdadeira?"}
+            ]),
+            ("grounded-counterpoint",[
+              {"role":"user","content":"Jarvis, toda informação que o governo divulga é uma mentira, não é?"}
+            ])
+          ]
+          report=["# Jarvis v30 — conversa de referência com personalidade","",
+            "UTC: "+datetime.datetime.now(datetime.timezone.utc).isoformat(),"",
+            "Aprovação mede se um LLM real respondeu sem saída interna, não se o áudio Android tem prosódia verificada.",""]
+          failed=0
+          request=urllib.request.Request(base+"/health")
+          with urllib.request.urlopen(request,timeout=20) as r: health=json.load(r)
+          report.append("Backend: "+str(health.get("service"))+"; provedores disponíveis: "+str(health.get("providersAvailable"))+"")
+          for name,messages in tests:
+            try:
+              req=urllib.request.Request(base+"/v1/chat",data=json.dumps({"messages":messages}).encode(),headers={"Content-Type":"application/json"},method="POST")
+              with urllib.request.urlopen(req,timeout=44) as r:data=json.load(r)
+              reply=(data.get("text") or "").strip()
+              low=reply.lower()
+              suspicious=any(t in low for t in ["<function=","<tool_call>","<parameter=","como modelo de linguagem","como uma inteligência artificial"])
+              ok=data.get("provider") in ("openrouter","groq") and len(reply)>=40 and not suspicious
+              if not ok:failed+=1
+              report.extend(["## "+name+": "+("PASS" if ok else "FAIL"),
+                "Provedor: "+str(data.get("provider"))+"; modo: "+str(data.get("mode"))+"; tamanho: "+str(len(reply)),
+                "Resposta real: "+reply[:1500].replace("\n"," "), ""])
+            except Exception as e:
+              failed+=1;report.extend(["## "+name+": ERROR",str(e)[:200],""])
+          report.append("Resultado: "+("PASS" if failed==0 else "FAIL")+"; falhas="+str(failed))
+          os.makedirs("docs",exist_ok=True)
+          with open("docs/JARVIS_V30_CINEMATIC_DIALOGUE_TEST.md","w",encoding="utf-8") as f:f.write("\n".join(report)+"\n")
+          print("\n".join(report))
+          if failed:raise SystemExit("Jarvis v30 dialogue failed real-model verification")
+          PY
+      - name: Preserve results from real service
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs
+          test -f docs/JARVIS_V30_CINEMATIC_DIALOGUE_TEST.md || echo 'Failed before producing live test report.' > docs/JARVIS_V30_CINEMATIC_DIALOGUE_TEST.md
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/JARVIS_V30_CINEMATIC_DIALOGUE_TEST.md
+          if ! git diff --cached --quiet; then
+            git commit -m 'test(jarvis): record actual cinematic conversational model responses'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
