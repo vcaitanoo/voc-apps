@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATA VC53 / 1.0.52: removida completamente a textura quadriculada repetida do modo Mapa noturno. Luz dos postes mais suave e difusa, com um único campo iluminado de 18,5 m em vez de dois círculos sobrepostos; centro menos intenso. Árvores 3D, casas, GPS, rotas, Satélite, Dia, mercados e postos preservados. APK Gradle compilado, assinado e verificado estruturalmente; teste real no Android ainda pendente. Versão estável VC4 intacta.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.52-eef490c08f8ece0e511836e27f48418130d56187a2133fd91b709525114bd725-vc53.apk",
-        "sha256": "eef490c08f8ece0e511836e27f48418130d56187a2133fd91b709525114bd725",
-        "versionCode": 53,
-        "versionName": "1.0.52",
+        "notes": "CANDIDATA VC54 / 1.0.53: interface visual com quatro contextos aprovados. Mapa livre: pesquisar, Traçar rota, Casa, Favoritos e Camadas; funções antigas de Recentes, Offline e Personalizar continuam acessíveis. Rota traçada: alternativas de rota e critérios reais, e Iniciar navegação com GPS recente. Navegação ativa: manobras, velocidade, distância, tempo restante, Encerrar rota e Camadas. Menu contextual durante navegação: Encerrar, Camadas, Satélite e Fechar menu, com botão Menu ~29% menor. Navegação GPS real, vegetação, casas, postos, mercados, modo noite e publicidade preservados. Gradle, estrutura, assinatura e teste Chromium verificados; teste físico Android pendente. Estável VC4 preservada.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.53-7f5ce513597c3f062321ee11d8e3b2705d94eb5aae9c2e36a4051bb8f0a410fa-vc54.apk",
+        "sha256": "7f5ce513597c3f062321ee11d8e3b2705d94eb5aae9c2e36a4051bb8f0a410fa",
+        "versionCode": 54,
+        "versionName": "1.0.53",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
