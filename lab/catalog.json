@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATA VC50 / 1.0.49: enquadramento da rota selecionada com ajuste final após 850 ms, zoom 3D mais próximo durante a condução e zoom progressivo em curvas e rotundas, árvores em áreas verdes com carregamento antecipado e modelos mais leves, e ícone GPS-3D com margem segura para leitura no Android. Preservados navegação GPS real, casas, mercados, postos, modo noturno, publicidade e a estável VC4. Testes automatizados e APK compilado/assinado; teste físico de navegação ainda pendente.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.49-bc00e4a983722ae12b0c0d7174c3d490df1c64879db8b8b1c8a6a9d5d0a225ea-vc50.apk",
-        "sha256": "bc00e4a983722ae12b0c0d7174c3d490df1c64879db8b8b1c8a6a9d5d0a225ea",
-        "versionCode": 50,
-        "versionName": "1.0.49",
+        "notes": "CANDIDATA VC51 / 1.0.50: visual noturno com textura real de terreno proveniente da fonte Esri que já existe no GPS, fundo azul-acinzentado em vez de preto, zonas verdes mais naturais, fachadas 3D mais visíveis e luzes suaves. A imagem é decorativa e aparece somente no modo Mapa noturno; modo Dia, modo Satélite, navegação VC50, casas, árvores, postos e mercados preservados. APK compilado, assinado e validado estruturalmente; aparência e navegação ainda dependem de teste físico Android. Estável VC4 preservada.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.50-41a53f225aee75d6a2333775a6e638e4a5fe6623695bd28c2cefed7edb70d9f2-vc51.apk",
+        "sha256": "41a53f225aee75d6a2333775a6e638e4a5fe6623695bd28c2cefed7edb70d9f2",
+        "versionCode": 51,
+        "versionName": "1.0.50",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
