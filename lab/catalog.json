@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATA VC52 / 1.0.51: modo Mapa noturno vetorial com textura procedural discreta, sem satélite escurecido. Árvores 3D mantidas. Postes iluminam a via com halos mais fortes e duas áreas de luz âmbar ancoradas no relevo (raios 14,2 m e 7,1 m). Dia/Satélite, rotas, GPS real, casas, mercados, postos, publicidade e estável VC4 preservados. APK compilado pelo Gradle, assinado e verificado estruturalmente; execução no Android real ainda pendente.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.51-00f0bf339fe1d54e0ca0f683de64889550c1836dc979dc37bdd408b46538ecf3-vc52.apk",
-        "sha256": "00f0bf339fe1d54e0ca0f683de64889550c1836dc979dc37bdd408b46538ecf3",
-        "versionCode": 52,
-        "versionName": "1.0.51",
+        "notes": "CANDIDATA VC53 / 1.0.52: removida completamente a textura quadriculada repetida do modo Mapa noturno. Luz dos postes mais suave e difusa, com um único campo iluminado de 18,5 m em vez de dois círculos sobrepostos; centro menos intenso. Árvores 3D, casas, GPS, rotas, Satélite, Dia, mercados e postos preservados. APK Gradle compilado, assinado e verificado estruturalmente; teste real no Android ainda pendente. Versão estável VC4 intacta.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.52-eef490c08f8ece0e511836e27f48418130d56187a2133fd91b709525114bd725-vc53.apk",
+        "sha256": "eef490c08f8ece0e511836e27f48418130d56187a2133fd91b709525114bd725",
+        "versionCode": 53,
+        "versionName": "1.0.52",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
