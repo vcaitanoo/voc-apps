@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATA VC47 / 1.0.46: melhora a fluidez da câmara ao interpolar apenas entre posições GPS recebidas, com duração adaptada e limite de 600 ms. Durante a navegação nativa pede timeout de 500 ms e intervalo mínimo de 250 ms. Preserva os modelos de postos, mercados, casas e igrejas, a interface, publicidade e demais funções. Teste físico Android e condução real pendentes. Estável VC4 preservada. Trânsito ao vivo e totais de portagens continuam pendentes.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.46-27062ea83fcbf74fce9df01fec8c8244c60434613b35ceb89e0ba95b337052f7-vc47.apk",
-        "sha256": "27062ea83fcbf74fce9df01fec8c8244c60434613b35ceb89e0ba95b337052f7",
-        "versionCode": 47,
-        "versionName": "1.0.46",
+        "notes": "CANDIDATA VC50 / 1.0.49: enquadramento da rota selecionada com ajuste final após 850 ms, zoom 3D mais próximo durante a condução e zoom progressivo em curvas e rotundas, árvores em áreas verdes com carregamento antecipado e modelos mais leves, e ícone GPS-3D com margem segura para leitura no Android. Preservados navegação GPS real, casas, mercados, postos, modo noturno, publicidade e a estável VC4. Testes automatizados e APK compilado/assinado; teste físico de navegação ainda pendente.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.49-bc00e4a983722ae12b0c0d7174c3d490df1c64879db8b8b1c8a6a9d5d0a225ea-vc50.apk",
+        "sha256": "bc00e4a983722ae12b0c0d7174c3d490df1c64879db8b8b1c8a6a9d5d0a225ea",
+        "versionCode": 50,
+        "versionName": "1.0.49",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
