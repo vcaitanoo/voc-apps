@@ -114,13 +114,13 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATA GPS-3D VC57 / 1.0.56: mantida integralmente a aparência da VC56. Após minimizar o painel principal, os botões laterais acompanham o Menu até o rodapé. Botão 3D alterna de fato câmera 2D de cima (pitch 0°) e perspectiva 3D (pitch 62°) sem mudar o botão, e o seguimento GPS respeita o modo selecionado. Durante movimento manual do mapa livre, mantém árvores e postes já renderizados, adiando a reconstrução do cenário 3D para depois do gesto, reduzindo sobrecarga sem remover elementos. Navegação, rotas, casas, mercados, postos, iluminação, publicidade e estável VC4 preservados. Testes Chromium, compilação Gradle, manifesto/DEX/resources, assinatura e SHA verificados; desempenho/execução em Android real pendentes de confirmação.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.56-055251f7d8c0225ff2f6ad6e06cef884409c9617b3cf1f9cec3404a198c2e1a7-vc57.apk",
-        "sha256": "055251f7d8c0225ff2f6ad6e06cef884409c9617b3cf1f9cec3404a198c2e1a7",
-        "versionCode": 57,
-        "versionName": "1.0.56",
-        "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
-      }
+          "notes": "CANDIDATA GPS-3D VC58 / 1.0.57: navegação GPS medida mais suave, sem extrapolação de posição; aviso de saída de rota removido após recálculo; zoom mais alto em retas longas e aproximação nas manobras, mantendo casas e elementos 3D visíveis; câmera 3D mais inclinada; árvores distribuídas por áreas verdes mapeadas, limite 420; menor frequência de reconstrução 3D. Menus e funções existentes, assinatura oficial e estável VC4 preservados. Build Gradle, regressões, assinatura, recursos e SHA-256 verificados; teste real de navegação Android ainda pendente.",
+          "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.57-2a4b0e4233e4ad9ba5ba1f3032748abcb950e6ad4c50d3df2ba0d0de1a9e6428-vc58.apk",
+          "sha256": "2a4b0e4233e4ad9ba5ba1f3032748abcb950e6ad4c50d3df2ba0d0de1a9e6428",
+          "versionCode": 58,
+          "versionName": "1.0.57",
+          "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
+        }
     }
   ]
 }
