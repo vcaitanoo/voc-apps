@@ -114,13 +114,13 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-          "notes": "CANDIDATA GPS-3D VC58 / 1.0.57: navegação GPS medida mais suave, sem extrapolação de posição; aviso de saída de rota removido após recálculo; zoom mais alto em retas longas e aproximação nas manobras, mantendo casas e elementos 3D visíveis; câmera 3D mais inclinada; árvores distribuídas por áreas verdes mapeadas, limite 420; menor frequência de reconstrução 3D. Menus e funções existentes, assinatura oficial e estável VC4 preservados. Build Gradle, regressões, assinatura, recursos e SHA-256 verificados; teste real de navegação Android ainda pendente.",
-          "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.57-2a4b0e4233e4ad9ba5ba1f3032748abcb950e6ad4c50d3df2ba0d0de1a9e6428-vc58.apk",
-          "sha256": "2a4b0e4233e4ad9ba5ba1f3032748abcb950e6ad4c50d3df2ba0d0de1a9e6428",
-          "versionCode": 58,
-          "versionName": "1.0.57",
-          "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
-        }
+        "notes": "CANDIDATA GPS-3D VC59 / 1.0.58, posterior aos vídeos: zoom e inclinação 3D transitam continuamente entre retas longas e aproximação de manobras; após recálculo de rota, o aviso de saída de percurso não reaparece durante 6,5 segundos, evitando alertas e novos recálculos indevidos; árvores amostradas por toda a extensão das áreas verdes vetoriais mapeadas e distribuídas em oito setores, mantendo o limite de 420. A suavização GPS validada na VC58 foi preservada porque aumentá-la provocou atraso mensurável; o GPS não simula posições. Menus, rotas e modelos 3D preservados. APK Gradle assinado e verificado em CI; teste de navegação em Android real pendente. Estável VC4 mantida.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.58-6ed7ba765a62fe79d7b4d7276601ac0d0da090f734f9f143620fffda97858d65-vc59.apk",
+        "sha256": "6ed7ba765a62fe79d7b4d7276601ac0d0da090f734f9f143620fffda97858d65",
+        "versionCode": 59,
+        "versionName": "1.0.58",
+        "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
+      }
     }
   ]
 }
