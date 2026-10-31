@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATA GPS-3D VC56 / 1.0.55: correção pontual do botão Menu que ficava suspenso no meio da tela ao tocar no sinal − para recolher o painel principal. Agora o Menu regressa ao canto inferior esquerdo e volta a ficar acima dos cards quando reabre. Nenhuma alteração na navegação, GPS, rotas, botões restantes, modelos 3D, modo noite ou publicidade. APK compilado por Gradle, assinado com certificado oficial, validado estruturalmente e aprovado nos testes de navegador; execução física Android pendente. VC4 estável preservada.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.55-1a741c788275d07f8532a5c6130c92396159474f215bc7ecb81ecd450b9168da-vc56.apk",
-        "sha256": "1a741c788275d07f8532a5c6130c92396159474f215bc7ecb81ecd450b9168da",
-        "versionCode": 56,
-        "versionName": "1.0.55",
+        "notes": "CANDIDATA GPS-3D VC57 / 1.0.56: mantida integralmente a aparência da VC56. Após minimizar o painel principal, os botões laterais acompanham o Menu até o rodapé. Botão 3D alterna de fato câmera 2D de cima (pitch 0°) e perspectiva 3D (pitch 62°) sem mudar o botão, e o seguimento GPS respeita o modo selecionado. Durante movimento manual do mapa livre, mantém árvores e postes já renderizados, adiando a reconstrução do cenário 3D para depois do gesto, reduzindo sobrecarga sem remover elementos. Navegação, rotas, casas, mercados, postos, iluminação, publicidade e estável VC4 preservados. Testes Chromium, compilação Gradle, manifesto/DEX/resources, assinatura e SHA verificados; desempenho/execução em Android real pendentes de confirmação.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.56-055251f7d8c0225ff2f6ad6e06cef884409c9617b3cf1f9cec3404a198c2e1a7-vc57.apk",
+        "sha256": "055251f7d8c0225ff2f6ad6e06cef884409c9617b3cf1f9cec3404a198c2e1a7",
+        "versionCode": 57,
+        "versionName": "1.0.56",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
