@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATA GPS-3D VC59 / 1.0.58, posterior aos vídeos: zoom e inclinação 3D transitam continuamente entre retas longas e aproximação de manobras; após recálculo de rota, o aviso de saída de percurso não reaparece durante 6,5 segundos, evitando alertas e novos recálculos indevidos; árvores amostradas por toda a extensão das áreas verdes vetoriais mapeadas e distribuídas em oito setores, mantendo o limite de 420. A suavização GPS validada na VC58 foi preservada porque aumentá-la provocou atraso mensurável; o GPS não simula posições. Menus, rotas e modelos 3D preservados. APK Gradle assinado e verificado em CI; teste de navegação em Android real pendente. Estável VC4 mantida.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.58-6ed7ba765a62fe79d7b4d7276601ac0d0da090f734f9f143620fffda97858d65-vc59.apk",
-        "sha256": "6ed7ba765a62fe79d7b4d7276601ac0d0da090f734f9f143620fffda97858d65",
-        "versionCode": 59,
-        "versionName": "1.0.58",
+        "notes": "CANDIDATA GPS-3D VC60 / 1.0.59: banner AdMob NATIVO de teste apenas quando existe rota ativa, na faixa de publicidade inferior já reservada. ID do aplicativo AdMob ca-app-pub-4663833571268509~9206665858 registado no manifesto; bloco real ca-app-pub-4663833571268509/2184915754 armazenado na configuração mas DESATIVADO. Este candidato usa exclusivamente o bloco oficial de teste ca-app-pub-3940256099942544/6300978111; pede informações de consentimento antes de solicitar anúncios. GPS, modelos 3D, zoom, rotas, ícone e interface da VC59 preservados. APK compilado por Gradle, assinado com o certificado existente, manifesto/DEX/recursos e SHA-256 conferidos na CI. Execução do anúncio e navegação em Android real ainda não testadas. Estável VC4 intacta.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.59-3fe90533de681041b2704b4f0e742ed7fd6d56356022adcf92991a9cae4d12e6-vc60.apk",
+        "sha256": "3fe90533de681041b2704b4f0e742ed7fd6d56356022adcf92991a9cae4d12e6",
+        "versionCode": 60,
+        "versionName": "1.0.59",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
