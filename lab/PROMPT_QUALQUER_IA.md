@@ -4,9 +4,19 @@ Se recebeu acesso a este repositório para continuar um dos apps, comece SEMPRE 
 
 > Leia `lab/CONTINUAR_AQUI.md` e `lab/catalog.json` antes de fazer qualquer alteração. O campo `stable` é a última versão aprovada e não pode ser substituído por uma build apenas compilada. Pode existir no máximo um `candidate`. Nunca use uma branch `tmp`, APK antigo, nome semelhante ou tentativa falhada como base. Trabalhe somente a partir da fonte estável confirmada do projeto. Depois de gerar um APK candidato, valide packageName, versionCode, versionName, SHA-256 e certificado de assinatura, publique o APK no VOC Lab e atualize somente `candidate`. Espere confirmação do utilizador antes de promover para `stable`.
 
+## ENTREGA PADRÃO
+
+## Entrega padrão obrigatória via VOC Lab — instrução do proprietário (2026-11-01)
+- Sempre que o proprietário pedir **uma alteração em um aplicativo Android do ecossistema VOC que resulte em uma nova versão instalável para teste**, executar a sequência completa até **publicar automaticamente a nova versão como `candidate` no VOC Lab**, sem exigir uma segunda mensagem dizendo “publique”, “suba” ou “mande atualização”. Essa ordem é autorização prévia para publicar **somente candidatos privados no VOC Lab**, nunca para produção nem para promover stable.
+- O APK pode e deve ser gerado internamente pelo Gradle, inspecionado, assinado com o certificado correto, submetido ao armazenamento HTTPS configurado, validado por SHA-256 remoto e registrado no `lab/catalog.json` e no endpoint ativo que o VOC Lab realmente consome. Em vez de pedir ao proprietário que baixe/instale um APK solto por um link externo, a entrega normal é: **“Abra o VOC Lab → ATUALIZAR LISTA → ATUALIZAR/INSTALAR candidato”**.
+- Não oferecer APK avulso como substituto da publicação no Lab. Link direto do APK só quando o usuário **pedir explicitamente**, ou em situação de recuperação sem alternativa e com explicação. AAB de Play Console só com solicitação explícita e após validação do APK equivalente.
+- Se a publicação for tecnicamente impossível (falta de fonte estável, chave, ferramentas, credenciais, rede, servidor ou dados), **não alegar que foi publicada**. Entregar o diagnóstico exato e a etapa bloqueada. Jamais atualizar catálogo com artefato fictício, URL inválida ou binário não verificado.
+- Para pedidos **apenas de análise/diagnóstico/plano**, não editar nem publicar. Para mudanças **somente no site/backend/PWA**, publicar no ambiente correspondente quando autorizado, **sem forçar APK** se o binário não mudou.
+- Jamais promover stable sem aprovação explícita do APK exato em Android real. Preservar o pacote aprovado e o histórico de versões.
+
 ## OPERAÇÃO: PUBLICAR CANDIDATO
 
-Quando o utilizador pedir uma alteração e quiser testar no telemóvel:
+Quando o utilizador pedir uma alteração Android que produza nova versão instalável, publicar automaticamente o candidato para teste, mesmo sem um segundo pedido de publicação:
 
 1. Identificar a fonte/base que o checkpoint do projeto marca como estável.
 2. Registar ANTES da alteração:
