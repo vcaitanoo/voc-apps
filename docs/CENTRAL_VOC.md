@@ -19,6 +19,7 @@
 | Registro geral de continuidade | [CONTINUITY.md](CONTINUITY.md) |
 | Inventário de apps | [APP_INVENTORY.md](APP_INVENTORY.md) |
 | Guia de segredos/credenciais | [COFRE_VOC_GUIA.md](COFRE_VOC_GUIA.md) |
+| Repositório privado do Cofre VOC (acesso autenticado) | [vcaitanoo/voc-cofre](https://github.com/vcaitanoo/voc-cofre) |
 
 **Separação essencial:** `lab/catalog.json` destina-se ao VOC Lab, com `stable` e `candidate`; `manifest.json` pertence ao VOC Manager oficial. Publicar candidato no Lab não promove stable automaticamente.
 
@@ -74,4 +75,4 @@ Ponto exato para continuar:
 - Sempre que algo de valor duradouro for confirmado (versão estável, SHA, assinatura, arquitetura, bug resolvido, setup, decisão, link oficial), atualizar a documentação apropriada no GitHub, sem divulgar segredos.
 - Não tratar uma tentativa recente como base estável. Preservar a fonte da última versão aprovada e só promover candidato após confirmação real em Android.
 - Após solicitação de alteração Android, o canal de entrega padrão é publicar o APK candidato **no VOC Lab**, nunca apenas entregar APK avulso, respeitando os requisitos técnicos.
-- **Arquitetura exclusiva GitHub escolhida pelo proprietário:** documentação no repositório público; backups de chaves privadas somente criptografados antes de commit em futuro repositório privado `voc-cofre`; credenciais operacionais em GitHub Actions Secrets, sem acesso posterior ao valor. Nunca guardar valores confidenciais em texto puro em repos, arquivos, issues ou logs. Consultar [COFRE_VOC_GUIA.md](COFRE_VOC_GUIA.md).
+- **Arquitetura exclusiva GitHub escolhida pelo proprietário:** documentação no repositório público; backups de chaves privadas somente criptografados antes de commit no repositório privado confirmado `vcaitanoo/voc-cofre` (estrutura preparada, backups não verificados); credenciais operacionais em GitHub Actions Secrets, sem acesso posterior ao valor. Nunca guardar valores confidenciais em texto puro em repos, arquivos, issues ou logs. Consultar [COFRE_VOC_GUIA.md](COFRE_VOC_GUIA.md).
