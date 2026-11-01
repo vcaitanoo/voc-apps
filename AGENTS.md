@@ -1,5 +1,11 @@
 # Instruções persistentes — VOC Apps e VOC Lab
 
+## Central VOC — conhecimento permanente e proteção de segredos (2026-11-01)
+- Usar [docs/CENTRAL_VOC.md](docs/CENTRAL_VOC.md) como índice permanente de projetos, repositórios, instruções, configurações **não sensíveis**, decisões, fontes estáveis verificadas, versões, hashes, assinaturas públicas e pontos de continuidade. Depois de uma confirmação relevante, atualizar a documentação adequada sem depender da memória da conversa.
+- Consultar [docs/COFRE_VOC_GUIA.md](docs/COFRE_VOC_GUIA.md) antes de tratar chaves de assinatura, tokens e senhas. O repositório `vcaitanoo/voc-apps` é **público**. Nunca registrar valores sigilosos, chaves privadas, keystores, senhas, arquivos .env, tokens nem códigos de recuperação no Git ou em logs.
+- Para segredos recuperáveis no celular/PC, usar um gestor de senhas/cofre criptografado independente; para CI, usar Secrets específicos do GitHub Actions; para arquivos de assinatura, backup criptografado com cópias de segurança. GitHub pode registrar o **nome** do Secret e onde está guardado, jamais seu valor.
+- Não assumir que um repositório privado substitui criptografia. Arquivos e histórico do Git são persistentes. Se houver vazamento, rotacionar/revogar a credencial.
+
 ## Entrega padrão obrigatória via VOC Lab — instrução do proprietário (2026-11-01)
 - Sempre que o proprietário pedir **uma alteração em um aplicativo Android do ecossistema VOC que resulte em uma nova versão instalável para teste**, executar a sequência completa até **publicar automaticamente a nova versão como `candidate` no VOC Lab**, sem exigir uma segunda mensagem dizendo “publique”, “suba” ou “mande atualização”. Essa ordem é autorização prévia para publicar **somente candidatos privados no VOC Lab**, nunca para produção nem para promover stable.
 - O APK pode e deve ser gerado internamente pelo Gradle, inspecionado, assinado com o certificado correto, submetido ao armazenamento HTTPS configurado, validado por SHA-256 remoto e registrado no `lab/catalog.json` e no endpoint ativo que o VOC Lab realmente consome. Em vez de pedir ao proprietário que baixe/instale um APK solto por um link externo, a entrega normal é: **“Abra o VOC Lab → ATUALIZAR LISTA → ATUALIZAR/INSTALAR candidato”**.
