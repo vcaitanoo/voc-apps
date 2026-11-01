@@ -2,7 +2,7 @@
 
 > Decisão do proprietário, 2026-11-01: **não utilizar Bitwarden, gestor de senhas externo ou outro serviço**. Central e fluxos de build ficam exclusivamente no GitHub. Este documento é **público e não contém segredos**.
 >
-> **ESTADO:** arquitetura documentada; o repositório privado `voc-cofre` ainda **não foi criado ou verificado**. Nenhuma credencial nem keystore foi transferida.
+> **ESTADO:** arquitetura documentada; o repositório privado [vcaitanoo/voc-cofre](https://github.com/vcaitanoo/voc-cofre) **foi confirmado como PRIVATE e recebeu estrutura documental em 2026-11-01**. Nenhuma credencial, keystore ou backup de assinatura foi transferido ou verificado.
 
 ## Regra permanente — registro automático de novas assinaturas (2026-11-01)
 - A partir de agora, sempre que o trabalho autorizado criar **um app Android novo** ou **uma chave/certificado de assinatura novo expressamente autorizado**, executar **no mesmo fluxo**, sem esperar outro pedido, o inventário: app, packageName, versionCode, versionName, fingerprint SHA-256 do certificado público, SHA-256 do APK/AAB, repo/commit do código-fonte, nome dos Secrets e localização do backup. Atualizar `docs/CENTRAL_VOC.md` e o checkpoint do app, sem expor valores.
@@ -14,7 +14,7 @@
 ## Arquitetura autorizada
 
 1. **GitHub público:** `vcaitanoo/voc-apps` + [CENTRAL_VOC.md](CENTRAL_VOC.md) contêm documentação, links, repositórios, versões confirmadas, hashes, fingerprints públicos de certificados, nomes dos Secrets e localização lógica dos backups. Nunca valores secretos.
-2. **GitHub privado (a criar pelo proprietário, visibilidade PRIVATE):** `vcaitanoo/voc-cofre` pode guardar inventário privado e **somente arquivos de backup já criptografados antes do commit** (por exemplo, keystore cifrado com criptografia autenticada e senha de descriptografia separada). A opção PRIVATE não transforma arquivos em texto puro em dados criptografados ponta a ponta.
+2. **GitHub privado (criado e confirmado como PRIVATE):** `vcaitanoo/voc-cofre` pode guardar inventário privado e **somente arquivos de backup já criptografados antes do commit** (por exemplo, keystore cifrado com criptografia autenticada e senha de descriptografia separada). A opção PRIVATE não transforma arquivos em texto puro em dados criptografados ponta a ponta.
 3. **GitHub Actions Secrets:** armazenam credenciais de build e tokens para workflows autorizados e revisados nos repositórios onde os workflows são executados. Os valores são fornecidos apenas a workflows que os referenciem; não ficam visíveis posteriormente em uma página para copiar. Servem para assinar/publicar sem colar a senha numa conversa.
 4. **Recuperação:** o proprietário precisa preservar um modo de recuperar a frase de descriptografia **fora do GitHub**, por exemplo uma cópia offline que ele controla e memoriza. Não colocar essa frase em arquivo, commit, issue, log, chat ou outro Secret que possa ser exposto junto do backup. Se perdê-la, pode ser impossível recuperar o keystore cifrado. Não há garantia absoluta de que apenas o proprietário ou um assistente técnico tenham acesso: GitHub, permissões de colaboradores, tokens e workflows são superfícies reais de acesso.
 
@@ -30,7 +30,7 @@
 
 ## Configuração pelo celular (GitHub, sem outro serviço)
 
-1. Entrar em [github.com/new](https://github.com/new) no navegador e criar `voc-cofre` com visibilidade **Private**. Não marcar Public.
+1. Repositório criado e confirmado: [vcaitanoo/voc-cofre](https://github.com/vcaitanoo/voc-cofre) (**Private**). Não alterar para Public.
 2. Restringir colaboradores, tokens, regras e workflows aos estritamente necessários. Habilitar autenticação de dois fatores na conta.
 3. **Antes de enviar chaves privadas:** gerar cópia criptografada localmente, verificar a capacidade de descriptografar e manter a frase fora do GitHub. Um `.jks` não é um backup seguro só por estar num repositório Private.
 4. Em cada repositório que precisa compilar: **Settings → Secrets and variables → Actions → New repository secret**. Colocar o token/senha na interface do GitHub, não na conversa e não em arquivos versionados.
@@ -43,7 +43,7 @@
 - Um workflow legítimo pode usar um Secret para assinar um APK sem devolver a senha. Revisar as permissões do workflow; código malicioso ou colaboradores com escrita podem tentar exfiltrar segredos.
 - Nenhuma IA deve afirmar que pode recuperar chaves, descriptografar backups ou fazer build assinado sem evidências e autorização.
 - Não criar, publicar, descriptografar ou mover material sensível sem autorização explícita do proprietário.
-- `voc-cofre` é proposto, não presume existência. **Não usar repositórios públicos**, incluindo `vcaitanoo/voc-apps`, para o backup do keystore nem criptografado sem análise específica do risco.
+- `voc-cofre` foi criado e seu acesso autorizado verificado; **nenhum segredo ou backup cifrado foi armazenado automaticamente**. **Não usar repositórios públicos**, incluindo `vcaitanoo/voc-apps`, para o backup do keystore nem criptografado sem análise específica do risco.
 - Se um segredo for exposto num commit, apagar o arquivo não remove o histórico: revogar/rotacionar o segredo e avaliar impacto.
 
 ## Fonte oficial
