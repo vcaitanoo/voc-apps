@@ -6,6 +6,13 @@ description: Trabalhar em apps do ecossistema VOC Lab/VOC Manager (GPS-3D, Jarvi
 # VOC Lab Master — disciplina de desenvolvimento e publicação
 
 ## Quando usar
+## Regra permanente — registro automático de novas assinaturas (2026-11-01)
+- A partir de agora, sempre que o trabalho autorizado criar **um app Android novo** ou **uma chave/certificado de assinatura novo expressamente autorizado**, executar **no mesmo fluxo**, sem esperar outro pedido, o inventário: app, packageName, versionCode, versionName, fingerprint SHA-256 do certificado público, SHA-256 do APK/AAB, repo/commit do código-fonte, nome dos Secrets e localização do backup. Atualizar `docs/CENTRAL_VOC.md` e o checkpoint do app, sem expor valores.
+- **Nunca** gerar chave nova para atualizar aplicativo já instalado quando a assinatura original estiver disponível; preservar a identidade de assinatura. Alteração ou rotação de chave exige autorização específica e análise da compatibilidade com Google Play e dispositivos já instalados.
+- Após um novo material de assinatura ter sido criado **com autorização**, configurar GitHub Actions Secrets adequados para assinatura automatizada **somente se houver acesso e permissão**, e preparar o backup da chave privada **criptografado antes de subir ao Git** no repositório privado `voc-cofre`, **somente após sua existência e acesso verificados**. Não armazenar keystore, senha ou token em texto puro em qualquer repositório, nem emitir valores em logs/relatórios/conversa. O proprietário mantém em segurança, fora do GitHub, a frase necessária para recuperar o backup cifrado.
+- Testar o procedimento de recuperação do backup sem expor dados e registrar evidências não sensíveis. Se não for possível fazer backup seguro, não declarar a chave “salva”; explicar exatamente o que falta. Não criar nem descartar irrevogavelmente nova chave sem plano de recuperação.
+- O proprietário **não precisa repetir essa instrução a cada tarefa**, desde que o agente esteja trabalhando no repositório com estas regras carregadas, ou dentro do Projeto ChatGPT que tenha as instruções aplicadas. Fora desses contextos, o carregamento automático **não é garantido**. GitHub Actions Secrets **não permitem consultar novamente o valor secreto**: não confundir segredo configurado com cópia recuperável.
+
 ## Central VOC e dados permanentes
 - Abrir [docs/CENTRAL_VOC.md](../../../docs/CENTRAL_VOC.md) no hub `vcaitanoo/voc-apps` para navegar entre projetos e registrar decisões técnicas, checkpoints, hashes, certificados públicos, versões aprovadas e referências de publicação que serão necessárias em conversas futuras.
 - Ao concluir uma etapa relevante, atualizar documentação de continuidade no GitHub **sem segredos**, sem alterar código dos aplicativos não pedidos.
