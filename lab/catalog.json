@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATA GPS-3D VC62 / 1.0.61: adiciona opção discreta «✕ Cancelar» na tela de Rotas alternativas, visível apenas antes de iniciar a navegação; reutiliza o encerramento original da rota sem desligar a localização GPS real. No AdMob de teste, identifica corretamente a falha UMP «Publisher misconfiguration / Failed to read publisher's account» e informa que o proprietário precisa publicar uma mensagem de Regulamentos europeus para o GPS-3D na seção Privacidade e mensagens do AdMob; sem contornar consentimento. IDs AdMob do proprietário preservados, banner real DESATIVADO e somente banner de teste oficial do Google usado. GPS, zoom, manobras, mapas, menus restantes e modelos 3D sem alterações. APK Gradle assinado, manifesto/DEX/recursos, certificado e SHA-256 verificados; funcionamento em Android real ainda precisa ser testado. Estável VC4 preservada.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.61-c5f2497d082cccba3bb546e4f6cc684f25bb83a127bfe4bb4f788cc56f0a3e0b-vc62.apk",
-        "sha256": "c5f2497d082cccba3bb546e4f6cc684f25bb83a127bfe4bb4f788cc56f0a3e0b",
-        "versionCode": 62,
-        "versionName": "1.0.61",
+        "notes": "CANDIDATA GPS-3D VC63 / 1.0.62: correção dos gestos de mapa após análise do vídeo gravado em Android. Pan com um dedo e aproximação/afastamento por pinça de dois dedos permanecem ativos, com orientação 3D estável: duas mãos não alteram acidentalmente inclinação (pitch) ou rotação; o segundo dedo não interrompe a pinça em curso. Pausa do seguimento GPS passa a ser realizada só uma vez no início do gesto; a navegação automática e o botão 2D/3D continuam disponíveis. Nenhuma alteração às funções de rotas, GPS real, modelos 3D, AdMob de teste, consentimento, cenários ou menus. Testes móveis em Chromium e Gradle concluídos, APK assinado, manifesto/DEX/recursos e hash verificados na CI; fluidez em Android real ainda requer confirmação do utilizador. Estável VC4 preservada. AAB para teste fechado somente após confirmação da execução do APK.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.62-e4835bfe8a3b2879c7a3254b7c63f4d9482b29a3776facad54fe790136023ff1-vc63.apk",
+        "sha256": "e4835bfe8a3b2879c7a3254b7c63f4d9482b29a3776facad54fe790136023ff1",
+        "versionCode": 63,
+        "versionName": "1.0.62",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
