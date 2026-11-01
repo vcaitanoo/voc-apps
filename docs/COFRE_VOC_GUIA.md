@@ -1,44 +1,45 @@
-# COFRE VOC — política de recuperação de credenciais
+# COFRE VOC — GitHub como única plataforma
 
-> Este guia é público e **não contém segredos**. `vcaitanoo/voc-apps` é um repositório público. Nunca inserir aqui chaves, tokens, senhas, `.jks`, `.keystore`, `service-account.json`, `.env`, códigos de recuperação, credenciais privadas ou certificados com chave privada.
+> Decisão do proprietário, 2026-11-01: **não utilizar Bitwarden, gestor de senhas externo ou outro serviço**. Central e fluxos de build ficam exclusivamente no GitHub. Este documento é **público e não contém segredos**.
+>
+> **ESTADO:** arquitetura documentada; o repositório privado `voc-cofre` ainda **não foi criado ou verificado**. Nenhuma credencial nem keystore foi transferida.
 
-## Dois lugares diferentes
+## Arquitetura autorizada
 
-1. **Central no GitHub:** códigos-fonte, instruções, catálogos, versões aprovadas, hashes, fingerprints de certificado, arquivos de configuração não secretos, nomes dos segredos e referências de onde foram guardados. Consultar [CENTRAL_VOC.md](CENTRAL_VOC.md).
-2. **Cofre de segredos:** gestor de senhas com criptografia ponta a ponta para valores recuperáveis no celular e PC (por exemplo, um gestor de senhas reputado com notas seguras), protegido por senha mestra forte e autenticação de dois fatores; backup seguro separado. Não confundir um repositório privado com um cofre criptográfico.
+1. **GitHub público:** `vcaitanoo/voc-apps` + [CENTRAL_VOC.md](CENTRAL_VOC.md) contêm documentação, links, repositórios, versões confirmadas, hashes, fingerprints públicos de certificados, nomes dos Secrets e localização lógica dos backups. Nunca valores secretos.
+2. **GitHub privado (a criar pelo proprietário, visibilidade PRIVATE):** `vcaitanoo/voc-cofre` pode guardar inventário privado e **somente arquivos de backup já criptografados antes do commit** (por exemplo, keystore cifrado com criptografia autenticada e senha de descriptografia separada). A opção PRIVATE não transforma arquivos em texto puro em dados criptografados ponta a ponta.
+3. **GitHub Actions Secrets:** armazenam credenciais de build e tokens para workflows autorizados e revisados nos repositórios onde os workflows são executados. Os valores são fornecidos apenas a workflows que os referenciem; não ficam visíveis posteriormente em uma página para copiar. Servem para assinar/publicar sem colar a senha numa conversa.
+4. **Recuperação:** o proprietário precisa preservar um modo de recuperar a frase de descriptografia **fora do GitHub**, por exemplo uma cópia offline que ele controla e memoriza. Não colocar essa frase em arquivo, commit, issue, log, chat ou outro Secret que possa ser exposto junto do backup. Se perdê-la, pode ser impossível recuperar o keystore cifrado. Não há garantia absoluta de que apenas o proprietário ou um assistente técnico tenham acesso: GitHub, permissões de colaboradores, tokens e workflows são superfícies reais de acesso.
 
-## Onde colocar cada dado
+## Onde guardar cada informação
 
-| Dado | Local seguro recomendado | No GitHub público |
+| Informação | Onde fica | Pode ser lida novamente no celular/PC? |
 | --- | --- | --- |
-| Repo/branch/commit, tarefas, URLs públicas, hash SHA-256, fingerprint **público** do certificado | Documentação versionada | Sim |
-| Android packageName, versionCode, versionName, App ID AdMob (identificador público) | Documentação versionada | Em geral, sim |
-| Senha de keystore, senha do alias, tokens pessoais, Supabase service_role, senhas de contas | Gestor de senhas/secret manager | **Nunca** |
-| Arquivo de assinatura Android `.jks`/`.keystore` (chave privada) | Backup **criptografado** separado, com recuperação testada e proteção de acesso | **Nunca em claro**, nem em repo privado |
-| Tokens/credenciais de compilação GitHub Actions | Repository → Settings → Secrets and variables → Actions | Guardar só o **nome** do Secret |
-| Credenciais do runtime Vercel/Supabase | Variáveis de ambiente/secret store das plataformas | Apenas a referência, nunca o valor |
-| Credenciais que você precisa consultar no telefone/PC | Gestor de senhas / notas seguras | Não colocar o valor |
+| packageName, versionCode, versões aprovadas, URLs públicas, SHA-256, fingerprint do certificado | Central VOC no GitHub público | Sim |
+| Lista de chaves, nome dos Secrets, política de backup, inventário privado sem valores sigilosos | GitHub privado `voc-cofre` | Sim, com acesso autorizado |
+| Tokens de API, senhas de assinatura para execução automática | GitHub Actions Secrets no repositório do workflow | **Não**. Podem ser atualizados e usados por workflows, não recuperados em texto pela interface |
+| Arquivo de assinatura Android `.jks` / `.keystore` | Backup **criptografado** num repositório privado e, se necessário, representação Base64 em Action Secret com limites de tamanho | Arquivo cifrado, sim; descriptografia somente com a frase fora do GitHub |
+| Senha de recuperação / frase que abre o backup cifrado | Somente sob controle pessoal do proprietário, fora do GitHub | Depende do backup pessoal; **nunca registrar no GitHub** |
 
-### GitHub Actions Secrets não são o cofre de consulta
+## Configuração pelo celular (GitHub, sem outro serviço)
 
-GitHub Actions Secrets servem para **usar** um segredo em workflows sem guardá-lo no código. O GitHub não disponibiliza o valor como uma nota legível para você consultar depois. Guarde a cópia recuperável em cofre próprio e armazene apenas o nome do Secret no índice.
+1. Entrar em [github.com/new](https://github.com/new) no navegador e criar `voc-cofre` com visibilidade **Private**. Não marcar Public.
+2. Restringir colaboradores, tokens, regras e workflows aos estritamente necessários. Habilitar autenticação de dois fatores na conta.
+3. **Antes de enviar chaves privadas:** gerar cópia criptografada localmente, verificar a capacidade de descriptografar e manter a frase fora do GitHub. Um `.jks` não é um backup seguro só por estar num repositório Private.
+4. Em cada repositório que precisa compilar: **Settings → Secrets and variables → Actions → New repository secret**. Colocar o token/senha na interface do GitHub, não na conversa e não em arquivos versionados.
+5. Criar no índice `voc-cofre` apenas referências: qual app usa cada Secret, em qual repo ele existe, como repor o segredo e onde está o backup **cifrado**. Registar fingerprint SHA-256 da assinatura pública para verificação de identidade do APK.
+6. Publicar APK candidato no VOC Lab seguindo a skill, sem expor segredos nos logs. Para Play Console, confirmar versão/certificado antes do AAB.
 
-### Como criar o acesso no celular e PC
+## Limitações de acesso do ChatGPT / Codex
 
-1. Instalar/abrir um gestor de senhas confiável em ambos os aparelhos e habilitar autenticação de dois fatores.
-2. Organizar entradas por app (VOC Lab, GPS 3D, Jarvis, Ache Aqui etc.) com nomes identificáveis; colocar senhas, tokens e instruções de recuperação em notas seguras. Não enviar a senha mestra em conversa.
-3. Guardar keystores como **backup criptografado em armazenamento privado adequado**, em pelo menos duas cópias controladas, com a chave/senha de decriptação em local separado e seguro. Confirmar a capacidade de recuperação antes de depender desses backups.
-4. No GitHub, documentar somente o nome do segredo e **qual sistema o contém**, não valores. Em `CENTRAL_VOC.md`, links e pontos de continuidade podem ser públicos.
-5. Conectar apps/contas a ferramentas de automação apenas com permissões mínimas necessárias. Revogar/rotacionar segredos expostos.
+- O assistente só pode ler/escrever um repositório privado quando a conexão do GitHub realmente autoriza. Não significa que pode abrir GitHub Actions Secrets ou ler o valor de uma senha.
+- Um workflow legítimo pode usar um Secret para assinar um APK sem devolver a senha. Revisar as permissões do workflow; código malicioso ou colaboradores com escrita podem tentar exfiltrar segredos.
+- Nenhuma IA deve afirmar que pode recuperar chaves, descriptografar backups ou fazer build assinado sem evidências e autorização.
+- Não criar, publicar, descriptografar ou mover material sensível sem autorização explícita do proprietário.
+- `voc-cofre` é proposto, não presume existência. **Não usar repositórios públicos**, incluindo `vcaitanoo/voc-apps`, para o backup do keystore nem criptografado sem análise específica do risco.
+- Se um segredo for exposto num commit, apagar o arquivo não remove o histórico: revogar/rotacionar o segredo e avaliar impacto.
 
-### Repositório privado (opcional)
+## Fonte oficial
 
-Um repositório `voc-cofre` privado no GitHub pode organizar **documentação privada não ultrassensível e backups já criptografados**. Não guardar segredos em texto puro nem assumir que a flag “private” elimina os riscos do histórico Git, acesso indevido ou compartilhamento acidental. Criação de outro repositório deve ser feita pelo proprietário via conta GitHub quando necessário.
-
-## Regra para ChatGPT e Codex
-
-- Nunca solicitar senha mestra, keystore privado, token ou chave sigilosa apenas para registrar na documentação pública.
-- Antes de criar/alterar docs, verificar que arquivos e diffs não contêm segredo. Nunca usar `git add .` cegamente.
-- Não imprimir valores secretos em respostas, logs, issues, PRs, catálogos nem commits.
-- Caso o usuário forneça material sigiloso para uma operação legítima, tratar como dado sensível, aplicar somente no destino seguro autorizado e não retransmitir em arquivos públicos. Preferir controles nativos de secret management.
-- Se qualquer credencial for exposta num repositório, primeiro **revogar/rotacionar**; simplesmente apagar um arquivo não elimina o histórico Git.
+- GitHub Docs: [Using secrets in GitHub Actions](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets).
+- GitHub Docs: [Secrets reference](https://docs.github.com/en/actions/reference/security/secrets).
