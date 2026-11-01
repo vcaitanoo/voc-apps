@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATA GPS-3D VC61 / 1.0.60: correção limitada ao módulo AdMob de teste. Agora a app apresenta o código e a mensagem do erro nativo do banner caso o anúncio não carregue, disponibiliza o botão «Tentar novamente» para refazer o pedido, e diferencia falha de SDK de bloqueio por consentimento RGPD. Consentimento consultado antes de inicializar anúncios. Usa apenas o bloco oficial de TESTE ca-app-pub-3940256099942544/6300978111; ID do aplicativo ca-app-pub-4663833571268509~9206665858 configurado, bloco real ca-app-pub-4663833571268509/2184915754 guardado e desativado. Nenhuma alteração ao código de mapas, GPS, navegação ou modelos 3D. APK assinado por Gradle, DEX/manifesto/recursos, certificado e SHA-256 verificados na CI; carregamento real do anúncio ainda não testado no Android. Estável VC4 preservada.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.60-dd7532f02b0c038dfab6f90f20f028893faa1f356e10592f3faf086f21dba775-vc61.apk",
-        "sha256": "dd7532f02b0c038dfab6f90f20f028893faa1f356e10592f3faf086f21dba775",
-        "versionCode": 61,
-        "versionName": "1.0.60",
+        "notes": "CANDIDATA GPS-3D VC62 / 1.0.61: adiciona opção discreta «✕ Cancelar» na tela de Rotas alternativas, visível apenas antes de iniciar a navegação; reutiliza o encerramento original da rota sem desligar a localização GPS real. No AdMob de teste, identifica corretamente a falha UMP «Publisher misconfiguration / Failed to read publisher's account» e informa que o proprietário precisa publicar uma mensagem de Regulamentos europeus para o GPS-3D na seção Privacidade e mensagens do AdMob; sem contornar consentimento. IDs AdMob do proprietário preservados, banner real DESATIVADO e somente banner de teste oficial do Google usado. GPS, zoom, manobras, mapas, menus restantes e modelos 3D sem alterações. APK Gradle assinado, manifesto/DEX/recursos, certificado e SHA-256 verificados; funcionamento em Android real ainda precisa ser testado. Estável VC4 preservada.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.61-c5f2497d082cccba3bb546e4f6cc684f25bb83a127bfe4bb4f788cc56f0a3e0b-vc62.apk",
+        "sha256": "c5f2497d082cccba3bb546e4f6cc684f25bb83a127bfe4bb4f788cc56f0a3e0b",
+        "versionCode": 62,
+        "versionName": "1.0.61",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
