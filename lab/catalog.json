@@ -114,11 +114,11 @@
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       },
       "candidate": {
-        "notes": "CANDIDATA GPS-3D VC63 / 1.0.62: correção dos gestos de mapa após análise do vídeo gravado em Android. Pan com um dedo e aproximação/afastamento por pinça de dois dedos permanecem ativos, com orientação 3D estável: duas mãos não alteram acidentalmente inclinação (pitch) ou rotação; o segundo dedo não interrompe a pinça em curso. Pausa do seguimento GPS passa a ser realizada só uma vez no início do gesto; a navegação automática e o botão 2D/3D continuam disponíveis. Nenhuma alteração às funções de rotas, GPS real, modelos 3D, AdMob de teste, consentimento, cenários ou menus. Testes móveis em Chromium e Gradle concluídos, APK assinado, manifesto/DEX/recursos e hash verificados na CI; fluidez em Android real ainda requer confirmação do utilizador. Estável VC4 preservada. AAB para teste fechado somente após confirmação da execução do APK.",
-        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.62-e4835bfe8a3b2879c7a3254b7c63f4d9482b29a3776facad54fe790136023ff1-vc63.apk",
-        "sha256": "e4835bfe8a3b2879c7a3254b7c63f4d9482b29a3776facad54fe790136023ff1",
-        "versionCode": 63,
-        "versionName": "1.0.62",
+        "notes": "CANDIDATA GPS-3D VC64 / 1.0.63: reconstruída a partir do código-fonte VC62 após regressão da VC63. Restaurada a rotação do mapa com dois dedos sem prejudicar a pinça de zoom ou o arrasto; o segundo dedo não interrompe o gesto e a inclinação 3D mantém-se estável. Textos cartográficos voltados para a tela com tamanho/contorno melhorados, incluindo etiquetas próprias das ruas. Contraste corrigido no aviso de casas do painel Camadas. A verificação de visibilidade das camadas 3D fica suspensa enquanto os dedos movimentam o mapa e volta após o gesto, sem retirar modelos. GPS real, rotas, navegação automática, controles 2D/3D, AdMob de teste e consentimento mantidos. Testes móveis em Chromium, Gradle, certificado/manifesto/DEX/SHA-256 do APK aprovados; fluidez em Android real requer teste pelo utilizador antes de AAB para Play Console. Estável VC4 preservada.",
+        "apkUrl": "https://khinnoxpesnhtmmvrken.supabase.co/storage/v1/object/public/voc-lab/gps-3d/candidate/GPS-3D-1.0.63-46767db88a11d3fa522ede06b6084eefa324c796669354d0cfd773e0385cf1d7-vc64.apk",
+        "sha256": "46767db88a11d3fa522ede06b6084eefa324c796669354d0cfd773e0385cf1d7",
+        "versionCode": 64,
+        "versionName": "1.0.63",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
       }
     }
