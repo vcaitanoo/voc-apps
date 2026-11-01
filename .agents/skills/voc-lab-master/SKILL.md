@@ -6,6 +6,11 @@ description: Trabalhar em apps do ecossistema VOC Lab/VOC Manager (GPS-3D, Jarvi
 # VOC Lab Master — disciplina de desenvolvimento e publicação
 
 ## Quando usar
+## Central VOC e dados permanentes
+- Abrir [docs/CENTRAL_VOC.md](../../../docs/CENTRAL_VOC.md) no hub `vcaitanoo/voc-apps` para navegar entre projetos e registrar decisões técnicas, checkpoints, hashes, certificados públicos, versões aprovadas e referências de publicação que serão necessárias em conversas futuras.
+- Ao concluir uma etapa relevante, atualizar documentação de continuidade no GitHub **sem segredos**, sem alterar código dos aplicativos não pedidos.
+- Ler [docs/COFRE_VOC_GUIA.md](../../../docs/COFRE_VOC_GUIA.md) para a política de credenciais: repos são documentação, não cofres de senhas; chaves privadas e tokens apenas em gestores de segredos/cofres criptografados apropriados. GitHub Actions Secrets servem a builds e não substituem um cofre pessoal recuperável.
+
 Use para tarefas de engenharia, manutenção, auditoria, distribuição e continuidade dos aplicativos VOC Lab e seus repositórios, tanto em Codex como em ChatGPT. Não usar para perguntas não relacionadas aos projetos VOC. Não inferir autorização para alterar app, catálogo ou produção de um simples pedido de análise.
 
 ## Princípio inegociável
