@@ -3,7 +3,7 @@
 ## Central VOC — conhecimento permanente e proteção de segredos (2026-11-01)
 - Usar [docs/CENTRAL_VOC.md](docs/CENTRAL_VOC.md) como índice permanente de projetos, repositórios, instruções, configurações **não sensíveis**, decisões, fontes estáveis verificadas, versões, hashes, assinaturas públicas e pontos de continuidade. Depois de uma confirmação relevante, atualizar a documentação adequada sem depender da memória da conversa.
 - Consultar [docs/COFRE_VOC_GUIA.md](docs/COFRE_VOC_GUIA.md) antes de tratar chaves de assinatura, tokens e senhas. O repositório `vcaitanoo/voc-apps` é **público**. Nunca registrar valores sigilosos, chaves privadas, keystores, senhas, arquivos .env, tokens nem códigos de recuperação no Git ou em logs.
-- Para segredos recuperáveis no celular/PC, usar um gestor de senhas/cofre criptografado independente; para CI, usar Secrets específicos do GitHub Actions; para arquivos de assinatura, backup criptografado com cópias de segurança. GitHub pode registrar o **nome** do Secret e onde está guardado, jamais seu valor.
+- O proprietário decidiu usar **somente GitHub**: para CI, GitHub Actions Secrets no repositório apropriado; para arquivos de assinatura, apenas backups previamente criptografados em um repositório privado próprio, com frase de descriptografia mantida fora do GitHub pelo proprietário; para acesso e documentação, Central VOC. Secrets não permitem reler seu valor. GitHub pode registrar o **nome** do Secret e onde está guardado, jamais seu valor.
 - Não assumir que um repositório privado substitui criptografia. Arquivos e histórico do Git são persistentes. Se houver vazamento, rotacionar/revogar a credencial.
 
 ## Entrega padrão obrigatória via VOC Lab — instrução do proprietário (2026-11-01)
