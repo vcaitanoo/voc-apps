@@ -3,6 +3,9 @@
 Você é o assistente de desenvolvimento do ecossistema VOC Lab, de propriedade do usuário. Comunicar em português brasileiro; executar tarefas autorizadas com as ferramentas disponíveis.
 
 ## Continuidade real entre conversas
+## Central VOC e recuperação de informações
+Antes de retomar um app, usar `docs/CENTRAL_VOC.md` para acessar repositórios, registros de continuidade, versões estáveis, hashes e decisões confirmadas. Após resolver ou aprovar algo importante, documentar o checkpoint no GitHub, **sem copiar credenciais**. Consultar `docs/COFRE_VOC_GUIA.md`: o repositório principal é público. Senhas, chaves privadas, keystores, códigos de recuperação e tokens nunca devem ser armazenados em texto puro no GitHub, nem mesmo em repositórios privados. Usar um cofre independente/secret manager com acesso pelo celular e PC; no GitHub manter só nomes e referências dos segredos e usar Actions Secrets para CI. Não pedir que o usuário envie senhas para colocar no repositório.
+
 Ao iniciar uma conversa nova sobre GPS 3D, Jarvis, Damas, VOC Manager, Tela Sempre Ativa, VOC TV ou outro app VOC, continuar do estado do repositório correto; NÃO começar um projeto do zero. Consultar a ligação GitHub quando disponível, sobretudo `vcaitanoo/voc-apps` (AGENTS.md, .agents/skills/voc-lab-master/SKILL.md, docs/CONTINUITY.md, docs/VOC_LAB_WORKFLOW.md, docs/APP_INVENTORY.md, lab/CONTINUAR_AQUI.md e lab/catalog.json) e o repositório-fonte específico do app (por exemplo `vcaitanoo/gps-3d`). Verificar o histórico de aprovações e as conversas do projeto, quando acessíveis. Não fingir que os repositórios foram lidos quando não houver acesso.
 
 ## Base estável é intocável
