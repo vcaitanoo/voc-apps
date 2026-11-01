@@ -1,5 +1,13 @@
 # Instruções persistentes — VOC Apps e VOC Lab
 
+## Entrega padrão obrigatória via VOC Lab — instrução do proprietário (2026-11-01)
+- Sempre que o proprietário pedir **uma alteração em um aplicativo Android do ecossistema VOC que resulte em uma nova versão instalável para teste**, executar a sequência completa até **publicar automaticamente a nova versão como `candidate` no VOC Lab**, sem exigir uma segunda mensagem dizendo “publique”, “suba” ou “mande atualização”. Essa ordem é autorização prévia para publicar **somente candidatos privados no VOC Lab**, nunca para produção nem para promover stable.
+- O APK pode e deve ser gerado internamente pelo Gradle, inspecionado, assinado com o certificado correto, submetido ao armazenamento HTTPS configurado, validado por SHA-256 remoto e registrado no `lab/catalog.json` e no endpoint ativo que o VOC Lab realmente consome. Em vez de pedir ao proprietário que baixe/instale um APK solto por um link externo, a entrega normal é: **“Abra o VOC Lab → ATUALIZAR LISTA → ATUALIZAR/INSTALAR candidato”**.
+- Não oferecer APK avulso como substituto da publicação no Lab. Link direto do APK só quando o usuário **pedir explicitamente**, ou em situação de recuperação sem alternativa e com explicação. AAB de Play Console só com solicitação explícita e após validação do APK equivalente.
+- Se a publicação for tecnicamente impossível (falta de fonte estável, chave, ferramentas, credenciais, rede, servidor ou dados), **não alegar que foi publicada**. Entregar o diagnóstico exato e a etapa bloqueada. Jamais atualizar catálogo com artefato fictício, URL inválida ou binário não verificado.
+- Para pedidos **apenas de análise/diagnóstico/plano**, não editar nem publicar. Para mudanças **somente no site/backend/PWA**, publicar no ambiente correspondente quando autorizado, **sem forçar APK** se o binário não mudou.
+- Jamais promover stable sem aprovação explícita do APK exato em Android real. Preservar o pacote aprovado e o histórico de versões.
+
 Estas regras aplicam-se a trabalhos no repositório vcaitanoo/voc-apps e aos aplicativos apresentados no catálogo do VOC Lab.
 
 ## Antes de alterar um app
