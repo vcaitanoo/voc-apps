@@ -1,0 +1,77 @@
+# CENTRAL VOC — índice permanente dos projetos
+
+> Atualizado: 2026-11-01. Este documento é **público**. Não inserir credenciais, tokens, senhas, keystores, chaves privadas nem valores de Secrets.
+>
+> Objetivo: acesso pelo celular/PC, ChatGPT, Codex e outros agentes com permissão, sem depender de uma conversa específica.
+
+## Acesso e links principais
+
+| Finalidade | Endereço ou arquivo canônico |
+| --- | --- |
+| Hub e distribuição | https://github.com/vcaitanoo/voc-apps |
+| Instruções do Codex | [AGENTS.md](../AGENTS.md) |
+| Skill de desenvolvimento | [VOC Lab Master](../.agents/skills/voc-lab-master/SKILL.md) |
+| Instruções do Projeto ChatGPT | [VOC Lab ChatGPT](VOC_LAB_CHATGPT_PROJECT_INSTRUCTIONS.md) |
+| Estado do VOC Lab | [CONTINUAR_AQUI.md](../lab/CONTINUAR_AQUI.md) |
+| Catálogo de candidatos e estáveis | [lab/catalog.json](../lab/catalog.json) |
+| Catálogo oficial do VOC Manager | [manifest.json](../manifest.json) |
+| Fluxo de atualização | [VOC_LAB_WORKFLOW.md](VOC_LAB_WORKFLOW.md) |
+| Registro geral de continuidade | [CONTINUITY.md](CONTINUITY.md) |
+| Inventário de apps | [APP_INVENTORY.md](APP_INVENTORY.md) |
+| Guia de segredos/credenciais | [COFRE_VOC_GUIA.md](COFRE_VOC_GUIA.md) |
+
+**Separação essencial:** `lab/catalog.json` destina-se ao VOC Lab, com `stable` e `candidate`; `manifest.json` pertence ao VOC Manager oficial. Publicar candidato no Lab não promove stable automaticamente.
+
+## Projetos e código-fonte
+
+| Projeto | Fonte / identificação a conferir |
+| --- | --- |
+| GPS 3D | https://github.com/vcaitanoo/gps-3d |
+| VOC Lab (app Android) | [lab/](../lab/) |
+| VOC Manager | [manager/](../manager/) |
+| Jarvis | Verificar a fonte canônica e o checkpoint atual; artefatos históricos em `lab/sources/jarvis/`; não assumir que uma tentativa recente é aprovada |
+| Damas | Consultar inventário e catálogo, confirmar repo da fonte e versão aprovada |
+| Tela Sempre Ativa | Consultar inventário, catálogo e checkpoint da fonte confirmada |
+| VOC TV | Consultar inventário, catálogo e repo de origem |
+| Ache Aqui e outros projetos | Repositório próprio a confirmar; **não adicionar ao catálogo** por suposição |
+
+## O que conservar de cada aplicativo
+
+Manter um checkpoint por app, em documentação **sem segredos** e com evidências verificáveis:
+1. Nome, repo/branch/commit da fonte e packageName.
+2. Última **versão efetivamente aprovada pelo usuário**, com data/ambiente do teste; não inferir aprovação por Gradle ou catálogo.
+3. versionCode, versionName, SHA-256 do APK/base, SHA-256 do certificado de assinatura e localização da cópia aprovada.
+4. Identificação da candidata atual, o que mudou, quais testes foram realmente executados e quais ficaram pendentes.
+5. Backlog de bugs, comportamentos a preservar, decisões do usuário, alertas de regressão e próximo passo.
+6. Histórico de Play Console (maior versionCode já enviado) **apenas após verificação**.
+7. Nomes/referências de Secrets e localização do cofre (sem os valores), com responsável pelo acesso e rotina de recuperação.
+
+### Modelo copiável de checkpoint
+
+```md
+# CHECKPOINT — <app>
+Atualizado: AAAA-MM-DD
+Repo / branch / commit-fonte: NÃO VERIFICADO
+Fonte da última versão aprovada: NÃO VERIFICADO
+Aprovação do usuário e teste real: NÃO VERIFICADO
+Package name: NÃO VERIFICADO
+Stable: versionCode / versionName / SHA-256 APK: NÃO VERIFICADO
+Certificado SHA-256: NÃO VERIFICADO
+Candidate: versão / URL / SHA-256 / status: NÃO VERIFICADO
+O que já funciona e deve ser preservado:
+O que foi solicitado:
+Arquivos alterados:
+Build: NÃO VERIFICADO
+Teste em dispositivo Android real: NÃO VERIFICADO
+Último versionCode usado na Play: NÃO VERIFICADO
+Local de credenciais (somente referência, não valor):
+Ponto exato para continuar:
+```
+
+## Regra de trabalho entre celular, PC e IAs
+
+- Usar este índice como **porta de entrada**. Ler instruções e checkpoint específico antes de editar apps.
+- Sempre que algo de valor duradouro for confirmado (versão estável, SHA, assinatura, arquitetura, bug resolvido, setup, decisão, link oficial), atualizar a documentação apropriada no GitHub, sem divulgar segredos.
+- Não tratar uma tentativa recente como base estável. Preservar a fonte da última versão aprovada e só promover candidato após confirmação real em Android.
+- Após solicitação de alteração Android, o canal de entrega padrão é publicar o APK candidato **no VOC Lab**, nunca apenas entregar APK avulso, respeitando os requisitos técnicos.
+- **O GitHub não é um gestor de senhas.** Não registrar valores confidenciais neste índice. Consultar [COFRE_VOC_GUIA.md](COFRE_VOC_GUIA.md).
