@@ -25,8 +25,12 @@ jobs:
 
       - name: Usar Android SDK do runner
         run: |
+          set -euo pipefail
           echo "ANDROID_HOME=${ANDROID_HOME}"
-          sdkmanager --version
+          SDKMGR="$(find "${ANDROID_HOME}/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -x "$SDKMGR"
+          echo "$(dirname "$SDKMGR")" >> "$GITHUB_PATH"
+          "$SDKMGR" --version
 
       - name: Instalar Android 36
         run: |
