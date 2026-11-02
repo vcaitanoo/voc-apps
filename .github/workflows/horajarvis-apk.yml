@@ -1,0 +1,73 @@
+name: Compilar APK Hora Jarvis 1.0.0
+on:
+  push:
+    branches:
+      - ci/horajarvis-apk-v1
+    paths:
+      - '.github/workflows/horajarvis-apk.yml'
+      - 'ci/horajarvis/**'
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Obter codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar Android 36
+        run: |
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Restaurar fonte original 1.0.0 e validar hash
+        run: |
+          set -euo pipefail
+          mkdir -p HoraJarvis
+          cat ci/horajarvis/source.part{1,2,3,4}.b64 | base64 -d > horajarvis-source-ci.tar.xz
+          echo "5d1e7db08983e3874ead243298e9b95d7eab94b512138595e27498c11d8ff064  horajarvis-source-ci.tar.xz" | sha256sum -c -
+          tar -xJf horajarvis-source-ci.tar.xz -C HoraJarvis
+          grep -q "applicationId 'pt.vcaitano.horajarvis'" HoraJarvis/app/build.gradle
+          grep -q "versionCode 1" HoraJarvis/app/build.gradle
+
+      - name: Configurar Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Compilar APK de teste
+        working-directory: HoraJarvis
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+
+      - name: Verificar estrutura, package e assinatura
+        run: |
+          set -euo pipefail
+          APK="HoraJarvis/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          unzip -t "$APK"
+          "${ANDROID_HOME}/build-tools/36.0.0/aapt" dump badging "$APK" | tee apk-badging.txt
+          grep -q "package: name='pt.vcaitano.horajarvis'" apk-badging.txt
+          "${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK"
+          unzip -l "$APK" | grep -E 'classes.dex|AndroidManifest.xml|resources.arsc'
+          cp "$APK" "HoraJarvis-v1.0.0-teste.apk"
+          sha256sum "HoraJarvis-v1.0.0-teste.apk" > "HoraJarvis-v1.0.0-teste.sha256"
+
+      - name: Disponibilizar APK para download
+        uses: actions/upload-artifact@v4
+        with:
+          name: HoraJarvis-v1.0.0-APK
+          path: |
+            HoraJarvis-v1.0.0-teste.apk
+            HoraJarvis-v1.0.0-teste.sha256
+          if-no-files-found: error
+          retention-days: 30
