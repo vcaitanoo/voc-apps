@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-10-26T20:53:08Z",
+  "updatedAt": "2026-11-03T23:43:00Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -120,6 +120,28 @@
         "versionCode": 64,
         "versionName": "1.0.63",
         "signatureSha256": "918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8"
+      }
+    },
+    {
+      "id": "hora-jarvis",
+      "name": "Hora Jarvis — LAB",
+      "packageName": "pt.vcaitano.horajarvis.lab",
+      "enabled": true,
+      "stable": {
+        "versionCode": 0,
+        "versionName": "Sem versão LAB aprovada",
+        "apkUrl": "",
+        "sha256": "",
+        "signatureSha256": "",
+        "notes": "A versão 1.1.0-teste foi confirmada funcional no telemóvel e está preservada fora do LAB (package pt.vcaitano.horajarvis.teste, APK SHA-256 f9048df617e7f8cdfa1ca21237b05c94ab432dc70e7be13d14bce55ba06e988c). Ainda não existe versão LAB aprovada."
+      },
+      "candidate": {
+        "versionCode": 3,
+        "versionName": "1.2.0-lab",
+        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/candidate/HoraJarvis-v1.2.0-LAB-VC3.apk",
+        "sha256": "085f61d80bef2826ecb68bcb537732dfa6bb395dbedcb24432cbb5b41d9f913e",
+        "signatureSha256": "13b7cccb5897d962c532cc11e39a0d0b95900ee5659e64b9feceb9e541d3a94b",
+        "notes": "CANDIDATA LAB VC3, não aprovada: a partir da base funcional 1.1.0-teste; alternância fala curta apenas da hora ou 15.360 combinações variadas, notificação exibindo a mesma frase, toque no heads-up abre tela visual própria; área ilustrativa de publicidade fictícia (70%)/frase completa (30%) com botão para pré-visualizar. Sem AdMob real. Identificador LAB separado para preservar 1.1.0. Compilação, DEX, manifesto, assinatura e hashes verificados; execução real da 1.2.0 ainda pendente."
       }
     }
   ]
