@@ -95,51 +95,12 @@ jobs:
           import os
           p = Path(os.environ['SRC']) / 'app/src/main/java/pt/vcaitano/telasempreativa/AodService.java'
           s = p.read_text()
-          before = """        super.onCreate();
-        createForegroundNotification();
-        createOverlayAnchor();
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(Intent.ACTION_SCREEN_OFF);
-        filter.addAction(Intent.ACTION_SCREEN_ON);
-        filter.addAction(Intent.ACTION_USER_PRESENT);
-        filter.addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);
-        if (Build.VERSION.SDK_INT >= 33) registerReceiver(screenReceiver, filter, Context.RECEIVER_EXPORTED);
-        else registerReceiver(screenReceiver, filter);"""
-          after = """        super.onCreate();
-        try {
-            createForegroundNotification();
-            createOverlayAnchor();
-            IntentFilter filter = new IntentFilter();
-            filter.addAction(Intent.ACTION_SCREEN_OFF);
-            filter.addAction(Intent.ACTION_SCREEN_ON);
-            filter.addAction(Intent.ACTION_USER_PRESENT);
-            filter.addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);
-            if (Build.VERSION.SDK_INT >= 33) registerReceiver(screenReceiver, filter, Context.RECEIVER_EXPORTED);
-            else registerReceiver(screenReceiver, filter);
-        } catch (RuntimeException startupError) {
-            // Some Android/Play installs reject foreground-service startup before
-            // permissions are ready. Never crash the settings activity as a result.
-            CrashGuard.save("AodService.onCreate", startupError);
-            stopSelf();
-        }"""
+          before = "        super.onCreate();\n        createForegroundNotification();\n        createOverlayAnchor();\n        IntentFilter filter = new IntentFilter();\n        filter.addAction(Intent.ACTION_SCREEN_OFF);\n        filter.addAction(Intent.ACTION_SCREEN_ON);\n        filter.addAction(Intent.ACTION_USER_PRESENT);\n        filter.addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);\n        if (Build.VERSION.SDK_INT >= 33) registerReceiver(screenReceiver, filter, Context.RECEIVER_EXPORTED);\n        else registerReceiver(screenReceiver, filter);"
+          after = "        super.onCreate();\n        try {\n            createForegroundNotification();\n            createOverlayAnchor();\n            IntentFilter filter = new IntentFilter();\n            filter.addAction(Intent.ACTION_SCREEN_OFF);\n            filter.addAction(Intent.ACTION_SCREEN_ON);\n            filter.addAction(Intent.ACTION_USER_PRESENT);\n            filter.addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);\n            if (Build.VERSION.SDK_INT >= 33) registerReceiver(screenReceiver, filter, Context.RECEIVER_EXPORTED);\n            else registerReceiver(screenReceiver, filter);\n        } catch (RuntimeException startupError) {\n            // Some Android/Play installs reject foreground-service startup before\n            // permissions are ready. Never crash the settings activity as a result.\n            CrashGuard.save(\"AodService.onCreate\", startupError);\n            stopSelf();\n        }"
           assert s.count(before) == 1
           s = s.replace(before, after, 1)
-          before = """        if (Prefs.get(context).getBoolean(Prefs.AOD_ENABLED, true)) {
-            if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(service);
-            else context.startService(service);
-        } else {
-            context.stopService(service);
-        }"""
-          after = """        try {
-            if (Prefs.get(context).getBoolean(Prefs.AOD_ENABLED, true)) {
-                if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(service);
-                else context.startService(service);
-            } else {
-                context.stopService(service);
-            }
-        } catch (RuntimeException startupError) {
-            CrashGuard.save("AodService.sync", startupError);
-        }"""
+          before = "        if (Prefs.get(context).getBoolean(Prefs.AOD_ENABLED, true)) {\n            if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(service);\n            else context.startService(service);\n        } else {\n            context.stopService(service);\n        }"
+          after = "        try {\n            if (Prefs.get(context).getBoolean(Prefs.AOD_ENABLED, true)) {\n                if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(service);\n                else context.startService(service);\n            } else {\n                context.stopService(service);\n            }\n        } catch (RuntimeException startupError) {\n            CrashGuard.save(\"AodService.sync\", startupError);\n        }"
           assert s.count(before) == 1
           p.write_text(s.replace(before, after, 1))
           PY
