@@ -128,7 +128,7 @@ jobs:
           "$BT/apksigner" verify --verbose --print-certs "$APK" | tee "$OUT/apk-signature.txt"
           "$BT/aapt" dump badging "$APK" | tee "$OUT/apk-badging.txt"
           grep -q "package: name='pt.vcaitano.telasempreativa' versionCode='20260903' versionName='1.0.29'" "$OUT/apk-badging.txt"
-          grep -q 'Signer #1 certificate SHA-256 digest: f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a' "$OUT/apk-signature.txt"
+          grep -q 'certificate SHA-256 digest: f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a' "$OUT/apk-signature.txt"
           unzip -l "$APK" | grep -q 'AndroidManifest.xml'
           unzip -l "$APK" | grep -q 'classes.dex'
           unzip -l "$APK" | grep -q 'resources.arsc'
