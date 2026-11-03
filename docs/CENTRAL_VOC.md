@@ -76,3 +76,17 @@ Ponto exato para continuar:
 - Não tratar uma tentativa recente como base estável. Preservar a fonte da última versão aprovada e só promover candidato após confirmação real em Android.
 - Após solicitação de alteração Android, o canal de entrega padrão é publicar o APK candidato **no VOC Lab**, nunca apenas entregar APK avulso, respeitando os requisitos técnicos.
 - **Arquitetura exclusiva GitHub escolhida pelo proprietário:** documentação no repositório público; backups de chaves privadas somente criptografados antes de commit no repositório privado confirmado `vcaitanoo/voc-cofre` (estrutura preparada, backups não verificados); credenciais operacionais em GitHub Actions Secrets, sem acesso posterior ao valor. Nunca guardar valores confidenciais em texto puro em repos, arquivos, issues ou logs. Consultar [COFRE_VOC_GUIA.md](COFRE_VOC_GUIA.md).
+
+
+## GPS 3D Auto — APK experimental isolado (03/11/2026)
+
+- Estado: **teste técnico independente, NÃO é stable, não aprovado em carro Android Auto**.
+- Repositório-fonte: [vcaitanoo/gps-3d](https://github.com/vcaitanoo/gps-3d); branch `feat/android-auto-test`, commit `e74c549f063c5ede23b7191c77089d1298ce88cf`; base GitHub `5f620b121335103d75d7a2c5097a44d99dd7e6e1`.
+- Pacote **separado**: `pt.vcaitano.gps3d.auto`; `versionCode=1`, `versionName=0.1.0-auto-test`; app original `pt.vcaitano.gps3d` intocado.
+- APK debug (9.496.946 bytes): https://github.com/vcaitanoo/gps-3d/releases/download/gps-3d-auto-test-v1-20261103/GPS-3D-Auto-0.1.0-vc1-debug.apk
+- SHA-256 do APK: `c917572529ad48a9442c8a52a6ec5f2e71f7f291ebec706e40c214fda88c3ff2`.
+- Certificado público debug SHA-256: `5a710c8048911525c477b13ed6055539d9a1cce9a38390f83004308b6f956af1`. **Chave privada temporária criada pelo runner do GitHub; sem backup verificável e sem GitHub Secret persistente.** Builds futuras não devem tentar atualizar este pacote com certificado diferente; instalar novamente depois de desinstalar, ou configurar uma chave persistente autorizada com backup criptografado no cofre.
+- CI GitHub Actions: https://github.com/vcaitanoo/gps-3d/actions/runs/41727952664 — **SUCCESS**. Gradle `assembleDebug`, `aapt` package/version/CarAppService/NAVIGATION/ACCESS_SURFACE, DEX, `apksigner verify` e checksum SHA-256 confirmados.
+- Integração: Android for Cars App Library 1.7.0, `NavigationTemplate`, `SurfaceCallback`, `VirtualDisplay` + `WebViewAssetLoader` apontando ao bundle GPS 3D; renderização 3D no carro, GPS, desempenho e navegação sincronizada **NÃO VERIFICADOS**.
+- Distribuição Android Auto: instalação direta do APK no telefone pode não habilitar app de navegação na central. Para testar em veículo real, usar distribuição confiável da Google Play (Internal App Sharing / track interno), conforme política Android for Cars; **não afirmar que APK sideload é suficiente**.
+- Fonte oficial GPS 3D e catálogos `lab/catalog.json` e `manifest.json` preservados. Nenhum AAB para Play criado. Último versionCode já submetido à Play para **este pacote novo**: NÃO VERIFICADO. Este APK nunca foi testado num Android físico nesta execução.
