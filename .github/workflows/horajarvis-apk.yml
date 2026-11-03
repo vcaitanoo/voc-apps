@@ -1,18 +1,18 @@
-name: Compilar APK Hora Jarvis 1.1.0 TESTE
+name: Compilar Hora Jarvis 1.2.0 LAB - Candidato
 on:
   push:
     branches:
-      - ci/horajarvis-apk-v2
+      - ci/horajarvis-apk-v3
     paths:
       - '.github/workflows/horajarvis-apk.yml'
-      - 'ci/horajarvis/v2patch.*'
+      - 'ci/horajarvis/v3patch.*'
   workflow_dispatch:
 
 jobs:
   android:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,21 +23,21 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Android 36
+      - name: SDK Android 36
         run: |
           set -euo pipefail
-          SDKMGR="$(find "${ANDROID_HOME}/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          SDKROOT="$(printenv ANDROID_HOME)"
+          SDKMGR="$(find "$SDKROOT/cmdline-tools" -type f -name sdkmanager | head -n 1)"
           test -x "$SDKMGR"
-          echo "$(dirname "$SDKMGR")" >> "$GITHUB_PATH"
           "$SDKMGR" --install "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Restaurar base 1.0.0 e aplicar somente patch versionado
+      - name: Restaurar 1.1.0 confirmada e aplicar patch v1.2.0
         run: |
           set -euo pipefail
           mkdir -p HoraJarvis
-          cat ci/horajarvis/source.part{1,2,3,4}.b64 | base64 -d > /tmp/horajarvis-source-ci.tar.xz
-          echo "5d1e7db08983e3874ead243298e9b95d7eab94b512138595e27498c11d8ff064  /tmp/horajarvis-source-ci.tar.xz" | sha256sum -c -
-          tar -xJf /tmp/horajarvis-source-ci.tar.xz -C HoraJarvis
+          cat ci/horajarvis/source.part{1,2,3,4}.b64 | base64 -d > /tmp/base1.tar.xz
+          echo "5d1e7db08983e3874ead243298e9b95d7eab94b512138595e27498c11d8ff064  /tmp/base1.tar.xz" | sha256sum -c -
+          tar -xJf /tmp/base1.tar.xz -C HoraJarvis
           cat ci/horajarvis/v2patch.part{1,2,3,4}.b64 | base64 -d > /tmp/v2.patch.xz
           echo "e6a3451f5e99eb412bf96715f65ede316e1024b55962d53d8ef6d3a14b3649ec  /tmp/v2.patch.xz" | sha256sum -c -
           xz -dc /tmp/v2.patch.xz > /tmp/v2.patch
@@ -45,39 +45,63 @@ jobs:
           (cd HoraJarvis && patch -p1 --batch --forward < /tmp/v2-code.patch)
           grep -q "versionCode 2" HoraJarvis/app/build.gradle
           grep -q "applicationIdSuffix '.teste'" HoraJarvis/app/build.gradle
-          test -s HoraJarvis/app/src/main/java/pt/vcaitano/horajarvis/PhraseGenerator.java
 
-      - name: Gradle 8.13
+          cat ci/horajarvis/v3patch.part{1,2,3}.b64 | base64 -d > /tmp/v3.patch.xz
+          echo "d0c9b1104f1ee01f830c3c9a243f130c285b77477dba1eceee68f54f609ff826  /tmp/v3.patch.xz" | sha256sum -c -
+          xz -dc /tmp/v3.patch.xz > /tmp/v3.patch
+          (cd HoraJarvis && patch -p1 --batch --forward < /tmp/v3.patch)
+          grep -q "versionCode 3" HoraJarvis/app/build.gradle
+          grep -q "versionName '1.2.0-lab'" HoraJarvis/app/build.gradle
+          grep -q "applicationIdSuffix '.lab'" HoraJarvis/app/build.gradle
+          grep -q "conciseSpeech" HoraJarvis/app/src/main/java/pt/vcaitano/horajarvis/AppSettings.java
+
+      - name: Configurar Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
 
-      - name: Compilar APK de teste isolado
+      - name: Compilar APK
         working-directory: HoraJarvis
         run: gradle --no-daemon --stacktrace :app:assembleDebug
 
-      - name: Verificar manifesto, resources, DEX e assinatura
+      - name: Validar pacote, estrutura e assinatura
         run: |
           set -euo pipefail
+          SDKROOT="$(printenv ANDROID_HOME)"
           APK="HoraJarvis/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
-          unzip -t "$APK"
-          "${ANDROID_HOME}/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/badging.txt
-          grep -q "package: name='pt.vcaitano.horajarvis.teste'" /tmp/badging.txt
-          grep -q "versionCode='2'" /tmp/badging.txt
-          "${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK"
+          unzip -t "$APK" > /tmp/apk-zip-test.log
+          "$SDKROOT/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/badging.txt
+          grep -q "package: name='pt.vcaitano.horajarvis.lab'" /tmp/badging.txt
+          grep -q "versionCode='3'" /tmp/badging.txt
+          "$SDKROOT/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/apksigner.txt
           unzip -l "$APK" | grep -E 'classes.dex|AndroidManifest.xml|resources.arsc'
-          cp "$APK" "HoraJarvis-v1.1.0-TESTE.apk"
-          sha256sum "HoraJarvis-v1.1.0-TESTE.apk" > "HoraJarvis-v1.1.0-TESTE.sha256"
-          (cd HoraJarvis && zip -qr "../HoraJarvis-Fonte-v1.1.0-TESTE.zip" . -x "app/build/*" ".gradle/*" "build/*")
+          cp "$APK" HoraJarvis-v1.2.0-LAB-VC3.apk
+          sha256sum HoraJarvis-v1.2.0-LAB-VC3.apk | tee HoraJarvis-v1.2.0-LAB-VC3.sha256
+          (cd HoraJarvis && zip -qr ../HoraJarvis-Fonte-v1.2.0-LAB.zip . -x 'app/build/*' '.gradle/*' 'build/*')
 
-      - name: Disponibilizar resultado
+      - name: Guardar APK, fonte e hashes para download
         uses: actions/upload-artifact@v4
         with:
-          name: HoraJarvis-v1.1.0-TESTE
+          name: HoraJarvis-v1.2.0-LAB-VC3
           path: |
-            HoraJarvis-v1.1.0-TESTE.apk
-            HoraJarvis-v1.1.0-TESTE.sha256
-            HoraJarvis-Fonte-v1.1.0-TESTE.zip
-          if-no-files-found: error
+            HoraJarvis-v1.2.0-LAB-VC3.apk
+            HoraJarvis-v1.2.0-LAB-VC3.sha256
+            HoraJarvis-Fonte-v1.2.0-LAB.zip
           retention-days: 30
+          if-no-files-found: error
+
+      - name: Publicar APK candidato no repositório VOC Lab
+        run: |
+          set -euo pipefail
+          git config user.name 'voc-lab-ci[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git worktree add --detach /tmp/voc-publish origin/main
+          DEST="/tmp/voc-publish/apks/hora-jarvis/candidate"
+          mkdir -p "$DEST"
+          cp HoraJarvis-v1.2.0-LAB-VC3.apk "$DEST/HoraJarvis-v1.2.0-LAB-VC3.apk"
+          cp HoraJarvis-v1.2.0-LAB-VC3.sha256 "$DEST/HoraJarvis-v1.2.0-LAB-VC3.sha256"
+          git -C /tmp/voc-publish add apks/hora-jarvis/candidate
+          git -C /tmp/voc-publish commit -m 'lab(hora-jarvis): publicar APK candidato VC3' 
+          git -C /tmp/voc-publish push origin HEAD:main
