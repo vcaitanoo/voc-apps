@@ -83,7 +83,7 @@ jobs:
           PATCH_ARCHIVE="$RUNNER_TEMP/tsa-v37-startup-guard.zip"
           base64 -d lab/patches/tsa-v36-startup-guard.zip.base64 > "$PATCH_ARCHIVE"
           echo '67270f68f891d4993549da1d48cc2173fb6b7a35d3725b330a40f826e8416f09  '"$PATCH_ARCHIVE" | sha256sum -c -
-          unzip -p "$PATCH_ARCHIVE" tsa_v37_startup_guard.patch | (cd "$SRC" && patch --batch -p1)
+          unzip -p "$PATCH_ARCHIVE" tsa_v36_startup_guard.patch | (cd "$SRC" && patch --batch -p1)
           grep -q 'android:name=".TsaApplication"' "$SRC/app/src/main/AndroidManifest.xml"
           grep -q 'sanitizeLegacyTypes' "$SRC/app/src/main/java/pt/vcaitano/telasempreativa/Prefs.java"
           grep -q 'showStartupRecovery' "$SRC/app/src/main/java/pt/vcaitano/telasempreativa/MainActivity.java"
