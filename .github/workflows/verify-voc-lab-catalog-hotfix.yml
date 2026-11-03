@@ -30,11 +30,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android platform
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - name: Android 36 via runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMGR="$(find "/usr/local/lib/android/sdk/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -x "$SDKMGR"
+          echo "$(dirname "$SDKMGR")" >> "$GITHUB_PATH"
+          "$SDKMGR" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
 
       - name: Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
