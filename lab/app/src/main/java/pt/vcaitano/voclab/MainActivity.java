@@ -41,8 +41,8 @@ import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
     private static final String[] CATALOG_URLS = new String[] {
-            "https://temporary-snappy-redwood-yqm3s0d.vercel.app/catalog.json",
-            "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/lab/catalog.json"
+            "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/lab/catalog.json",
+            "https://temporary-snappy-redwood-yqm3s0d.vercel.app/catalog.json"
     };
     private static final String INSTALL_STATUS_ACTION = "pt.vcaitano.voclab.INSTALL_STATUS";
 
