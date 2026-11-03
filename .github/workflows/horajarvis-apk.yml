@@ -41,7 +41,8 @@ jobs:
           cat ci/horajarvis/v2patch.part{1,2,3,4}.b64 | base64 -d > /tmp/v2.patch.xz
           echo "e6a3451f5e99eb412bf96715f65ede316e1024b55962d53d8ef6d3a14b3649ec  /tmp/v2.patch.xz" | sha256sum -c -
           xz -dc /tmp/v2.patch.xz > /tmp/v2.patch
-          (cd HoraJarvis && patch -p1 --batch --forward < /tmp/v2.patch)
+          awk 'index($0,"diff -ruN hj-stable/app/build.gradle ")==1 { printOn=1 } printOn {print}' /tmp/v2.patch > /tmp/v2-code.patch
+          (cd HoraJarvis && patch -p1 --batch --forward < /tmp/v2-code.patch)
           grep -q "versionCode 2" HoraJarvis/app/build.gradle
           grep -q "applicationIdSuffix '.teste'" HoraJarvis/app/build.gradle
           test -s HoraJarvis/app/src/main/java/pt/vcaitano/horajarvis/PhraseGenerator.java
