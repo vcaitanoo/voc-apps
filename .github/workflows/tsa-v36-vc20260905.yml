@@ -88,6 +88,61 @@ jobs:
           grep -q 'showStartupRecovery' "$SRC/app/src/main/java/pt/vcaitano/telasempreativa/MainActivity.java"
           grep -q 'class CrashGuard' "$SRC/app/src/main/java/pt/vcaitano/telasempreativa/CrashGuard.java"
           grep -q 'class TsaApplication' "$SRC/app/src/main/java/pt/vcaitano/telasempreativa/TsaApplication.java"
+          # Also make the existing AOD foreground service fail safely on Android
+          # versions that reject foreground-service startup/permissions.
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path(os.environ['SRC']) / 'app/src/main/java/pt/vcaitano/telasempreativa/AodService.java'
+          s = p.read_text()
+          before = """        super.onCreate();
+        createForegroundNotification();
+        createOverlayAnchor();
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(Intent.ACTION_SCREEN_OFF);
+        filter.addAction(Intent.ACTION_SCREEN_ON);
+        filter.addAction(Intent.ACTION_USER_PRESENT);
+        filter.addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(screenReceiver, filter, Context.RECEIVER_EXPORTED);
+        else registerReceiver(screenReceiver, filter);"""
+          after = """        super.onCreate();
+        try {
+            createForegroundNotification();
+            createOverlayAnchor();
+            IntentFilter filter = new IntentFilter();
+            filter.addAction(Intent.ACTION_SCREEN_OFF);
+            filter.addAction(Intent.ACTION_SCREEN_ON);
+            filter.addAction(Intent.ACTION_USER_PRESENT);
+            filter.addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(screenReceiver, filter, Context.RECEIVER_EXPORTED);
+            else registerReceiver(screenReceiver, filter);
+        } catch (RuntimeException startupError) {
+            // Some Android/Play installs reject foreground-service startup before
+            // permissions are ready. Never crash the settings activity as a result.
+            CrashGuard.save("AodService.onCreate", startupError);
+            stopSelf();
+        }"""
+          assert s.count(before) == 1
+          s = s.replace(before, after, 1)
+          before = """        if (Prefs.get(context).getBoolean(Prefs.AOD_ENABLED, true)) {
+            if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(service);
+            else context.startService(service);
+        } else {
+            context.stopService(service);
+        }"""
+          after = """        try {
+            if (Prefs.get(context).getBoolean(Prefs.AOD_ENABLED, true)) {
+                if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(service);
+                else context.startService(service);
+            } else {
+                context.stopService(service);
+            }
+        } catch (RuntimeException startupError) {
+            CrashGuard.save("AodService.sync", startupError);
+        }"""
+          assert s.count(before) == 1
+          p.write_text(s.replace(before, after, 1))
+          PY
           cd "$SRC"
           zip -qr "$RUNNER_TEMP/out/TelaSempreAtiva_V36_FONTE_vc20260905.zip" . -x '.gradle/*' 'app/build/*' 'build/*'
           
