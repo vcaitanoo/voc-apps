@@ -9,6 +9,7 @@ on:
       - 'lab/settings.gradle.kts'
       - 'lab/gradle.properties'
       - '.github/workflows/build-voc-lab.yml'
+      - '.github/workflows/verify-voc-lab-catalog-hotfix.yml'
   workflow_dispatch:
 
 permissions:
