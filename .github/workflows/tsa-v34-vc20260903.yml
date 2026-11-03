@@ -129,9 +129,9 @@ jobs:
           "$BT/aapt" dump badging "$APK" | tee "$OUT/apk-badging.txt"
           grep -q "package: name='pt.vcaitano.telasempreativa' versionCode='20260903' versionName='1.0.29'" "$OUT/apk-badging.txt"
           grep -q 'certificate SHA-256 digest: f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a' "$OUT/apk-signature.txt"
-          unzip -l "$APK" | grep -q 'AndroidManifest.xml'
-          unzip -l "$APK" | grep -q 'classes.dex'
-          unzip -l "$APK" | grep -q 'resources.arsc'
+          unzip -Z -1 "$APK" | grep -F 'AndroidManifest.xml' > /dev/null
+          unzip -Z -1 "$APK" | grep -F 'classes.dex' > /dev/null
+          unzip -Z -1 "$APK" | grep -F 'resources.arsc' > /dev/null
           jarsigner -verify -verbose -certs "$AAB" > "$OUT/aab-jarsigner-verify.txt"
           grep -q 'jar verified.' "$OUT/aab-jarsigner-verify.txt"
           unzip -l "$AAB" > "$OUT/aab-contents.txt"
@@ -144,6 +144,7 @@ jobs:
           printf '%s\n'             'TELA SEMPRE ATIVA — V33 RESTAURADA PARA GOOGLE PLAY'             'packageName: pt.vcaitano.telasempreativa'             'versionCode: 20260903'             'versionName: 1.0.29'             'certificado SHA-256: f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a'             "APK SHA-256: $APK_SHA"             "AAB SHA-256: $AAB_SHA"             'Base checkpoint SHA-256: 40469bae71d6667e731816cc5624f20c96031bf277f4ccb6eacae0c959d45f0f'             'Popup: pressão longa + vibração + área segura máxima + Abrir/Responder/Remover + Abrir após desbloqueio'             'Ficheiros alterados: app/build.gradle; app/src/main/AndroidManifest.xml; AodActivity.java; MediaNotificationService.java'             'Validação: compilação e estrutura verificadas; execução em Android real NÃO testada neste workflow.'             > "$OUT/VALIDACAO_V33_PLAY.txt"
 
       - name: Upload APK AAB source and validation
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: TelaSempreAtiva_V34_PLAY_PLAY_vc20260903
