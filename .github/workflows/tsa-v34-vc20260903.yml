@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/tsa-v34-vc20260903.yml'
+      - 'lab/assets/tsa-v34-play-icon-capture.b64'
   pull_request:
     paths:
       - '.github/workflows/tsa-v34-vc20260903.yml'
