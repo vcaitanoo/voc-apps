@@ -109,16 +109,16 @@ jobs:
           test -s "$APK_UNSIGNED" && test -s "$AAB_UNSIGNED"
           BT="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n1)"
           "$BT/zipalign" -p -f 4 "$APK_UNSIGNED" "$RUNNER_TEMP/aligned.apk"
-          "$BT/apksigner" sign --ks "$KEY" --ks-key-alias telaativa --ks-pass env:PASS --key-pass env:KEYPASS --out "$RUNNER_TEMP/out/TelaSempreAtiva_V34_PLAY_v1.0.28_vc20260903.apk" "$RUNNER_TEMP/aligned.apk"
-          jarsigner -keystore "$KEY" -storepass:env PASS -keypass:env KEYPASS -signedjar "$RUNNER_TEMP/out/TelaSempreAtiva_V34_PLAY_v1.0.28_vc20260903.aab" "$AAB_UNSIGNED" telaativa
+          "$BT/apksigner" sign --ks "$KEY" --ks-key-alias telaativa --ks-pass env:PASS --key-pass env:KEYPASS --out "$RUNNER_TEMP/out/TelaSempreAtiva_V34_PLAY_v1.0.29_vc20260903.apk" "$RUNNER_TEMP/aligned.apk"
+          jarsigner -keystore "$KEY" -storepass:env PASS -keypass:env KEYPASS -signedjar "$RUNNER_TEMP/out/TelaSempreAtiva_V34_PLAY_v1.0.29_vc20260903.aab" "$AAB_UNSIGNED" telaativa
 
       - name: Structural validation
         shell: bash
         run: |
           set -euo pipefail
           OUT="$RUNNER_TEMP/out"
-          APK="$OUT/TelaSempreAtiva_V34_PLAY_v1.0.28_vc20260903.apk"
-          AAB="$OUT/TelaSempreAtiva_V34_PLAY_v1.0.28_vc20260903.aab"
+          APK="$OUT/TelaSempreAtiva_V34_PLAY_v1.0.29_vc20260903.apk"
+          AAB="$OUT/TelaSempreAtiva_V34_PLAY_v1.0.29_vc20260903.aab"
           BT="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n1)"
           "$BT/apksigner" verify --verbose --print-certs "$APK" | tee "$OUT/apk-signature.txt"
           "$BT/aapt" dump badging "$APK" | tee "$OUT/apk-badging.txt"
@@ -133,7 +133,7 @@ jobs:
           grep -q 'base/manifest/AndroidManifest.xml' "$OUT/aab-contents.txt"
           grep -q 'base/dex/classes.dex' "$OUT/aab-contents.txt"
           grep -q 'base/resources.pb' "$OUT/aab-contents.txt"
-          sha256sum "$APK" "$AAB" "$OUT/TelaSempreAtiva_V34_PLAY_FONTE_vc20260903.zip" > "$OUT/SHA256SUMS.txt"
+          sha256sum "$APK" "$AAB" "$OUT/TelaSempreAtiva_V34_FONTE_vc20260903.zip" > "$OUT/SHA256SUMS.txt"
           APK_SHA="$(sha256sum "$APK" | awk '{print $1}')"
           AAB_SHA="$(sha256sum "$AAB" | awk '{print $1}')"
           printf '%s\n'             'TELA SEMPRE ATIVA — V33 RESTAURADA PARA GOOGLE PLAY'             'packageName: pt.vcaitano.telasempreativa'             'versionCode: 20260903'             'versionName: 1.0.29'             'certificado SHA-256: f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a'             "APK SHA-256: $APK_SHA"             "AAB SHA-256: $AAB_SHA"             'Base checkpoint SHA-256: 40469bae71d6667e731816cc5624f20c96031bf277f4ccb6eacae0c959d45f0f'             'Popup: pressão longa + vibração + área segura máxima + Abrir/Responder/Remover + Abrir após desbloqueio'             'Ficheiros alterados: app/build.gradle; app/src/main/AndroidManifest.xml; AodActivity.java; MediaNotificationService.java'             'Validação: compilação e estrutura verificadas; execução em Android real NÃO testada neste workflow.'             > "$OUT/VALIDACAO_V33_PLAY.txt"
