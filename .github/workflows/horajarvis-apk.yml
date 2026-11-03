@@ -26,7 +26,7 @@ jobs:
       - name: Android 36
         run: |
           set -euo pipefail
-          SDKMGR="$(find "\${ANDROID_HOME}/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          SDKMGR="$(find "${ANDROID_HOME}/cmdline-tools" -type f -name sdkmanager | head -n 1)"
           test -x "$SDKMGR"
           echo "$(dirname "$SDKMGR")" >> "$GITHUB_PATH"
           "$SDKMGR" --install "platforms;android-36" "build-tools;36.0.0"
@@ -61,10 +61,10 @@ jobs:
           APK="HoraJarvis/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
           unzip -t "$APK"
-          "\${ANDROID_HOME}/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/badging.txt
+          "${ANDROID_HOME}/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/badging.txt
           grep -q "package: name='pt.vcaitano.horajarvis.teste'" /tmp/badging.txt
           grep -q "versionCode='2'" /tmp/badging.txt
-          "\${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK"
+          "${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK"
           unzip -l "$APK" | grep -E 'classes.dex|AndroidManifest.xml|resources.arsc'
           cp "$APK" "HoraJarvis-v1.1.0-TESTE.apk"
           sha256sum "HoraJarvis-v1.1.0-TESTE.apk" > "HoraJarvis-v1.1.0-TESTE.sha256"
