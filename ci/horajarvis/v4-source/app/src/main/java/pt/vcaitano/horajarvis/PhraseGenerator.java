@@ -68,11 +68,9 @@ public final class PhraseGenerator {
         if (config.customSpeech) {
             String personalized = customAt(config.customSpeechLines, now);
             if (personalized != null) {
-                // {hora} insere a hora corrente no local escrito pelo utilizador.
-                // Sem marcador, a hora é anunciada antes do texto personalizado.
-                if (personalized.contains("{hora}"))
-                    return personalized.replace("{hora}", humanTime(now));
-                return shortPhrase(now) + ". " + personalized;
+                // Preserva a frase livre, sem repetir a hora quando ela ja foi escrita.
+                // {hora} insere a hora no ponto escolhido; sem hora escrita, anuncia antes.
+                return CustomSpeech.format(personalized, now, humanTime(now), shortPhrase(now));
             }
         }
         if (config.conciseSpeech) return shortPhrase(now);
