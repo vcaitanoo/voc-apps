@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-11-04T12:31:37.949Z",
+  "updatedAt": "2026-11-04T13:00:00Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -123,40 +123,25 @@
       }
     },
     {
-      "id": "hora-jarvis",
+      "id": "hora",
       "name": "Hora",
-      "packageName": "pt.vcaitano.horajarvis.lab",
-      "enabled": true,
-      "stable": {
-        "versionCode": 3,
-        "versionName": "1.2.0-lab",
-        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/stable/Hora-v1.2.0-VC3.apk",
-        "sha256": "085f61d80bef2826ecb68bcb537732dfa6bb395dbedcb24432cbb5b41d9f913e",
-        "signatureSha256": "13b7cccb5897d962c532cc11e39a0d0b95900ee5659e64b9feceb9e541d3a94b",
-        "notes": "BASE ESTÁVEL OFICIAL DO APP HORA, aprovada explicitamente pelo utilizador em Android real em 2026-11-04 após instalar pelo VOC Lab original. APK 1.2.0-lab / VC3, package pt.vcaitano.horajarvis.lab. Identidade do binário, funcionalidades, recursos, package, versão e certificado preservados integralmente; o APK stable é o MESMO blob Git da candidata aprovada. Avisos falados, modo curto ou variado, horários livres, vibração configurável e pré-visualização da tela personalizados; publicidade apenas fictícia. A mudança de nome 'Hora' neste catálogo não altera o nome impresso no APK instalado; isso exigirá APK assinado com o mesmo certificado. Certificado de debug sem backup privado confirmado: NÃO gerar versão de atualização com outra assinatura."
-      },
-      "candidate": null
-    },
-    {
-      "id": "hora-frases-teste",
-      "name": "Hora — Frases (Teste)",
-      "packageName": "pt.vcaitano.horajarvis.frases",
+      "packageName": "pt.vcaitano.horajarvis.frases5",
       "enabled": true,
       "stable": {
         "versionCode": 0,
-        "versionName": "Sem versão aprovada",
+        "versionName": "Ainda não homologada",
         "apkUrl": "",
         "sha256": "",
         "signatureSha256": "",
-        "notes": "Entrada exclusiva para teste. O Hora oficial 1.2.0 está em outro item e permanece inalterado."
+        "notes": "O Hora oficial VC3 foi retirado apenas da listagem, mantendo APK estável e fontes anteriores arquivados para recuperação."
       },
       "candidate": {
-        "versionCode": 4,
-        "versionName": "1.3.0-lab",
-        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/teste/Hora-Frases-1.3.0-VC4.apk",
-        "sha256": "be199a3c81e302c171e80cae9786af6b010dd2810415001f2b02f85e58837e7c",
-        "signatureSha256": "9a00499882708de3de94f3e66417240629866b221d94dd1ce9983f0926143af1",
-        "notes": "Frases personalizadas por horário, nome Hora no dispositivo e pré-visualização. App separado para preservar a assinatura da stable; teste em Android pendente. A chave debug deste candidato é temporária."
+        "versionCode": 5,
+        "versionName": "1.3.1-lab",
+        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/teste/Hora-Frases-1.3.1-VC5.apk",
+        "sha256": "4b5e68212e7ea9cdf8ecfb907701c71aab8f690bfe4ef24a92493f2760f28073",
+        "signatureSha256": "8254f8b635c828029cff88f88555f5b63d307512e57755863e4e29cad864d35c",
+        "notes": "Corrige a fala duplicada nas mensagens personalizadas. Nova instalação separada por assinatura incompatível; desative/remova os apps Hora anteriores do dispositivo para não receber avisos em duplicidade."
       }
     }
   ]
