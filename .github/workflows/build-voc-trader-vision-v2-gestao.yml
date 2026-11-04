@@ -1,0 +1,134 @@
+name: Build VOC Trader Vision Gestao V2 DEMO
+
+on:
+  push:
+    branches:
+      - feat/voc-trader-vision-v2-gestao-20261104
+    paths:
+      - 'trader-vision/**'
+      - '.github/workflows/build-voc-trader-vision-v2-gestao.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Unit tests for risk management
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/vocrisk
+          javac -d /tmp/vocrisk \
+            trader-vision/app/src/main/java/pt/vcaitano/tradervision/RiskManager.java \
+            trader-vision/tests/RiskManagerTest.java
+          java -cp /tmp/vocrisk pt.vcaitano.tradervision.RiskManagerTest
+      - name: Android SDK
+        shell: bash
+        run: |
+          set -e
+          SDK_ROOT="/usr/local/lib/android/sdk"
+          SDKM="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort | tail -1)"
+          test -n "$SDKM"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          yes | "$SDKM" --licenses >/dev/null || true
+          "$SDKM" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Assemble debug APK from source
+        run: gradle -p trader-vision clean :app:assembleDebug --stacktrace
+      - name: Validate APK identity structure and signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=trader-vision/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/trader-v2-badging.txt
+          grep -q "package: name='pt.vcaitano.tradervision.gestaoteste' versionCode='2' versionName='0.2.0-demo'" /tmp/trader-v2-badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/trader-v2-signature.txt
+          unzip -l "$APK" | grep -q 'classes.dex'
+          unzip -l "$APK" | grep -q 'resources.arsc'
+          sha256sum "$APK" | tee /tmp/trader-v2-sha256.txt
+      - name: Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VOC-Trader-Vision-Gestao-V2-DEMO
+          if-no-files-found: error
+          path: |
+            trader-vision/app/build/outputs/apk/debug/app-debug.apk
+            /tmp/trader-v2-badging.txt
+            /tmp/trader-v2-signature.txt
+            /tmp/trader-v2-sha256.txt
+      - name: Checkout current VOC Lab catalog without replacing V1
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: publish-main
+          fetch-depth: 0
+      - name: Publish isolated V2 candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="trader-vision/app/build/outputs/apk/debug/app-debug.apk"
+          DEST="apks/voc-trader-vision-gestao-teste/candidate/VOC-Trader-Vision-Gestao-0.2.0-demo-VC2.apk"
+          mkdir -p "publish-main/$(dirname "$DEST")"
+          cp "$APK" "publish-main/$DEST"
+          SHA="$(sha256sum "$APK" | awk '{print $1}')"
+          CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/trader-v2-signature.txt | head -1 | tr '[:upper:]' '[:lower:]')"
+          test -n "$CERT"
+          export V2_SHA="$SHA" V2_CERT="$CERT" V2_PATH="$DEST"
+          python3 - <<'PY'
+          import os,json,datetime
+          path='publish-main/lab/catalog.json'
+          with open(path,encoding='utf-8') as f: cat=json.load(f)
+          assert cat['schemaVersion']==1 and isinstance(cat['apps'],list)
+          key='voc-trader-vision-gestao-teste'
+          candidate={
+              'versionCode':2,'versionName':'0.2.0-demo',
+              'apkUrl':f"https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/{os.environ['V2_PATH']}",
+              'sha256':os.environ['V2_SHA'],
+              'signatureSha256':os.environ['V2_CERT'],
+              'notes':'Gestão DEMO V2: entrada mínima €1; acima de €100, alvo 1% do saldo (truncado a cêntimos). Saldo €29,48 implica risco efetivo 3,39% com entrada €1. Saldo configurado manualmente e valor na Hezilex precisa corresponder. Estratégias e motor visual V1 preservados. Pacote ISOLADO para não substituir V1, cuja assinatura debug privada é indisponível. APK compilado, estrutura e SHA confirmados; abertura em Android real depende de teste. Assinatura debug de CI é temporária.'
+          }
+          found=[a for a in cat['apps'] if a.get('id')==key]
+          assert len(found)<2
+          if found:
+              assert found[0]['packageName']=='pt.vcaitano.tradervision.gestaoteste'
+              found[0]['candidate']=candidate
+          else:
+              cat['apps'].append({
+                  'id':key,'name':'VOC Trader Vision Gestão (Teste)',
+                  'packageName':'pt.vcaitano.tradervision.gestaoteste','enabled':True,
+                  'stable':{'versionCode':0,'versionName':'Ainda não homologada','apkUrl':'',
+                            'sha256':'','signatureSha256':'','notes':'Sem estável aprovada; somente candidato DEMO V2.'},
+                  'candidate':candidate})
+          assert all(isinstance(a.get('stable'),dict) for a in cat['apps']), 'Invalid stable'
+          cat['updatedAt']=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds').replace('+00:00','Z')
+          with open(path,'w',encoding='utf-8') as f:json.dump(cat,f,ensure_ascii=False,indent=2);f.write('\n')
+          PY
+          git -C publish-main config user.name "github-actions[bot]"
+          git -C publish-main config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C publish-main add "$DEST" lab/catalog.json
+          git -C publish-main diff --cached --check
+          git -C publish-main commit -m "candidate(trader-vision): publish isolated V2 risk management demo"
+          git -C publish-main push origin HEAD:main
+          echo "V2 APK SHA256: $SHA"
+          echo "V2 signing certificate SHA256: $CERT"
+      - name: Verify remote APK content matches build
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-trader-vision-gestao-teste/candidate/VOC-Trader-Vision-Gestao-0.2.0-demo-VC2.apk"
+          curl -fsSL --retry 5 --retry-delay 2 "$URL" -o /tmp/vision-v2-remote.apk
+          cmp trader-vision/app/build/outputs/apk/debug/app-debug.apk /tmp/vision-v2-remote.apk
+          sha256sum /tmp/vision-v2-remote.apk
