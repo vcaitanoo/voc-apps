@@ -12,6 +12,7 @@ import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
 import android.media.Image;
@@ -36,6 +37,13 @@ import android.widget.TextView;
 import java.nio.ByteBuffer;
 import java.time.LocalDate;
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.text.Text;
+import com.google.mlkit.vision.text.TextRecognizer;
+import com.google.mlkit.vision.text.TextRecognition;
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Serviço de captura autorizado por MediaProjection. Nunca executa em conta real. */
@@ -55,6 +63,9 @@ public final class VisionService extends Service {
     private WindowManager.LayoutParams overlayParams;
     private TextView text;
     private PowerManager.WakeLock wake;
+    private TextRecognizer textRecognizer;
+    private final AtomicBoolean visualVerificationPending=new AtomicBoolean(false);
+    private long lastVerificationFailureElapsedMs=-1L;
     private int width,height,density;
     private long lastFrame=0,lastAttemptElapsedMs=-1L;
     private volatile String lastGestureMessage="";
@@ -91,6 +102,7 @@ public final class VisionService extends Service {
             reader.setOnImageAvailableListener(this::consume,worker);
             display=projection.createVirtualDisplay("VOC Vision DEMO",width,height,density,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,reader.getSurface(),null,worker);
+            textRecognizer=TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
             running=true;createOverlay();keepScreenOn();
         }catch(Exception e){
             android.util.Log.e("VOCVision","Captura falhou",e);
@@ -224,14 +236,14 @@ public final class VisionService extends Service {
             int minBars=Math.max(18,Math.min(100,MainActivity.getI(p,"candles",22)));
             VisionEngine.Result r=VisionEngine.analyze(argb,width,height,minBars);
             int minScore=Math.max(60,Math.min(99,MainActivity.getI(p,"score",78)));
-            evaluateSignal(r,minScore,p);
+            evaluateSignal(r,minScore,p,argb);
         }catch(Throwable ex){android.util.Log.w("VOCVision","Falha leitura",ex);}
         finally{
             if(im!=null)im.close();
             processing.set(false);
         }
     }
-    private void evaluateSignal(VisionEngine.Result r,int minScore,SharedPreferences p){
+    private void evaluateSignal(VisionEngine.Result r,int minScore,SharedPreferences p,int[] pixels){
         String reason="";
         double balance=MainActivity.getD(p,"balance",29.48);
         double risk=MainActivity.getD(p,"risk",1);
@@ -264,18 +276,17 @@ public final class VisionService extends Service {
             else if(losses>=3)reason="Limite de 3 perdas apontadas hoje";
             else if(!timing.allowed)reason=timing.message;
             else if(TapService.INSTANCE==null)reason="Ative o serviço de acessibilidade";
+            else if(visualVerificationPending.get())reason="Verificando conta DEMO e campos no ecrã...";
+            else if(lastVerificationFailureElapsedMs>=0
+                 &&SystemClock.elapsedRealtime()-lastVerificationFailureElapsedMs<10000L)
+                reason="Reverificando em "+((10000L-
+                    (SystemClock.elapsedRealtime()-lastVerificationFailureElapsedMs)+999L)/1000L)+
+                    "s: "+lastGestureMessage;
             else {
-                lastAttemptElapsedMs=SystemClock.elapsedRealtime(); // evita repetição e exposição sobreposta, inclusive se o Android rejeitar o gesto
-                boolean buy=r.direction.equals("COMPRAR");
-                TapService.INSTANCE.placeDemoTrade(buy,width,height,r.buyX,r.buyY,
-                    r.sellX,r.sellY,stake,expiry,
-                    ()->{
-                        int countNow=p.getInt("trades",0);
-                        p.edit().putInt("trades",countNow+1).apply();
-                        reportGesture("GESTO DE "+(buy?"COMPRA":"VENDA")+" CONCLUÍDO. A aceitação pela Hezilex NÃO foi verificada; confirme no histórico.");
-                    },
-                    error->reportGesture("ENTRADA RECUSADA: "+error));
-                reason="Verificando campos via acessibilidade...";
+                // Não iniciar cooldown antes da resposta do Android. Capturas,
+                // gestos recusados e falhas de OCR não contam como operação.
+                verifyAndPlaceDemoTrade(r,p,pixels,stake,expiry);
+                reason="Lendo Conta Demo, Valor e Expiração (OCR)...";
             }
         }
         String gestao=plan.valid?String.format(Locale.US,
@@ -289,6 +300,74 @@ public final class VisionService extends Service {
         if(SystemClock.elapsedRealtime()<lastGestureMessageUntilMs&&!lastGestureMessage.isEmpty())
             display+="\n"+lastGestureMessage;
         if(!reason.startsWith("Verificando campos"))setPanel(display);
+    }
+
+    private void verifyAndPlaceDemoTrade(VisionEngine.Result result,
+                                          SharedPreferences prefs,int[] pixels,
+                                          double stake,int expiry){
+        if(!visualVerificationPending.compareAndSet(false,true))return;
+        final Bitmap screenshot;
+        try {
+            screenshot=Bitmap.createBitmap(pixels,width,height,Bitmap.Config.ARGB_8888);
+        } catch(Exception ex) {
+            visualVerificationPending.set(false);
+            rejectVerification("Falha ao preparar imagem para OCR");
+            return;
+        }
+        if(textRecognizer==null){
+            screenshot.recycle();
+            visualVerificationPending.set(false);
+            rejectVerification("Leitor visual ainda não iniciado");
+            return;
+        }
+        textRecognizer.process(InputImage.fromBitmap(screenshot,0))
+          .addOnSuccessListener(words->{
+              if(disposing||!running)return;
+              List<VisualTradeVerifier.Area> areas=new ArrayList<>();
+              for(Text.TextBlock block:words.getTextBlocks()){
+                  Rect br=block.getBoundingBox();
+                  if(br!=null)areas.add(new VisualTradeVerifier.Area(
+                      block.getText(),br.left,br.top,br.right,br.bottom));
+                  for(Text.Line line:block.getLines()){
+                      Rect lr=line.getBoundingBox();
+                      if(lr!=null)areas.add(new VisualTradeVerifier.Area(
+                          line.getText(),lr.left,lr.top,lr.right,lr.bottom));
+                  }
+              }
+              VisualTradeVerifier.Check verified=VisualTradeVerifier.evaluate(
+                  areas,width,height,stake,expiry);
+              if(!verified.allowed()){
+                  rejectVerification(verified.reason);
+                  return;
+              }
+              // A análise pode mudar durante o OCR; só autorizar o sinal
+              // que estava estável quando a imagem foi capturada.
+              TapService tap=TapService.INSTANCE;
+              if(tap==null){rejectVerification("Acessibilidade não está ativa");return;}
+              boolean buy=result.direction.equals("COMPRAR");
+              tap.placeDemoTrade(buy,width,height,result.buyX,result.buyY,
+                result.sellX,result.sellY,verified,
+                ()->{
+                    lastAttemptElapsedMs=SystemClock.elapsedRealtime();
+                    lastVerificationFailureElapsedMs=-1L;
+                    int count=prefs.getInt("trades",0);
+                    prefs.edit().putInt("trades",count+1).apply();
+                    reportGesture("TOQUE "+(buy?"COMPRAR":"VENDER")+
+                        " enviado ao Android. Verifique no histórico da Hezilex"+
+                        " se a ordem DEMO foi realmente aceite.");
+                },
+                this::rejectVerification);
+          })
+          .addOnFailureListener(err->
+              rejectVerification("OCR indisponível: "+err.getClass().getSimpleName()))
+          .addOnCompleteListener(task->{
+              screenshot.recycle();
+              visualVerificationPending.set(false);
+          });
+    }
+    private void rejectVerification(String reason){
+        lastVerificationFailureElapsedMs=SystemClock.elapsedRealtime();
+        reportGesture("SEM ENTRADA: "+reason);
     }
     private void reportGesture(String message){
         lastGestureMessage=message;
@@ -304,6 +383,7 @@ public final class VisionService extends Service {
         if(workerThread!=null){workerThread.quitSafely();workerThread=null;}
         if(overlay!=null&&windows!=null){try{windows.removeViewImmediate(overlay);}catch(Exception ignored){}overlay=null;overlayParams=null;}
         if(wake!=null&&wake.isHeld()){wake.release();wake=null;}
+        if(textRecognizer!=null){textRecognizer.close();textRecognizer=null;}
         super.onDestroy();
     }
 }
