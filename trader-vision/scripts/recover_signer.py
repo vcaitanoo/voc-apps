@@ -63,7 +63,7 @@ def main():
              "-alias","voc-trader-release","-storepass",password],
             check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True
         )
-        hashes_found=re.findall(r"SHA256:\\s*([0-9A-Fa-f:]+)",result.stdout)
+        hashes_found=re.findall(r"SHA256:\s*([0-9A-Fa-f:]+)",result.stdout)
         if not hashes_found or hashes_found[0].replace(":","").lower() != PINNED_CERT:
             raise RuntimeError("Recovered keystore certificate DOES NOT MATCH VC3")
     except Exception:
