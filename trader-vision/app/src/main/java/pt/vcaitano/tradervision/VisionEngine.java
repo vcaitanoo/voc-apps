@@ -34,7 +34,7 @@ public final class VisionEngine {
             return "VOC TRADER VISION · DEMO\n"+
                 "Velas visíveis: "+bars+" | Tela: "+(buttons?"OK":"NÃO CALIBRADA")+"\n"+
                 "Mercado: "+regime+"\nEstratégia: "+strategy+"\n"+
-                "Sinal: "+direction+" ("+score+"/100)\n"+
+                "Sinal: "+direction+" | Nota técnica "+score+"/100 (não é probabilidade)\n"+
                 "RSI "+fmt(rsi)+"  ADX "+fmt(adx)+"  MACD "+fmt(macd)+"\n"+
                 detail;
         }

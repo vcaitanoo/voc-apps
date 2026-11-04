@@ -24,6 +24,7 @@ import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.WindowManager;
@@ -52,7 +53,9 @@ public final class VisionService extends Service {
     private TextView text;
     private PowerManager.WakeLock wake;
     private int width,height,density;
-    private long lastFrame=0,lastAttemptBucket=-1;
+    private long lastFrame=0,lastAttemptElapsedMs=-1L;
+    private volatile String lastGestureMessage="";
+    private volatile long lastGestureMessageUntilMs=0L;
     private String previousSignal="";
     private int stability=0;
     private volatile boolean disposing=false;
@@ -179,7 +182,6 @@ public final class VisionService extends Service {
         else if(!demo)reason="BLOQUEADO: confirme CONTA DEMO";
         else if(!r.buttons)reason="BLOQUEADO: botões não identificados";
         else if(!hasSignal)reason="Aguardando nota mínima "+minScore;
-        else if(stability<2)reason="Aguardando imagem/sinal estável";
         else {
             int expiry=MainActivity.getI(p,"expiry",5);
             int timeframe=MainActivity.getI(p,"tf",5);
@@ -190,29 +192,24 @@ public final class VisionService extends Service {
                     .putInt("wins",0).putInt("losses",0).apply();
             }
             int count=p.getInt("trades",0),losses=p.getInt("losses",0);
-            long minute=System.currentTimeMillis()/60000;
-            long bucket=minute/Math.max(1,timeframe);
-            int sec=(int)(System.currentTimeMillis()/1000%60);
-            boolean newCandle=(minute%Math.max(1,timeframe)==0 && sec>=3&&sec<=12);
+            long elapsed=lastAttemptElapsedMs<0?-1L:SystemClock.elapsedRealtime()-lastAttemptElapsedMs;
+            EntryTiming.Decision timing=EntryTiming.evaluate(stability,elapsed,timeframe,expiry);
             if(!plan.valid)reason="BLOQUEADO: saldo inferior a €1 ou risco configurado inválido";
             else if(count>=max)reason="Limite diário de operações";
             else if(losses>=3)reason="Limite de 3 perdas apontadas hoje";
-            else if(!newCandle)reason="Esperando início da próxima vela ("+timeframe+"m)";
-            else if(bucket==lastAttemptBucket)reason="Já houve tentativa nesta vela";
-            else if(expiry<1||expiry>120)reason="Expiração inválida";
+            else if(!timing.allowed)reason=timing.message;
             else if(TapService.INSTANCE==null)reason="Ative o serviço de acessibilidade";
             else {
-                lastAttemptBucket=bucket; // previne entradas repetidas mesmo em falha
+                lastAttemptElapsedMs=SystemClock.elapsedRealtime(); // evita repetição e exposição sobreposta, inclusive se o Android rejeitar o gesto
                 boolean buy=r.direction.equals("COMPRAR");
                 TapService.INSTANCE.placeDemoTrade(buy,width,height,r.buyX,r.buyY,
                     r.sellX,r.sellY,stake,expiry,
                     ()->{
                         int countNow=p.getInt("trades",0);
                         p.edit().putInt("trades",countNow+1).apply();
-                        setPanel("GESTO DE "+(buy?"COMPRA":"VENDA")+" CONCLUÍDO.\n"+
-                          "A ACEITAÇÃO da ordem pela Hezilex NÃO está confirmada; confira no histórico.");
+                        reportGesture("GESTO DE "+(buy?"COMPRA":"VENDA")+" CONCLUÍDO. A aceitação pela Hezilex NÃO foi verificada; confirme no histórico.");
                     },
-                    error->setPanel("ENTRADA BLOQUEADA:\n"+error));
+                    error->reportGesture("ENTRADA RECUSADA: "+error));
                 reason="Verificando campos via acessibilidade...";
             }
         }
@@ -224,7 +221,14 @@ public final class VisionService extends Service {
         String display=r.panel()+"\n"+gestao+"\n"+
             "TENTATIVAS "+p.getInt("trades",0)+" · WIN "+p.getInt("wins",0)+
             " · LOSS "+p.getInt("losses",0)+"\n"+reason;
+        if(SystemClock.elapsedRealtime()<lastGestureMessageUntilMs&&!lastGestureMessage.isEmpty())
+            display+="\n"+lastGestureMessage;
         if(!reason.startsWith("Verificando campos"))setPanel(display);
+    }
+    private void reportGesture(String message){
+        lastGestureMessage=message;
+        lastGestureMessageUntilMs=SystemClock.elapsedRealtime()+30000L;
+        setPanel(message);
     }
     private void setPanel(String s){ui.post(()->{if(!disposing&&text!=null)text.setText(s);});}
     @Override public void onDestroy(){

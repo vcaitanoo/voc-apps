@@ -20,3 +20,10 @@ Esta versão é candidata experimental. Compilar/assinar/validar estrutura não 
 
 Para testes matemáticos locais: `javac -d /tmp/tvrisk trader-vision/app/src/main/java/pt/vcaitano/tradervision/RiskManager.java trader-vision/tests/RiskManagerTest.java && java -cp /tmp/tvrisk pt.vcaitano.tradervision.RiskManagerTest`
 
+
+## Ajuste de gatilho de entrada — V3, código de teste, sem promoção
+- O score 0–100 é confluência heurística sobre pixels, **não** probabilidade estatística nem garantia de execução.
+- A V2 executava apenas entre o 3º e o 12º segundo após o minuto divisível pelo timeframe, usando relógio local. Isso perdia quase todas as oportunidades depois da condição técnica reconhecida.
+- A V3 autoriza a tentativa de entrada em DEMO quando o sinal da penúltima vela (presumida fechada) se mantém por 3 análises consecutivas (score >= mínimo), respeitando validação da conta, payout/expiração configurada, permissões, saldo, stop diário e intervalo mínimo de `max(timeframe, expiração)` minutos entre tentativas.
+- Sem dados OHLC oficiais, não se comprova o verdadeiro fechamento nem a sincronização com o broker: nunca usar esta heurística em dinheiro real. Uma rejeição de acessibilidade fica 30s visível no painel, sem tentar toque cego.
+- Mesma identidade `pt.vcaitano.tradervision.gestaoteste`, sem novo aplicativo; fonte isolada em branch de fix, versãoCode 3. **Não publicar APK em catálogo** antes de assinar com a MESMA chave privada da V2: certificado SHA-256 `3151054948a50ccb3dde9a97fd1b3bc298f544fe5742aa384d901c3bf1c01632`. A chave debug não está arquivada. Compilar debug com outra chave não oferece atualização por cima. Stable e candidate V2 mantidas.
