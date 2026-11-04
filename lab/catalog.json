@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-11-04T20:45:48Z",
+  "updatedAt": "2026-11-04T20:49:00Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -145,30 +145,8 @@
       }
     },
     {
-      "id": "voc-trader-vision",
-      "name": "VOC Trader Vision",
-      "packageName": "pt.vcaitano.tradervision",
-      "enabled": true,
-      "stable": {
-        "versionCode": 0,
-        "versionName": "Ainda não homologada",
-        "apkUrl": "",
-        "sha256": "",
-        "signatureSha256": "",
-        "notes": "Ainda não existe versão estável aprovada. Apenas a candidata 0.1.0-demo está disponível para testes; não promover sem teste Android real."
-      },
-      "candidate": {
-        "versionCode": 1,
-        "versionName": "0.1.0-demo",
-        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-trader-vision/candidate/VOC-Trader-Vision-0.1.0-demo-VC1.apk",
-        "sha256": "51b125105128f3442fd05ee8fe1ddf864a2f166c9aa2a1d6c850ee155188cf9a",
-        "signatureSha256": "da17fe1c3ac49d1fcd4c2cc6067f3fad0b1acdcee143129dcc2f1e6a76371f35",
-        "notes": "TESTE DEMO VISUAL: fonte na branch feat/voc-trader-vision-v1-20261104; captura MediaProjection, acessibilidade Chrome, sinais de múltiplas estratégias e cliques condicionais. APK debug de assinatura temporária: para futuras atualizações pode ser necessário desinstalar até configurar keystore permanente. Gradle e estrutura verificados, execução física Android NÃO testada. Conta real BLOQUEADA."
-      }
-    },
-    {
       "id": "voc-trader-vision-gestao-teste",
-      "name": "VOC Trader Vision Gestão (Teste)",
+      "name": "VOC Trader Vision",
       "packageName": "pt.vcaitano.tradervision.gestaoteste",
       "enabled": true,
       "stable": {
