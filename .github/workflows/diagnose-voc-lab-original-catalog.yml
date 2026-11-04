@@ -1,0 +1,40 @@
+name: Diagnose VOC Lab original catalog
+on:
+  push:
+    branches:
+      - fix/voc-lab-catalog-github-first-20261103
+    paths:
+      - '.github/workflows/diagnose-voc-lab-original-catalog.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Testar endpoints atuais sem escrever nada
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,urllib.request,urllib.error,hashlib
+          endpoints={
+            "Vercel_original":"https://temporary-snappy-redwood-yqm3s0d.vercel.app/catalog.json",
+            "Github_atual":"https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/lab/catalog.json"
+          }
+          for name,url in endpoints.items():
+            try:
+              req=urllib.request.Request(url+"?diag=20261104",headers={"Cache-Control":"no-cache","User-Agent":"VOC-Lab-Catalog-Diagnostic"})
+              with urllib.request.urlopen(req,timeout=20) as response:
+                content=response.read()
+                print(name,"HTTP",response.status,"Bytes",len(content),"Content-Type",response.headers.get("content-type"),"SHA",hashlib.sha256(content).hexdigest())
+                data=json.loads(content.decode("utf-8"))
+                apps=data.get("apps",[])
+                print(name,"updatedAt",data.get("updatedAt"),"app_count",len(apps),"has_hora_jarvis",any(a.get("id")=="hora-jarvis" for a in apps),"ids",",".join(a.get("id","") for a in apps))
+            except Exception as e: print(name,"ERROR",str(e))
+          req=urllib.request.Request("https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/candidate/HoraJarvis-v1.2.0-LAB-VC3.apk",headers={"User-Agent":"VOC-Lab-Catalog-Diagnostic"})
+          try:
+            with urllib.request.urlopen(req,timeout=20) as response:
+              b=response.read()
+              print("HoraJarvis_APK","HTTP",response.status,"Bytes",len(b),"SHA",hashlib.sha256(b).hexdigest())
+          except Exception as e:print("HoraJarvis_APK","ERROR",str(e))
+          PY
