@@ -47,3 +47,20 @@
 - Catálogo GitHub `lab/catalog.json`: `name=Hora`, `stable=VC3`, `candidate=null`. Catálogo Supabase real servido no endpoint original deve receber **a mesma atualização SOMENTE no registro Hora**, preservando 8 outros apps.
 - **IMPORTANTE NOME**: o texto no VOC Lab muda imediatamente para `Hora`; o label embutido no APK Android aprovado permanece o anterior até uma recompilação assinada com a chave idêntica. Não alegar que o ícone Android foi renomeado sem APK validado/instalado.
 - **Publicação na Google Play**: NÃO realizada. "Oficial" neste checkpoint significa a base stable no VOC Lab com aprovação em dispositivo, não publicação na Play Store.
+
+
+## TESTE APARTADO — HORA FRASES 1.3.0 VC4 (2026-11-04)
+
+- Solicitação: renomear para Hora e permitir fala personalizada por horário ou frase geral, preservando o modo de fala curto, as combinações variadas, notificações, anúncios fictícios e programações.
+- Implementado em fonte isolada (sem modificar o código da base aprovada): branch `feat/hora-frase-personalizada-v4-20261104`, arquivos parciais em `ci/horajarvis/v4-source/app/`, reconstruindo a fonte oficial VC3 a partir dos patches de hash conferido. Commit compilado: `2a6f69d689d1089409e9020867d02373f2f9c592`.
+- Arquivos V4 alterados na fonte: `app/build.gradle`, `AppSettings.java`, `PhraseGenerator.java`, `MainActivity.java`, `AlertActivity.java`, `VoiceService.java` e `res/values/strings.xml`. Ajuste adicional do applicationIdSuffix de `.lab` para `.frases` no build experimental, para instalar ao lado do original.
+- O app da instalação oficial `pt.vcaitano.horajarvis.lab`, VC3 e certificado `13b7cccb5897d962c532cc11e39a0d0b95900ee5659e64b9feceb9e541d3a94b` permanecem intactos. Sua assinatura privada original continua indisponível, portanto nenhuma atualização in-place foi tentada.
+- APK experimental distinto: package `pt.vcaitano.horajarvis.frases`, versionCode `4`, versionName `1.3.0-lab`, nome Android **Hora**, SDK min 26, target 36.
+- URL HTTPS validada: `https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/teste/Hora-Frases-1.3.0-VC4.apk`.
+- APK: 39791 bytes, SHA-256 `be199a3c81e302c171e80cae9786af6b010dd2810415001f2b02f85e58837e7c`, certificado debug temporário SHA-256 `9a00499882708de3de94f3e66417240629866b221d94dd1ce9983f0926143af1`. **Este certificado não é uma chave recuperável para próximas atualizações**, não promover a stable nem assumir continuidade de assinatura.
+- GitHub Actions build/publicação: `https://github.com/vcaitanoo/voc-apps/actions/runs/41829756744`, sucesso com Gradle, verificação de package, DEX, manifesto, resources, assinatura e hash.
+- Catálogo GitHub `lab/catalog.json`: acrescida somente entrada `hora-frases-teste` com `candidate=VC4` e `stable=VC0` sem APK; a entrada `hora-jarvis` stable VC3 permanece igual; `manifest.json` não alterado.
+- Catálogo **real** do VOC Lab original: `public.voc_lab_catalog_store` em Supabase `khinnoxpesnhtmmvrken`, registro `id=main`, atualizado apenas por *append* protegido contra duplicação da nova entrada, passando de 9 para 10 aplicativos; 9 anteriores preservados. Endpoint primário `https://temporary-snappy-redwood-yqm3s0d.vercel.app/catalog.json`.
+- Verificação externa HTTPS do catálogo ativo e APK (download, SHA, ZIP e entradas): `https://github.com/vcaitanoo/voc-apps/actions/runs/41830303395`, sucesso: `CATALOGO_ATIVO_OK 10 APPS`, `HORA_STABLE_VC3_INTACTO`, `HORA_FRASES_TESTE_VC4_PRESENTE`, `APK_SHA256_VERIFICADO`.
+- **Execução Android real não testada**, aguardar confirmação do utilizador. Esta variante de teste NÃO substitui o Hora original; nome idêntico no lançador pode mostrar dois ícones "Hora" até que se faça futura migração segura e assinada.
+- Regra de continuidade: qualquer atualização do Hora oficial usa somente a base stable VC3 até que exista migração explicitamente aprovada; não usar este APK experimental nem sua assinatura debug efémera como base de uma futura atualização oficial.
