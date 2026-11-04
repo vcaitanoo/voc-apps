@@ -7,8 +7,8 @@ android {
         applicationId = "pt.vcaitano.tradervision.gestaoteste"
         minSdk = 29
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0-demo"
+        versionCode = 4
+        versionName = "0.4.0-demo"
     }
     // A identidade de assinatura é imutável após esta migração.
     // A keystore nunca é commitada; só é carregada durante o build autorizado.
@@ -35,4 +35,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+// On-device, bundled Latin text recognizer. No screen image is uploaded.
+dependencies {
+    implementation("com.google.mlkit:text-recognition:16.0.1")
 }
