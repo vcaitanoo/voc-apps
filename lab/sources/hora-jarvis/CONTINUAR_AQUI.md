@@ -34,3 +34,16 @@
 - A Google Play proíbe monetizar tela bloqueada e anúncios sobre outros aplicativos. Não colocar SDK real de anúncios nessa tela.
 - Antes de futuras atualizações/publicação, criar chave permanente no cofre privado `vcaitanoo/voc-cofre` e assinar uma linhagem separada ou planear migração sem invalidar uma versão aprovada.
 - Nunca promover a candidata 1.2.0 a stable sem confirmação explícita do utilizador de teste real.
+
+## BASE ESTÁVEL OFICIAL — HORA 1.2.0, CONFIRMADA (04/11/2026)
+- **Confirmação explícita do utilizador**: "Funcionou. E ja esta no voc lab. Essa agora é o oficial. E o nome passa a ser somente hora". A versão LAB instalada é aprovada como versão oficial funcional.
+- Nome público aprovado: **Hora** (não "Hora Jarvis — LAB").
+- Package imutável instalado: `pt.vcaitano.horajarvis.lab`; versionCode **3**; versionName real do APK **1.2.0-lab**; não editar metadados internos do APK aprovado.
+- Base estável binária **exatamente igual** à candidata confirmada: objeto Git `08a37e175c8e2f4459834af1db764f0a5061c756`, copiado como referência, sem reconstruir, no caminho permanente `apks/hora-jarvis/stable/Hora-v1.2.0-VC3.apk`.
+- URL oficial no VOC Lab: `https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/stable/Hora-v1.2.0-VC3.apk`.
+- SHA-256 do APK aprovado: `085f61d80bef2826ecb68bcb537732dfa6bb395dbedcb24432cbb5b41d9f913e` (38139 bytes).
+- Certificado público SHA-256: `13b7cccb5897d962c532cc11e39a0d0b95900ee5659e64b9feceb9e541d3a94b`; **chave privada temporária não preservada**, situação de assinatura NÃO RESOLVIDA. Uma próxima APK com assinatura diferente NÃO atualizará esta instalação. Antes de qualquer build de atualização, recuperar chave original ou planear migração explicitamente, sem sobrescrever base.
+- Fonte correspondente: reconstrução v1.2.0 em branch `ci/horajarvis-apk-v3`, patch v3 SHA-256 `d0c9b1104f1ee01f830c3c9a243f130c285b77477dba1eceee68f54f609ff826`, derivada da base v1.1.0 aprovada. Conservar fontes e os patches históricos; não usar commits experimentais.
+- Catálogo GitHub `lab/catalog.json`: `name=Hora`, `stable=VC3`, `candidate=null`. Catálogo Supabase real servido no endpoint original deve receber **a mesma atualização SOMENTE no registro Hora**, preservando 8 outros apps.
+- **IMPORTANTE NOME**: o texto no VOC Lab muda imediatamente para `Hora`; o label embutido no APK Android aprovado permanece o anterior até uma recompilação assinada com a chave idêntica. Não alegar que o ícone Android foi renomeado sem APK validado/instalado.
+- **Publicação na Google Play**: NÃO realizada. "Oficial" neste checkpoint significa a base stable no VOC Lab com aprovação em dispositivo, não publicação na Play Store.

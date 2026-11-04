@@ -104,3 +104,10 @@ Ponto exato para continuar:
 - **Download via Google Drive autenticado**, ZIP contendo exatamente o APK verificado e um arquivo `.sha256`: https://drive.google.com/file/d/1bV2P6V-DRX4k3icszyc7jFhwoHSZzFx-/view?usp=drivesdk . O APK extraído teve SHA-256 idêntico ao da compilação/release.
 - Endereço alternativo no ChatGPT Library: `/VOC_LAB_Testes/GPS-3D-Auto-0.2.0-vc2-debug.apk`.
 - Android Auto: teste em veículo pode requerer distribuição por trilha interna/compartilhamento interno da Play; APK instalado manualmente não garante exibição da categoria NAVIGATION na central. **Não publicar AAB**, promover stable ou alterar catálogo oficial sem validação e autorização. 
+
+## Hora — aplicativo de avisos falados, BASE ESTÁVEL (2026-11-04)
+- Nome de exibição aprovado: **Hora**. O usuário confirmou a versão 1.2.0 LAB instalada via VOC Lab como versão oficial funcional em Android.
+- APK imutável: `https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/stable/Hora-v1.2.0-VC3.apk`, sha256 `085f61d80bef2826ecb68bcb537732dfa6bb395dbedcb24432cbb5b41d9f913e`, size 38139 bytes, certificate sha256 `13b7cccb5897d962c532cc11e39a0d0b95900ee5659e64b9feceb9e541d3a94b`.
+- Package `pt.vcaitano.horajarvis.lab`, versionCode 3, versionName `1.2.0-lab`; `lab/catalog.json` e catálogo Supabase ativo devem exibir nome `Hora`, stable VC3 e candidate nulo.
+- Checkpoint completo: `lab/sources/hora-jarvis/CONTINUAR_AQUI.md`.
+- Chave de assinatura debug da versão aprovada sem backup; **não gerar APK de atualização com assinatura diferente**. O nome do ícone Android não muda com atualização do catálogo.
