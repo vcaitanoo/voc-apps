@@ -1,0 +1,6 @@
+VOC Lab de recuperacao 1.0.3, vc4
+Package: pt.vcaitano.voclab.emergencia
+Estado: teste independente, nao substitui o VOC Lab oficial
+Mudanca: catalogo Github em primeiro lugar, Vercel como fallback
+APK debug assinado com chave temporaria do GitHub runner
+Funcionamento em Android real: NAO VERIFICADO
