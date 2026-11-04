@@ -1,0 +1,32 @@
+name: Export encrypted VOC Trader keystore for offline signing
+on:
+  push:
+    branches:
+      - fix/voc-trader-vision-vc4-real-entry-20261104
+    paths:
+      - '.github/workflows/export-encrypted-voc-trader-key.yml'
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Assert encrypted backup identity only
+        run: |
+          test -s trader-vision/security/voc-trader-signing-vc3.encrypted.json
+          python3 - <<'PY'
+          import json
+          p=json.load(open('trader-vision/security/voc-trader-signing-vc3.encrypted.json'))
+          assert p['certificateSha256']=='e52d1c13baa3a4e7f73b71cb7e15bc1fdd8709650aa64fe8a9b86bb26a5491f9'
+          assert p['algorithm']=='RSA-OAEP-SHA256+AES-256-GCM'
+          print('Encrypted backup only; private recovery kit stays outside CI')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VOC-Trader-Permanent-Encrypted-Backup
+          path: trader-vision/security/voc-trader-signing-vc3.encrypted.json
+          retention-days: 14
+          if-no-files-found: error
