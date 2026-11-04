@@ -43,7 +43,7 @@ jobs:
           git config user.name 'voc-lab-ci[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add ci/horajarvis/review-v3
-          git diff --cached --check
+          git -c core.whitespace=-blank-at-eol diff --cached --check
           if git diff --cached --quiet; then
             echo "Fonte ja disponivel."
           else
