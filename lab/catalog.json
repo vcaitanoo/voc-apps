@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-11-04T13:11:11Z",
+  "updatedAt": "2026-11-04T19:19:00Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -149,7 +149,14 @@
       "name": "VOC Trader Vision",
       "packageName": "pt.vcaitano.tradervision",
       "enabled": true,
-      "stable": null,
+      "stable": {
+        "versionCode": 0,
+        "versionName": "Ainda não homologada",
+        "apkUrl": "",
+        "sha256": "",
+        "signatureSha256": "",
+        "notes": "Ainda não existe versão estável aprovada. Apenas a candidata 0.1.0-demo está disponível para testes; não promover sem teste Android real."
+      },
       "candidate": {
         "versionCode": 1,
         "versionName": "0.1.0-demo",
