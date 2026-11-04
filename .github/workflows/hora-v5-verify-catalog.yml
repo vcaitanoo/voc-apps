@@ -1,0 +1,50 @@
+name: Validar VOC Lab Hora VC5 unico
+on:
+  push:
+    branches: [fix/hora-voz-sem-repetir-v5-20261104]
+    paths: ['.github/workflows/hora-v5-verify-catalog.yml']
+  workflow_dispatch:
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar catalogo primario, fallback e APK VC5
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --connect-timeout 15 --retry 3 --max-time 70 \
+            -H "Cache-Control: no-cache" \
+            "https://temporary-snappy-redwood-yqm3s0d.vercel.app/catalog.json?t=$(date +%s)" \
+            -o /tmp/catalog-primary.json
+          curl --fail --location --connect-timeout 15 --retry 3 --max-time 70 \
+            "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/lab/catalog.json?t=$(date +%s)" \
+            -o /tmp/catalog-fallback.json
+          curl --fail --location --connect-timeout 15 --retry 3 --max-time 70 \
+            -o /tmp/Hora-VC5.apk \
+            "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/teste/Hora-Frases-1.3.1-VC5.apk"
+          python3 - <<'PY'
+          import hashlib,json,pathlib,zipfile
+          expected_sha="4b5e68212e7ea9cdf8ecfb907701c71aab8f690bfe4ef24a92493f2760f28073"
+          expected_cert="8254f8b635c828029cff88f88555f5b63d307512e57755863e4e29cad864d35c"
+          p=pathlib.Path("/tmp/Hora-VC5.apk")
+          digest=hashlib.sha256(p.read_bytes()).hexdigest()
+          assert digest==expected_sha, ("bad APK sha",digest)
+          with zipfile.ZipFile(p) as z:
+              assert z.testzip() is None
+              assert {"AndroidManifest.xml","resources.arsc","classes.dex"} <= set(z.namelist())
+          for path in ["/tmp/catalog-primary.json","/tmp/catalog-fallback.json"]:
+              data=json.loads(pathlib.Path(path).read_text())
+              apps=data["apps"]
+              horas=[a for a in apps if "hora" in (a.get("name","")+" "+a.get("id","")).lower()]
+              assert len(horas)==1,(path,len(horas))
+              h=horas[0]
+              assert h["name"]=="Hora" and h["id"]=="hora",h
+              assert h["packageName"]=="pt.vcaitano.horajarvis.frases5",h
+              assert h["candidate"]["versionCode"]==5,h
+              assert h["candidate"]["sha256"]==expected_sha,h
+              assert h["candidate"]["signatureSha256"]==expected_cert,h
+              assert h["candidate"]["apkUrl"].endswith("/Hora-Frases-1.3.1-VC5.apk"),h
+              assert not any(a["id"] in ("hora-jarvis","hora-frases-teste") for a in apps)
+              print("CATALOGO_OK",path,"APPS",len(apps),"HORA_UNICO",h["id"])
+          print("APK_HTTPS_OK",p.stat().st_size,"SHA",digest)
+          PY
