@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-11-04T22:31:31Z",
+  "updatedAt": "2026-11-04T23:14:11Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -158,12 +158,12 @@
         "notes": "Sem estável aprovada; somente candidato DEMO V2."
       },
       "candidate": {
-        "versionCode": 3,
-        "versionName": "0.3.0-demo",
-        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-trader-vision-gestao-teste/candidate/VOC-Trader-Vision-0.3.0-demo-VC3.apk",
-        "sha256": "18d0c7f5ae76595bf2fe248c6a664807cf735b75991e0ac1969e101056a21f88",
+        "versionCode": 4,
+        "versionName": "0.4.0-demo",
+        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-trader-vision-gestao-teste/candidate/VOC-Trader-Vision-0.4.0-demo-VC4.apk",
+        "sha256": "a567f412d23ee308251d752b3e04f2cd21371f9fe4679792a130e234194d441b",
         "signatureSha256": "e52d1c13baa3a4e7f73b71cb7e15bc1fdd8709650aa64fe8a9b86bb26a5491f9",
-        "notes": "VC3 DEMO: painel arrastável, confirmação visual de sinal sem janela de 10 segundos, cooldown de entradas e gestão mantida. UMA SÓ APP e MESMO package. ASSINATURA MIGRADA: desinstale a VC2 uma única vez antes de instalar a VC3; configurações locais antigas podem perder-se. Keystore permanente cifrada com RSA-OAEP+AES-GCM, recuperação documentada no voc-cofre. Assinatura não é compatível com a VC2, futuras versões devem reutilizar EXATAMENTE a chave permanente VC3. Build, manifesto, DEX, hash e assinatura verificados; execução no Android real ainda não testada."
+        "notes": "VC4 DEMO: sem cooldown falso quando OCR/gesto falha; confirma Conta Demo, Valor e Expiração no ecrã via ML Kit OCR offline antes de enviar toque no Chrome. Toque Android só inicia intervalo quando concluído, e painel mostra recusa. Permissões solicitadas ao abrir (consentimento manual obrigatório pelo Android), GUARDAR CONFIGURAÇÃO movido para baixo das ativações. Mesmo package e MESMA assinatura permanente VC3, atualização por cima. Gestão/estratégias/painel móvel preservados. Build e estrutura verificados; execução Android real ainda não testada. Scores NÃO representam probabilidade de vitória."
       }
     }
   ]
