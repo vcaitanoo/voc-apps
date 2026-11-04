@@ -1,0 +1,46 @@
+name: Verificar Hora oficial no VOC Lab original
+on:
+  push:
+    branches:
+      - fix/voc-lab-catalog-github-first-20261103
+    paths:
+      - '.github/workflows/verify-hora-stable.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirmar catalogo publico e APK original
+        run: |
+          python3 - <<'PY'
+          import json,urllib.request,hashlib
+          url="https://temporary-snappy-redwood-yqm3s0d.vercel.app/catalog.json"
+          r=urllib.request.Request(url+"?v=stable-20261104",headers={"Cache-Control":"no-cache","User-Agent":"Hora-official-verification"})
+          with urllib.request.urlopen(r,timeout=25) as resp:
+              assert resp.status==200
+              d=json.load(resp)
+          assert len(d["apps"])==9,len(d["apps"])
+          ids=[a["id"] for a in d["apps"]]
+          assert len(set(ids))==9
+          assert ids==["tela-sempre-ativa","voc-manager","voc-tv","damas","jarvis","simulador-jetpack","divulgador","gps-3d","hora-jarvis"],ids
+          hora=d["apps"][-1]
+          assert hora["name"]=="Hora",hora["name"]
+          assert hora["stable"]["versionCode"]==3
+          assert hora["stable"]["versionName"]=="1.2.0-lab"
+          assert hora["candidate"] is None
+          expected="085f61d80bef2826ecb68bcb537732dfa6bb395dbedcb24432cbb5b41d9f913e"
+          apkurl=hora["stable"]["apkUrl"]
+          assert apkurl=="https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/stable/Hora-v1.2.0-VC3.apk"
+          with urllib.request.urlopen(apkurl,timeout=40) as r:
+              assert r.status==200
+              apk=r.read()
+          sha=hashlib.sha256(apk).hexdigest()
+          assert sha==expected,(sha,expected)
+          assert sha==hora["stable"]["sha256"]
+          assert len(apk)==38139,len(apk)
+          print("CONFIRMADO: Catalogo VOC Lab ORIGINAL HTTP 200; 9 apps; nome Hora; stable VC3; candidate null")
+          print("CONFIRMADO: APK stable HTTP 200; bytes 38139; SHA256",sha)
+          print("Inalterados: outros 8 apps; nenhum novo build Android")
+          PY
