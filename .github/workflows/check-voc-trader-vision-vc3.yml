@@ -26,10 +26,13 @@ jobs:
           javac -d /tmp/voc-vision-tests \
             trader-vision/app/src/main/java/pt/vcaitano/tradervision/RiskManager.java \
             trader-vision/app/src/main/java/pt/vcaitano/tradervision/EntryTiming.java \
+            trader-vision/app/src/main/java/pt/vcaitano/tradervision/PanelPosition.java \
             trader-vision/tests/RiskManagerTest.java \
-            trader-vision/tests/EntryTimingTest.java
+            trader-vision/tests/EntryTimingTest.java \
+            trader-vision/tests/PanelPositionTest.java
           java -cp /tmp/voc-vision-tests pt.vcaitano.tradervision.RiskManagerTest
           java -cp /tmp/voc-vision-tests pt.vcaitano.tradervision.EntryTimingTest
+          java -cp /tmp/voc-vision-tests pt.vcaitano.tradervision.PanelPositionTest
       - name: Android SDK
         shell: bash
         run: |
