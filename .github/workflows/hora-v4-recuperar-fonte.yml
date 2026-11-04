@@ -1,0 +1,52 @@
+name: Hora V4 - recuperar fonte da base aprovada para revisao
+on:
+  push:
+    branches:
+      - feat/hora-frase-personalizada-v4-20261104
+    paths:
+      - '.github/workflows/hora-v4-recuperar-fonte.yml'
+  workflow_dispatch:
+
+jobs:
+  recuperar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restaurar exatamente a fonte 1.2.0 LAB confirmada
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p HoraJarvis
+          cat ci/horajarvis/source.part{1,2,3,4}.b64 | base64 -d > /tmp/base1.tar.xz
+          echo "5d1e7db08983e3874ead243298e9b95d7eab94b512138595e27498c11d8ff064  /tmp/base1.tar.xz" | sha256sum -c -
+          tar -xJf /tmp/base1.tar.xz -C HoraJarvis
+          cat ci/horajarvis/v2patch.part{1,2,3,4}.b64 | base64 -d > /tmp/v2.patch.xz
+          echo "e6a3451f5e99eb412bf96715f65ede316e1024b55962d53d8ef6d3a14b3649ec  /tmp/v2.patch.xz" | sha256sum -c -
+          xz -dc /tmp/v2.patch.xz > /tmp/v2.patch
+          awk 'index($0,"diff -ruN hj-stable/app/build.gradle ")==1 { printOn=1 } printOn {print}' /tmp/v2.patch > /tmp/v2-code.patch
+          (cd HoraJarvis && patch -p1 --batch --forward < /tmp/v2-code.patch)
+          cat ci/horajarvis/v3patch.part{1,2,3}.b64 | base64 -d > /tmp/v3.patch.xz
+          echo "d0c9b1104f1ee01f830c3c9a243f130c285b77477dba1eceee68f54f609ff826  /tmp/v3.patch.xz" | sha256sum -c -
+          xz -dc /tmp/v3.patch.xz > /tmp/v3.patch
+          (cd HoraJarvis && patch -p1 --batch --forward < /tmp/v3.patch)
+          grep -q "versionCode 3" HoraJarvis/app/build.gradle
+          grep -q "conciseSpeech" HoraJarvis/app/src/main/java/pt/vcaitano/horajarvis/AppSettings.java
+      - name: Guardar copia do codigo-fonte para alteracao isolada V4
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci/horajarvis/review-v3/app
+          cp -r HoraJarvis/app/src ci/horajarvis/review-v3/app/
+          cp HoraJarvis/app/build.gradle ci/horajarvis/review-v3/app/build.gradle
+          git config user.name 'voc-lab-ci[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ci/horajarvis/review-v3
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "Fonte ja disponivel."
+          else
+            git commit -m 'ci(hora): snapshot fonte VC3 para implementacao isolada da frase'
+            git push origin HEAD:feat/hora-frase-personalizada-v4-20261104
+          fi
