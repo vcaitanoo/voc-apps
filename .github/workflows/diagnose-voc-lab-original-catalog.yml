@@ -38,3 +38,4 @@ jobs:
               print("HoraJarvis_APK","HTTP",response.status,"Bytes",len(b),"SHA",hashlib.sha256(b).hexdigest())
           except Exception as e:print("HoraJarvis_APK","ERROR",str(e))
           PY
+# Read-only recheck after adding Hora Jarvis to Supabase catalog
