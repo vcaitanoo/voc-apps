@@ -1,0 +1,47 @@
+name: Verificar Hora Frases no VOC Lab ativo
+on:
+  push:
+    branches: [feat/hora-frase-personalizada-v4-20261104]
+    paths:
+      - '.github/workflows/hora-v4-verify-live.yml'
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Verificar catalogo publicado e binario HTTPS
+        shell: bash
+        run: |
+          set -euo pipefail
+          CATALOG="https://temporary-snappy-redwood-yqm3s0d.vercel.app/catalog.json"
+          APK="https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/teste/Hora-Frases-1.3.0-VC4.apk"
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 60 -H "Cache-Control: no-cache" "$CATALOG?t=$(date +%s)" -o /tmp/catalog.json
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 60 "$APK" -o /tmp/hora-frases.apk
+          python3 - <<'PY'
+          import json,hashlib,zipfile,pathlib
+          p=pathlib.Path("/tmp/hora-frases.apk")
+          c=json.loads(pathlib.Path("/tmp/catalog.json").read_text())
+          apps=c.get("apps",[])
+          official=next((x for x in apps if x.get("id")=="hora-jarvis"),None)
+          test=next((x for x in apps if x.get("id")=="hora-frases-teste"),None)
+          assert official is not None and test is not None,"Hora nao aparece no catalogo ativo"
+          assert official["stable"]["versionCode"]==3
+          assert official["stable"]["sha256"]=="085f61d80bef2826ecb68bcb537732dfa6bb395dbedcb24432cbb5b41d9f913e"
+          assert official["candidate"] is None
+          assert test["packageName"]=="pt.vcaitano.horajarvis.frases"
+          assert test["candidate"]["versionCode"]==4
+          assert test["candidate"]["signatureSha256"]=="9a00499882708de3de94f3e66417240629866b221d94dd1ce9983f0926143af1"
+          digest=hashlib.sha256(p.read_bytes()).hexdigest()
+          assert digest==test["candidate"]["sha256"]== "be199a3c81e302c171e80cae9786af6b010dd2810415001f2b02f85e58837e7c", "SHA nao confere"
+          with zipfile.ZipFile(p) as f:
+              assert f.testzip() is None
+              names=set(f.namelist())
+              assert {"AndroidManifest.xml","classes.dex","resources.arsc"}<=names
+          print("CATALOGO_ATIVO_OK",len(apps),"APPS")
+          print("HORA_STABLE_VC3_INTACTO")
+          print("HORA_FRASES_TESTE_VC4_PRESENTE")
+          print("APK_HTTP_OK_SIZE",p.stat().st_size)
+          print("APK_SHA256_VERIFICADO",digest)
+          PY
