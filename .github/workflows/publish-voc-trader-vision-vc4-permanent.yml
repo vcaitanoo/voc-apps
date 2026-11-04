@@ -43,7 +43,7 @@ jobs:
           old=files[0].read_bytes()
           sha=lambda b:hashlib.sha256(b).hexdigest()
           assert sha(old)==patch['unsignedSha256']=='f128e3c4cbedf18bd7b5d503b69112105a120c9130c3c35e546a25998191f27e'
-          eocd=old.rfind(b'PK\\x05\\x06')
+          eocd=old.rfind(b'PK\x05\x06')
           assert eocd>0
           cd=struct.unpack_from('<I',old,eocd+16)[0]
           assert cd==patch['unsignedCdOffset']
