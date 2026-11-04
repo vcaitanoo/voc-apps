@@ -2,6 +2,8 @@ package pt.vcaitano.tradervision;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.ComponentName;
+import android.content.pm.PackageManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.media.projection.MediaProjectionManager;
@@ -27,6 +29,9 @@ import java.util.Locale;
 
 public final class MainActivity extends Activity {
     private static final int CAPTURE_REQUEST=77;
+    private static final int NOTIFICATION_REQUEST=87;
+    private boolean startupPermissions=true;
+    private boolean askedAccessibility=false,askedOverlay=false,askedCapture=false,askedNotifications=false;
     private SharedPreferences prefs;
     private LinearLayout root;
     private EditText balance,stake,risk,expiry,timeframe,score,minCandles,maxTrades;
@@ -50,7 +55,7 @@ public final class MainActivity extends Activity {
         root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(18),dp(18),dp(18),dp(24));scroll.addView(root);setContentView(scroll);
         TextView title=label("VOC TRADER VISION",23,0xff72e6bd,true);root.addView(title);
-        root.addView(label("V0.3.0 · Entrada DEMO · Hezilex no Chrome",13,0xffd0dae5,false));
+        root.addView(label("V0.4.0 · Entrada DEMO · Hezilex no Chrome",13,0xffd0dae5,false));
         root.addView(label("O bot captura pixels do gráfico, aplica estratégias e somente pode tocar se tiver todos os controles verificados.",13,0xffa4b8cd,false));
 
         demo=new CheckBox(this);demo.setText("Estou usando CONTA DEMO na Hezilex");
@@ -79,25 +84,22 @@ public final class MainActivity extends Activity {
         balance.addTextChangedListener(watcher);
         risk.addTextChangedListener(watcher);
         updateCalculatedStake();
-        Button save=button("GUARDAR CONFIGURAÇÃO",0xff236f8c);root.addView(save);
+        Button save=button("GUARDAR CONFIGURAÇÃO",0xff236f8c);
         save.setOnClickListener(v->save());
         Button a11y=button("1. ATIVAR ACESSIBILIDADE",0xff36506c);root.addView(a11y);
         a11y.setOnClickListener(v->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         Button overlay=button("2. PERMITIR PAINEL SOBRE OUTRAS APPS",0xff36506c);root.addView(overlay);
         overlay.setOnClickListener(v->{Intent i=new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName()));startActivity(i);});
         Button capture=button("3. AUTORIZAR CAPTURA E INICIAR",0xff168453);root.addView(capture);
-        capture.setOnClickListener(v->{
-            save();
-            if(!Settings.canDrawOverlays(this)){msg("Autorize primeiro o painel sobre outras apps.");return;}
-            MediaProjectionManager mgr=(MediaProjectionManager)getSystemService(Context.MEDIA_PROJECTION_SERVICE);
-            startActivityForResult(mgr.createScreenCaptureIntent(),CAPTURE_REQUEST);
-        });
+        capture.setOnClickListener(v->requestCaptureConsent());
         Button browser=button("4. ABRIR HEZILEX NO CHROME",0xff287bbd);root.addView(browser);
         browser.setOnClickListener(v->{
             Intent i=new Intent(Intent.ACTION_VIEW,Uri.parse("https://app.hezilex.com/traderoom"));
             i.setPackage("com.android.chrome");
             try{startActivity(i);}catch(Exception e){i.setPackage(null);startActivity(i);}
         });
+        // Configurações ficam embaixo das permissões e do acesso ao gráfico.
+        root.addView(save);
         Button stop=button("PARAR CAPTURA E TOQUES",0xff9a3638);root.addView(stop);
         stop.setOnClickListener(v->{
             Intent i=new Intent(this,VisionService.class);i.setAction(VisionService.ACTION_STOP);
@@ -109,9 +111,8 @@ public final class MainActivity extends Activity {
         Button loss=button("MARCAR LOSS",0xffa44343);root.addView(loss);
         loss.setOnClickListener(v->mark(false));
         status=label("",13,0xffffffff,false);root.addView(status);
-        if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=getPackageManager().PERMISSION_GRANTED)
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},87);
         updateStatus();
+        root.postDelayed(this::askStartupPermissions,500L);
     }
     private int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
     private GradientDrawable bg(int color){
@@ -195,7 +196,72 @@ public final class MainActivity extends Activity {
             t,w,l,TapService.INSTANCE==null?"desligada":"ligada",
             VisionService.running?"ativa":"parada"));
     }
-    @Override protected void onResume(){super.onResume();if(status!=null)updateStatus();}
+    private boolean accessibilityEnabled(){
+        String list=Settings.Secure.getString(getContentResolver(),
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        if(list==null)return false;
+        String component=new ComponentName(this,TapService.class).flattenToString();
+        return list.toLowerCase(Locale.ROOT).contains(component.toLowerCase(Locale.ROOT))
+            ||TapService.INSTANCE!=null;
+    }
+    private void askStartupPermissions(){
+        if(!startupPermissions||isFinishing())return;
+        if(Build.VERSION.SDK_INT>=33
+             &&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED
+             &&!askedNotifications){
+            askedNotifications=true;
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATION_REQUEST);
+            return;
+        }
+        if(!Settings.canDrawOverlays(this)&&!askedOverlay){
+            askedOverlay=true;
+            Intent overlaySettings=new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:"+getPackageName()));
+            startActivity(overlaySettings);
+            return;
+        }
+        if(!accessibilityEnabled()&&!askedAccessibility){
+            askedAccessibility=true;
+            startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+            return;
+        }
+        // Android always requires an explicit user grant for each new capture.
+        // Never start capturing or tapping before overlay/accessibility are ready.
+        if(Settings.canDrawOverlays(this)&&accessibilityEnabled()
+           &&!VisionService.running&&!askedCapture){
+            askedCapture=true;
+            requestCaptureConsent();
+            return;
+        }
+        startupPermissions=false;
+        updateStatus();
+    }
+    private void requestCaptureConsent(){
+        if(!Settings.canDrawOverlays(this)){
+            msg("Primeiro permita o painel sobre outros aplicativos.");
+            return;
+        }
+        if(!accessibilityEnabled()){
+            msg("Primeiro ative a acessibilidade do VOC Trader Vision.");
+            return;
+        }
+        save();
+        MediaProjectionManager manager=(MediaProjectionManager)
+            getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+        startActivityForResult(manager.createScreenCaptureIntent(),CAPTURE_REQUEST);
+    }
+    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
+        super.onRequestPermissionsResult(requestCode,permissions,results);
+        if(requestCode==NOTIFICATION_REQUEST&&root!=null){
+            root.postDelayed(this::askStartupPermissions,350L);
+        }
+    }
+    @Override protected void onResume(){
+        super.onResume();
+        if(status!=null)updateStatus();
+        if(root!=null&&startupPermissions)
+            root.postDelayed(this::askStartupPermissions,550L);
+    }
     @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
         super.onActivityResult(requestCode,resultCode,data);
         if(requestCode==CAPTURE_REQUEST && resultCode==RESULT_OK && data!=null) {
@@ -206,5 +272,6 @@ public final class MainActivity extends Activity {
             try{startForegroundService(svc);msg("Captura autorizada. Abra a Hezilex na conta DEMO.");}
             catch(Exception e){msg("Falha ao iniciar captura: "+e.getMessage());}
         } else if(requestCode==CAPTURE_REQUEST)msg("Captura não autorizada.");
+        if(requestCode==CAPTURE_REQUEST)startupPermissions=false;
     }
 }
