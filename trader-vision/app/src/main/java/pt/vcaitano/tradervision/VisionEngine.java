@@ -67,14 +67,14 @@ public final class VisionEngine {
             if(ng>0.42*w/6*.42 && nr>0.42*w/6*.42 && total>best){best=total;bestY=y;}
         }
         out.buttons=bestY>=0;
-        out.buyY=out.sellY=bestY;
+        out.buyY=out.sellY=bestY+(int)(h*.028);
         out.buyX=(int)(w*.255);out.sellX=(int)(w*.745);
         if(!out.buttons) {
             out.detail="Não achei simultaneamente Comprar e Vender; mantenha a Hezilex visível.";
             return out;
         }
-        out.chartLeft=(int)(w*.105); out.chartRight=(int)(w*.963);
-        out.chartTop=(int)(h*.34); out.chartBottom=clamp(bestY-(int)(h*.026),out.chartTop+40,h-1);
+        out.chartLeft=(int)(w*.105); out.chartRight=(int)(w*.945);
+        out.chartTop=(int)(h*.38); out.chartBottom=clamp(bestY-(int)(h*.026),out.chartTop+40,h-1);
         if(out.chartBottom-out.chartTop<120){out.detail="Área de velas demasiado pequena";return out;}
 
         // Segmenta corpos verdes/vermelhos por colunas. Remove linha horizontal de preço.
