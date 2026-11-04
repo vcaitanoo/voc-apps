@@ -111,3 +111,11 @@ Ponto exato para continuar:
 - Package `pt.vcaitano.horajarvis.lab`, versionCode 3, versionName `1.2.0-lab`; `lab/catalog.json` e catálogo Supabase ativo devem exibir nome `Hora`, stable VC3 e candidate nulo.
 - Checkpoint completo: `lab/sources/hora-jarvis/CONTINUAR_AQUI.md`.
 - Chave de assinatura debug da versão aprovada sem backup; **não gerar APK de atualização com assinatura diferente**. O nome do ícone Android não muda com atualização do catálogo.
+
+
+## Hora — candidato separado para frases personalizadas (2026-11-04)
+- Base oficial confirmada: `pt.vcaitano.horajarvis.lab` VC3/1.2.0-lab, APK SHA-256 `085f61d80bef2826ecb68bcb537732dfa6bb395dbedcb24432cbb5b41d9f913e`, certificado `13b7cccb5897d962c532cc11e39a0d0b95900ee5659e64b9feceb9e541d3a94b`. **Não alterada.**
+- Novo candidato independente `Hora — Frases (Teste)`, package `pt.vcaitano.horajarvis.frases`, VC4/1.3.0-lab. Mostra e fala frases personalizadas por horário, mantém modo curto ou variado. APK: `https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/teste/Hora-Frases-1.3.0-VC4.apk`, SHA-256 `be199a3c81e302c171e80cae9786af6b010dd2810415001f2b02f85e58837e7c`, assinatura debug temporária `9a00499882708de3de94f3e66417240629866b221d94dd1ce9983f0926143af1`.
+- GitHub e catálogo ativo Supabase `khinnoxpesnhtmmvrken/public.voc_lab_catalog_store` atualizados com entrada `hora-frases-teste`. Endpoint original do VOC Lab foi validado com 10 aplicativos e URL APK SHA correta no workflow `https://github.com/vcaitanoo/voc-apps/actions/runs/41830303395`.
+- Código isolado: branch `feat/hora-frase-personalizada-v4-20261104`; commit de build `2a6f69d689d1089409e9020867d02373f2f9c592` e `lab/sources/hora-jarvis/CONTINUAR_AQUI.md` para auditoria completa.
+- O teste instalado no Android ainda **não foi confirmado pelo utilizador**. Chave debug da variante experimental não preservada: não usar como assinatura futura nem promover a stable sem migração segura.
