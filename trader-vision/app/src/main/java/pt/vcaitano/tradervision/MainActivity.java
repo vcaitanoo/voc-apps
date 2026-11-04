@@ -32,6 +32,7 @@ public final class MainActivity extends Activity {
     private static final int NOTIFICATION_REQUEST=87;
     private boolean startupPermissions=true;
     private boolean askedAccessibility=false,askedOverlay=false,askedCapture=false,askedNotifications=false;
+    private boolean externalSettingsPending=false,pausedForSettings=false;
     private SharedPreferences prefs;
     private LinearLayout root;
     private EditText balance,stake,risk,expiry,timeframe,score,minCandles,maxTrades;
@@ -112,7 +113,6 @@ public final class MainActivity extends Activity {
         loss.setOnClickListener(v->mark(false));
         status=label("",13,0xffffffff,false);root.addView(status);
         updateStatus();
-        root.postDelayed(this::askStartupPermissions,500L);
     }
     private int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
     private GradientDrawable bg(int color){
@@ -205,7 +205,7 @@ public final class MainActivity extends Activity {
             ||TapService.INSTANCE!=null;
     }
     private void askStartupPermissions(){
-        if(!startupPermissions||isFinishing())return;
+        if(!startupPermissions||isFinishing()||externalSettingsPending)return;
         if(Build.VERSION.SDK_INT>=33
              &&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED
              &&!askedNotifications){
@@ -215,6 +215,7 @@ public final class MainActivity extends Activity {
         }
         if(!Settings.canDrawOverlays(this)&&!askedOverlay){
             askedOverlay=true;
+            externalSettingsPending=true;
             Intent overlaySettings=new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:"+getPackageName()));
             startActivity(overlaySettings);
@@ -222,6 +223,7 @@ public final class MainActivity extends Activity {
         }
         if(!accessibilityEnabled()&&!askedAccessibility){
             askedAccessibility=true;
+            externalSettingsPending=true;
             startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
             return;
         }
@@ -256,8 +258,16 @@ public final class MainActivity extends Activity {
             root.postDelayed(this::askStartupPermissions,350L);
         }
     }
+    @Override protected void onPause(){
+        if(externalSettingsPending)pausedForSettings=true;
+        super.onPause();
+    }
     @Override protected void onResume(){
         super.onResume();
+        if(externalSettingsPending && pausedForSettings){
+            externalSettingsPending=false;
+            pausedForSettings=false;
+        }
         if(status!=null)updateStatus();
         if(root!=null&&startupPermissions)
             root.postDelayed(this::askStartupPermissions,550L);
