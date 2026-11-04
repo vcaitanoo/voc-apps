@@ -27,6 +27,8 @@ import android.os.PowerManager;
 import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -50,6 +52,7 @@ public final class VisionService extends Service {
     private Handler worker;
     private WindowManager windows;
     private LinearLayout overlay;
+    private WindowManager.LayoutParams overlayParams;
     private TextView text;
     private PowerManager.WakeLock wake;
     private int width,height,density;
@@ -121,6 +124,14 @@ public final class VisionService extends Service {
         overlay=new LinearLayout(this);overlay.setOrientation(LinearLayout.VERTICAL);
         overlay.setPadding(dp(9),dp(8),dp(9),dp(7));
         overlay.setBackgroundColor(0xee172233);
+        TextView dragHandle=new TextView(this);
+        dragHandle.setText("↕ ARRASTE PARA MOVER");
+        dragHandle.setTextColor(0xff70e6bd);
+        dragHandle.setTextSize(12);
+        dragHandle.setTypeface(null,android.graphics.Typeface.BOLD);
+        dragHandle.setPadding(dp(4),dp(3),dp(4),dp(7));
+        dragHandle.setContentDescription("Toque e arraste para mover o painel do robô");
+        overlay.addView(dragHandle);
         text=new TextView(this);text.setTextColor(Color.WHITE);text.setTextSize(10);
         text.setText("VOC Trader Vision · DEMO\nCaptura iniciada. Abra Hezilex no Chrome.");
         overlay.addView(text);
@@ -135,7 +146,61 @@ public final class VisionService extends Service {
           WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
           PixelFormat.TRANSLUCENT);
         lp.gravity=Gravity.TOP|Gravity.LEFT;lp.x=dp(4);lp.y=dp(42);
+        overlayParams=lp;
+        installPanelDrag(dragHandle);
+        installPanelDrag(text);
         windows.addView(overlay,lp);
+        // A posição é salva como fração da área disponível: mantém-se
+        // acessível após mudança da altura do painel ou do tamanho da tela.
+        overlay.post(()->{
+            if(disposing||overlay==null||windows==null)return;
+            SharedPreferences prefs=getSharedPreferences("vision",MODE_PRIVATE);
+            float rx=prefs.getFloat("panel_x_ratio",-1f);
+            float ry=prefs.getFloat("panel_y_ratio",-1f);
+            if(rx>=0f||ry>=0f){
+                lp.x=PanelPosition.restore(rx,availableWidth(),dp(4));
+                lp.y=PanelPosition.restore(ry,availableHeight(),dp(42));
+                windows.updateViewLayout(overlay,lp);
+            }
+        });
+    }
+    private int availableWidth(){
+        return Math.max(0,width-(overlay==null?dp(252):overlay.getWidth()));
+    }
+    private int availableHeight(){
+        return Math.max(0,height-dp(28)-(overlay==null?0:overlay.getHeight()));
+    }
+    private void installPanelDrag(View handle){
+        final float[] originRaw=new float[2];
+        final int[] originXY=new int[2];
+        handle.setOnTouchListener((v,event)->{
+            if(overlay==null||overlayParams==null||windows==null)return false;
+            switch(event.getActionMasked()){
+                case MotionEvent.ACTION_DOWN:
+                    originRaw[0]=event.getRawX();
+                    originRaw[1]=event.getRawY();
+                    originXY[0]=overlayParams.x;
+                    originXY[1]=overlayParams.y;
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    overlayParams.x=PanelPosition.move(originXY[0],
+                        event.getRawX()-originRaw[0],availableWidth());
+                    overlayParams.y=PanelPosition.move(originXY[1],
+                        event.getRawY()-originRaw[1],availableHeight());
+                    windows.updateViewLayout(overlay,overlayParams);
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    getSharedPreferences("vision",MODE_PRIVATE).edit()
+                        .putFloat("panel_x_ratio",PanelPosition.fraction(
+                            overlayParams.x,availableWidth()))
+                        .putFloat("panel_y_ratio",PanelPosition.fraction(
+                            overlayParams.y,availableHeight()))
+                        .apply();
+                    return true;
+                default:return false;
+            }
+        });
     }
     private int dp(int v){return (int)(getResources().getDisplayMetrics().density*v+.5f);}
     private void consume(ImageReader ir){
@@ -237,7 +302,7 @@ public final class VisionService extends Service {
         if(display!=null){display.release();display=null;}
         if(projection!=null){try{projection.stop();}catch(Exception ignored){}projection=null;}
         if(workerThread!=null){workerThread.quitSafely();workerThread=null;}
-        if(overlay!=null&&windows!=null){try{windows.removeViewImmediate(overlay);}catch(Exception ignored){}overlay=null;}
+        if(overlay!=null&&windows!=null){try{windows.removeViewImmediate(overlay);}catch(Exception ignored){}overlay=null;overlayParams=null;}
         if(wake!=null&&wake.isHeld()){wake.release();wake=null;}
         super.onDestroy();
     }

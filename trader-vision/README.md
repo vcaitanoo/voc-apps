@@ -27,3 +27,10 @@ Para testes matemáticos locais: `javac -d /tmp/tvrisk trader-vision/app/src/mai
 - A V3 autoriza a tentativa de entrada em DEMO quando o sinal da penúltima vela (presumida fechada) se mantém por 3 análises consecutivas (score >= mínimo), respeitando validação da conta, payout/expiração configurada, permissões, saldo, stop diário e intervalo mínimo de `max(timeframe, expiração)` minutos entre tentativas.
 - Sem dados OHLC oficiais, não se comprova o verdadeiro fechamento nem a sincronização com o broker: nunca usar esta heurística em dinheiro real. Uma rejeição de acessibilidade fica 30s visível no painel, sem tentar toque cego.
 - Mesma identidade `pt.vcaitano.tradervision.gestaoteste`, sem novo aplicativo; fonte isolada em branch de fix, versãoCode 3. **Não publicar APK em catálogo** antes de assinar com a MESMA chave privada da V2: certificado SHA-256 `3151054948a50ccb3dde9a97fd1b3bc298f544fe5742aa384d901c3bf1c01632`. A chave debug não está arquivada. Compilar debug com outra chave não oferece atualização por cima. Stable e candidate V2 mantidas.
+
+## Painel móvel — revisão VC3
+- A faixa verde **↕ ARRASTE PARA MOVER** no topo e o próprio texto do painel aceitam gestos de arrastar; o botão vermelho PARAR ROBÔ mantém exclusivamente a função de parar.
+- O gesto usa coordenadas brutas de toque e `WindowManager.updateViewLayout`, limitadas aos bordos da área disponível para nunca perder o painel fora da tela.
+- A localização é guardada em `SharedPreferences` como proporção horizontal/vertical; reaparece no mesmo local relativo após reabrir a captura, inclusive com ecrã redimensionado.
+- Não muda a análise visual, o gatilho, os campos da Hezilex, o risco, as permissões nem a identidade Android. Apenas os arquivos `VisionService.java`, `PanelPosition.java` e `PanelPositionTest.java` e este registo documental.
+- APK VC3 ainda NÃO distribuído: assinatura de compilação debug do CI é diferente da V2 instalada, cuja chave privada não está recuperada. Não substituir a VC2 no VOC Lab nem afirmar compatibilidade de atualização.
