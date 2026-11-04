@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -61,3 +61,64 @@ jobs:
             /tmp/vision-signature.txt
             /tmp/vision-sha256.txt
           if-no-files-found: error
+
+      - name: Checkout official VOC Lab catalog (main)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: publish-main
+          fetch-depth: 0
+      - name: Publish experimental candidate in VOC Lab
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="trader-vision/app/build/outputs/apk/debug/app-debug.apk"
+          DEST="apks/voc-trader-vision/candidate/VOC-Trader-Vision-0.1.0-demo-VC1.apk"
+          mkdir -p "publish-main/$(dirname "$DEST")"
+          cp "$APK" "publish-main/$DEST"
+          SHA="$(sha256sum "$APK" | awk '{print $1}')"
+          CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/vision-signature.txt | head -1 | tr '[:upper:]' '[:lower:]')"
+          test -n "$CERT"
+          export TV_SHA="$SHA" TV_CERT="$CERT" TV_PATH="$DEST"
+          python3 - <<'PY'
+          import os,json,datetime
+          path='publish-main/lab/catalog.json'
+          with open(path,encoding='utf-8') as f: cat=json.load(f)
+          assert cat['schemaVersion']==1 and isinstance(cat['apps'],list)
+          key='voc-trader-vision'
+          candidate={
+            'versionCode':1,
+            'versionName':'0.1.0-demo',
+            'apkUrl':f"https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/{os.environ['TV_PATH']}",
+            'sha256':os.environ['TV_SHA'],
+            'signatureSha256':os.environ['TV_CERT'],
+            'notes':'TESTE DEMO VISUAL: fonte na branch feat/voc-trader-vision-v1-20261104; captura MediaProjection, acessibilidade Chrome, sinais de múltiplas estratégias e cliques condicionais. APK debug de assinatura temporária: para futuras atualizações pode ser necessário desinstalar até configurar keystore permanente. Gradle e estrutura verificados, execução física Android NÃO testada. Conta real BLOQUEADA.'
+          }
+          matches=[a for a in cat['apps'] if a.get('id')==key]
+          if len(matches)>1: raise SystemExit('duplicate app id')
+          if matches:
+              assert matches[0].get('packageName')=='pt.vcaitano.tradervision'
+              matches[0]['candidate']=candidate
+          else:
+              cat['apps'].append({'id':key,'name':'VOC Trader Vision','packageName':'pt.vcaitano.tradervision','enabled':True,'stable':None,'candidate':candidate})
+          cat['updatedAt']=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds').replace('+00:00','Z')
+          with open(path,'w',encoding='utf-8') as f:
+              json.dump(cat,f,ensure_ascii=False,indent=2);f.write('\n')
+          PY
+          git -C publish-main config user.name "github-actions[bot]"
+          git -C publish-main config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C publish-main add "$DEST" lab/catalog.json
+          git -C publish-main diff --cached --check
+          git -C publish-main commit -m "candidate(trader-vision): publish verified demo APK VC1"
+          git -C publish-main push origin HEAD:main
+          echo "Published candidate source branch: $GITHUB_SHA"
+          echo "APK SHA256: $SHA"
+          echo "APK signer SHA256: $CERT"
+      - name: Verify published APK URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-trader-vision/candidate/VOC-Trader-Vision-0.1.0-demo-VC1.apk"
+          curl -fsSL --retry 5 --retry-delay 2 "$URL" -o /tmp/remote-vision.apk
+          cmp trader-vision/app/build/outputs/apk/debug/app-debug.apk /tmp/remote-vision.apk
+          sha256sum /tmp/remote-vision.apk
