@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
-    <application android:allowBackup="false" android:label="VOC Trader Vision" android:theme="@android:style/Theme.Material.NoActionBar" android:icon="@drawable/ic_launcher" android:usesCleartextTraffic="false">
+    <application android:allowBackup="false" android:label="VOC Trader Vision Gestão" android:theme="@android:style/Theme.Material.NoActionBar" android:icon="@drawable/ic_launcher" android:usesCleartextTraffic="false">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>

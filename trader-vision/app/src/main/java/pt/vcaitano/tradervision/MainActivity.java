@@ -31,7 +31,7 @@ public final class MainActivity extends Activity {
     private LinearLayout root;
     private EditText balance,stake,risk,expiry,timeframe,score,minCandles,maxTrades;
     private CheckBox demo,automatic;
-    private TextView status;
+    private TextView status, managementInfo;
 
     static double getD(SharedPreferences p,String key,double def){
         try{return Double.parseDouble(p.getString(key,String.valueOf(def)).replace(',','.'));}
@@ -50,7 +50,7 @@ public final class MainActivity extends Activity {
         root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(18),dp(18),dp(18),dp(24));scroll.addView(root);setContentView(scroll);
         TextView title=label("VOC TRADER VISION",23,0xff72e6bd,true);root.addView(title);
-        root.addView(label("V0.1.0 · Exclusivamente DEMO · Hezilex no Chrome",13,0xffd0dae5,false));
+        root.addView(label("V0.2.0 · Gestão DEMO · Hezilex no Chrome",13,0xffd0dae5,false));
         root.addView(label("O bot captura pixels do gráfico, aplica estratégias e somente pode tocar se tiver todos os controles verificados.",13,0xffa4b8cd,false));
 
         demo=new CheckBox(this);demo.setText("Estou usando CONTA DEMO na Hezilex");
@@ -59,7 +59,9 @@ public final class MainActivity extends Activity {
         automatic.setTextColor(Color.WHITE);automatic.setChecked(prefs.getBoolean("auto",false));root.addView(automatic);
 
         balance=field("Saldo demo (€)", "balance","29.48",true);
-        stake=field("Valor por operação (€)","stake","1.00",true);
+        stake=field("Entrada calculada automaticamente (€)","stake","1.00",true);
+        stake.setFocusable(false);
+        stake.setClickable(false);
         risk=field("Risco máximo por operação (%)","risk","1",true);
         expiry=field("Expiração pretendida (minutos)","expiry","5",false);
         timeframe=field("Período de cada vela no gráfico (minutos)","tf","5",false);
@@ -67,7 +69,16 @@ public final class MainActivity extends Activity {
         minCandles=field("Velas mínimas identificadas","candles","22",false);
         maxTrades=field("Máximo de entradas por dia","maxTrades","8",false);
 
-        root.addView(label("Com saldo €29,48, 1% de risco é €0,29. Se o mínimo na Hezilex for €1, a operação ficará BLOQUEADA. Para testar a execução, ajuste conscientemente o limite na demo.",12,0xffffce83,false));
+        managementInfo=label("",12,0xffffce83,false);
+        root.addView(managementInfo);
+        android.text.TextWatcher watcher=new android.text.TextWatcher(){
+            @Override public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+            @Override public void onTextChanged(CharSequence s,int start,int before,int count){updateCalculatedStake();}
+            @Override public void afterTextChanged(android.text.Editable e){}
+        };
+        balance.addTextChangedListener(watcher);
+        risk.addTextChangedListener(watcher);
+        updateCalculatedStake();
         Button save=button("GUARDAR CONFIGURAÇÃO",0xff236f8c);root.addView(save);
         save.setOnClickListener(v->save());
         Button a11y=button("1. ATIVAR ACESSIBILIDADE",0xff36506c);root.addView(a11y);
@@ -126,7 +137,30 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(50));
         lp.topMargin=dp(9);b.setLayoutParams(lp);return b;
     }
+    private void updateCalculatedStake(){
+        if(balance==null||risk==null||stake==null||managementInfo==null)return;
+        double saldo=parseNumber(balance.getText().toString());
+        double percentual=parseNumber(risk.getText().toString());
+        RiskManager.Plan plan=RiskManager.calculate(saldo,percentual);
+        if(!plan.valid){
+            stake.setText("0.00");
+            managementInfo.setText("Informe saldo de pelo menos €1 e risco percentual válido. Nenhuma operação poderá ser executada.");
+        } else {
+            stake.setText(String.format(Locale.US,"%.2f",plan.stake));
+            managementInfo.setText(String.format(Locale.US,
+                "Gestão automática: mínimo Hezilex €1,00; alvo %.2f%%. Entrada €%.2f, risco efetivo %.2f%% da banca.%s\n"+
+                "Na Hezilex, o campo Valor precisa coincidir com €%.2f; esta versão não altera o campo automaticamente.",
+                percentual,plan.stake,plan.effectiveRiskPercent,
+                plan.aboveTarget?" ATENÇÃO: o mínimo de €1 ultrapassa o risco alvo.":"",
+                plan.stake));
+        }
+    }
+    private static double parseNumber(String v){
+        try{return Double.parseDouble(v.replace(',','.'));}
+        catch(Exception e){return Double.NaN;}
+    }
     private void save(){
+        updateCalculatedStake();
         prefs.edit()
           .putString("balance",balance.getText().toString().replace(',','.'))
           .putString("stake",stake.getText().toString().replace(',','.'))

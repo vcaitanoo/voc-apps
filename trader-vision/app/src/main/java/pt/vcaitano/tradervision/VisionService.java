@@ -32,6 +32,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.nio.ByteBuffer;
 import java.time.LocalDate;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Serviço de captura autorizado por MediaProjection. Nunca executa em conta real. */
@@ -164,6 +165,10 @@ public final class VisionService extends Service {
     }
     private void evaluateSignal(VisionEngine.Result r,int minScore,SharedPreferences p){
         String reason="";
+        double balance=MainActivity.getD(p,"balance",29.48);
+        double risk=MainActivity.getD(p,"risk",1);
+        RiskManager.Plan plan=RiskManager.calculate(balance,risk);
+        double stake=plan.stake;
         boolean auto=p.getBoolean("auto",false),demo=p.getBoolean("demo",false);
         boolean hasSignal=(r.direction.equals("COMPRAR")||r.direction.equals("VENDER"))&&r.score>=minScore;
         String sig=hasSignal?r.direction+"|"+r.strategy:"";
@@ -176,9 +181,6 @@ public final class VisionService extends Service {
         else if(!hasSignal)reason="Aguardando nota mínima "+minScore;
         else if(stability<2)reason="Aguardando imagem/sinal estável";
         else {
-            double balance=MainActivity.getD(p,"balance",29.48);
-            double stake=MainActivity.getD(p,"stake",1);
-            double risk=MainActivity.getD(p,"risk",1);
             int expiry=MainActivity.getI(p,"expiry",5);
             int timeframe=MainActivity.getI(p,"tf",5);
             int max=MainActivity.getI(p,"maxTrades",8);
@@ -192,8 +194,7 @@ public final class VisionService extends Service {
             long bucket=minute/Math.max(1,timeframe);
             int sec=(int)(System.currentTimeMillis()/1000%60);
             boolean newCandle=(minute%Math.max(1,timeframe)==0 && sec>=3&&sec<=12);
-            if(balance<=0||stake<=0||risk<=0||risk>20)reason="Risco/saldo inválido";
-            else if(stake>balance*risk/100.0+.00001)reason="BLOQUEADO: €"+stake+" supera "+risk+"% da banca";
+            if(!plan.valid)reason="BLOQUEADO: saldo inferior a €1 ou risco configurado inválido";
             else if(count>=max)reason="Limite diário de operações";
             else if(losses>=3)reason="Limite de 3 perdas apontadas hoje";
             else if(!newCandle)reason="Esperando início da próxima vela ("+timeframe+"m)";
@@ -215,7 +216,12 @@ public final class VisionService extends Service {
                 reason="Verificando campos via acessibilidade...";
             }
         }
-        String display=r.panel()+"\n"+
+        String gestao=plan.valid?String.format(Locale.US,
+            "GESTÃO €%.2f | efetivo %.2f%% | alvo %.2f%%%s",
+            plan.stake,plan.effectiveRiskPercent,risk,
+            plan.aboveTarget?" (mínimo obrigatório)":""):
+            "GESTÃO: saldo/risco inválido";
+        String display=r.panel()+"\n"+gestao+"\n"+
             "TENTATIVAS "+p.getInt("trades",0)+" · WIN "+p.getInt("wins",0)+
             " · LOSS "+p.getInt("losses",0)+"\n"+reason;
         if(!reason.startsWith("Verificando campos"))setPanel(display);

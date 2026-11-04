@@ -1,20 +1,22 @@
-# VOC Trader Vision 0.1.0-demo
-Novo projeto Android independente, criado para captura visual do gráfico Hezilex em Chrome, análise local e **teste em conta DEMO**. O código-fonte original do MT5 não foi copiado; apenas famílias de estratégias foram adaptadas. Não há trailing nas opções com expiração fixa.
+# VOC Trader Vision – Gestão 0.2.0-demo (teste isolado)
 
-**Nunca opere contas reais nesta versão.** A imagem não fornece necessariamente OHLC/preço exato, histórico oculto, payout, retorno ou probabilidade real de lucro. A nota 0–100 é técnica, não taxa de acerto. O bot bloqueia operações se não identificar botões, velas suficientes, campos e condições de risco. Para testar cliques, configure/autorize conta demo, acessibilidade e captura, veja o painel.
+Esta candidata usa EXATAMENTE as fontes visuais/estratégias da V1 instalada, alterando **somente gestão monetária, interface de gestão e identificação do pacote para teste separado**.
 
-- Package: pt.vcaitano.tradervision
-- versionCode: 1; versionName: 0.1.0-demo
-- Captura: Android MediaProjection com consentimento a cada sessão
-- Toque: AccessibilityService ativado manualmente
-- Tela ligada: FLAG_KEEP_SCREEN_ON e WakeLock enquanto captura
-- Análises: EMA 9/21/50, RSI, MACD proxy, Bollinger, ATR, DX proxy de tendência, suporte/resistência, 11 famílias de setups.
-- Barras agregadas de outros timeframes NÃO disponíveis somente por imagem. Período do gráfico escolhido manualmente.
-- Sem API não se pode verificar por completo os resultados executados na corretora. Os WIN/LOSS são apontamentos manuais.
-- A compra/venda somente é permitida após validação de screenshot + confirmação de campos + janela de horário e risco definido pelo utilizador.
-- Não inclui OCR nem modelo ML externo. Detecta botões por cores e pixels das velas, e textos de campos usando acessibilidade do Chrome quando expostos.
+O package desta candidata é `pt.vcaitano.tradervision.gestaoteste` (VC2). O V1 (package `pt.vcaitano.tradervision`) e o APK aprovado visualmente NÃO foram sobrescritos. O V1 tinha certificado DEBUG temporário SHA-256 `da17fe1c3ac49d1fcd4c2cc6067f3fad0b1acdcee143129dcc2f1e6a76371f35` cuja chave privada não está disponível; tentar atualizar seu package com outro signer falharia. O novo app instala em paralelo, evitando desinstalar ou afetar a V1. Precisa **parar a V1 antes de iniciar a V2**, pois ambas podem mostrar o painel e capturar a tela.
 
-Build: Gradle 8.13 + Android SDK 36 + JDK 17: `gradle -p trader-vision :app:assembleDebug`.
-Debug APK é assinado com certificado de teste (não usar para produção; builds de runners distintos exigem assinatura persistente para atualizar sem reinstalar).
+## Gestão
+- Valor mínimo permitido pela Hezilex: €1.
+- Valor calculado = `max(€1, truncate_to_cents(saldo_demo × risco% / 100))`.
+- Alvo padrão de risco: 1%; continua configurável.
+- Saldo de €29,48, risco alvo 1% → entrada €1 e **risco efetivo 3,39%** (o mínimo excede o alvo; informamos isso explicitamente).
+- Saldo €100 → €1; saldo €150 → €1,50; saldo €250 → €2,50.
+- Saldo inferior a €1, percentual inválido ou entrada acima do saldo: BLOQUEADO.
+- O campo de valor do app mostra a gestão calculada e é somente leitura. O campo Valor da Hezilex ainda precisa de ajuste manual para corresponder ao valor calculado; se não coincidir, o robô bloqueia o gesto como na V1.
+- Não ler saldo automaticamente da corretora. Atualize-o manualmente no app após mudança de banca. Sem martingale.
+- Clique automático somente com os mesmos controles e verificações de conta DEMO da V1.
 
-**Estado:** fonte candidata; build Android em CI e teste em aparelho requerem confirmação independente.
+## Estado
+Esta versão é candidata experimental. Compilar/assinar/validar estrutura não comprova abertura no Android nem execução de trade. Testar em DEMO exclusivamente, sem disponibilizar ordem real. V1 mantida e recuperável em `apks/voc-trader-vision/candidate/`.
+
+Para testes matemáticos locais: `javac -d /tmp/tvrisk trader-vision/app/src/main/java/pt/vcaitano/tradervision/RiskManager.java trader-vision/tests/RiskManagerTest.java && java -cp /tmp/tvrisk pt.vcaitano.tradervision.RiskManagerTest`
+

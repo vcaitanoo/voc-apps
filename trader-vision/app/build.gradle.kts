@@ -4,11 +4,11 @@ android {
     namespace = "pt.vcaitano.tradervision"
     compileSdk = 36
     defaultConfig {
-        applicationId = "pt.vcaitano.tradervision"
+        applicationId = "pt.vcaitano.tradervision.gestaoteste"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0-demo"
+        versionCode = 2
+        versionName = "0.2.0-demo"
     }
     buildTypes {
         getByName("release") { isMinifyEnabled = false }
