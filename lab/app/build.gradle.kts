@@ -36,6 +36,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".emergencia"
+        }
         release {
             isMinifyEnabled = false
             if (hasReleaseSigning) signingConfig = signingConfigs.getByName("vocLabRelease")

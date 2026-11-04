@@ -1,0 +1,102 @@
+name: VOC Lab catalogo atualizado - versao de recuperacao
+on:
+  push:
+    branches:
+      - fix/voc-lab-catalog-github-first-20261103
+    paths:
+      - 'lab/app/**'
+      - '.github/workflows/recovery-voc-lab-catalog.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Obter fonte de recuperacao
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android 36 via SDK preinstalado
+        run: |
+          set -euo pipefail
+          SDKMGR="$(find "/usr/local/lib/android/sdk/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -x "$SDKMGR"
+          echo "$(dirname "$SDKMGR")" >> "$GITHUB_PATH"
+          "$SDKMGR" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - name: Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Compilar Debug com identificador separado
+        run: gradle -p lab --no-daemon :app:assembleDebug --stacktrace
+      - name: Validar binario, package e assinatura
+        run: |
+          set -euo pipefail
+          APK="lab/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          unzip -tq "$APK"
+          "${ANDROID_HOME}/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/badging.txt
+          grep -q "package: name='pt.vcaitano.voclab.emergencia' versionCode='4' versionName='1.0.3'" /tmp/badging.txt
+          "${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/certificate.txt
+          unzip -l "$APK" | grep -E 'AndroidManifest.xml|classes.dex|resources.arsc'
+          mkdir -p recovery-apk
+          cp "$APK" recovery-apk/VOC-Lab-Atualizado-1.0.3-VC4.apk
+          sha256sum recovery-apk/VOC-Lab-Atualizado-1.0.3-VC4.apk | tee recovery-apk/SHA256.txt
+          cat > recovery-apk/STATUS.txt <<'TXT'
+          VOC Lab de recuperacao 1.0.3, vc4
+          Package: pt.vcaitano.voclab.emergencia
+          Estado: teste independente, nao substitui o VOC Lab oficial
+          Mudanca: catalogo Github em primeiro lugar, Vercel como fallback
+          APK debug assinado com chave temporaria do GitHub runner
+          Funcionamento em Android real: NAO VERIFICADO
+          TXT
+      - name: Obter main apenas para publicar binario de recuperacao
+        uses: actions/checkout@v4
+        with:
+          path: publish
+          ref: main
+          fetch-depth: 0
+      - name: Publicar APK sem modificar aplicativos ou catalogo
+        run: |
+          set -euo pipefail
+          mkdir -p publish/lab/apks/voc-lab-emergencia
+          cp recovery-apk/* publish/lab/apks/voc-lab-emergencia/
+          cd publish
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lab/apks/voc-lab-emergencia/
+          if ! git diff --cached --quiet; then
+            git commit -m "recovery(lab): app separado com catalogo GitHub atualizado"
+            git push origin HEAD:main
+          fi
+      - name: Verificar HTTPS e hash remoto
+        run: |
+          set -euo pipefail
+          URL="https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/lab/apks/voc-lab-emergencia/VOC-Lab-Atualizado-1.0.3-VC4.apk"
+          for i in 1 2 3 4 5; do
+            if curl --fail --location --retry 3 --max-time 35 -o /tmp/download.apk "$URL"; then
+              if cmp -s recovery-apk/VOC-Lab-Atualizado-1.0.3-VC4.apk /tmp/download.apk; then
+                echo "APK remoto idêntico ao compilado"
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          exit 1
+      - name: Guardar APK e evidencias
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: VOC-Lab-Atualizado-Recuperacao-1.0.3
+          path: |
+            recovery-apk/
+            /tmp/badging.txt
+            /tmp/certificate.txt
+          retention-days: 30
