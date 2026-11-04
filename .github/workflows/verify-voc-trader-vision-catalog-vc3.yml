@@ -1,0 +1,33 @@
+name: Verify VOC Trader Vision VC3 live Lab catalog
+on:
+  push:
+    branches: [release/voc-trader-vision-vc3-permanent-key-20261104]
+    paths: ['.github/workflows/verify-voc-trader-vision-catalog-vc3.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Fetch official VOC Lab endpoint and validate one Trader Vision
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://temporary-snappy-redwood-yqm3s0d.vercel.app/catalog.json'
+          curl -fsSL --retry 5 --retry-delay 2 --max-time 25 "$URL" -o /tmp/catalog-live.json
+          python3 - <<'PY'
+          import json
+          j=json.load(open('/tmp/catalog-live.json',encoding='utf-8'))
+          apps=j['apps']
+          r=[a for a in apps if 'trader' in a.get('id','').lower()]
+          assert len(r)==1, f'Expected exactly one Trader, got {len(r)}'
+          a=r[0]
+          assert a['id']=='voc-trader-vision-gestao-teste'
+          assert a['packageName']=='pt.vcaitano.tradervision.gestaoteste'
+          assert a['candidate']['versionCode']==3
+          assert a['candidate']['sha256']=='18d0c7f5ae76595bf2fe248c6a664807cf735b75991e0ac1969e101056a21f88'
+          assert a['candidate']['signatureSha256']=='e52d1c13baa3a4e7f73b71cb7e15bc1fdd8709650aa64fe8a9b86bb26a5491f9'
+          print('LIVE VOC Lab catalog verified: single VC3 candidate, original package, signer pinned.')
+          PY
