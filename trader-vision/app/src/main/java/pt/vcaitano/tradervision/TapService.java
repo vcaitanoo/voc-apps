@@ -4,7 +4,6 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.graphics.Path;
 import android.graphics.Rect;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.accessibility.AccessibilityEvent;
@@ -15,9 +14,9 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Execução sempre falha-fechada. Só aceita Chrome, rótulo Conta Demo no
- * conteúdo acessível e campos numéricos confirmados antes de tocar no botão.
- * Se o Chrome não expõe esses textos, NÃO opera (não tenta às cegas).
+ * DEMO-only gesture executor. ML Kit verifies the *current screenshot* first,
+ * because Hezilex renders part of its UI in a canvas that accessibility cannot read.
+ * No text inferred from the image means NO TOUCH. Chrome must be active.
  */
 public final class TapService extends AccessibilityService {
     public static volatile TapService INSTANCE;
@@ -31,6 +30,7 @@ public final class TapService extends AccessibilityService {
     @Override public void onAccessibilityEvent(AccessibilityEvent e){}
     @Override public void onInterrupt(){}
     @Override public void onDestroy(){INSTANCE=null;super.onDestroy();}
+
     private void collect(AccessibilityNodeInfo node,List<Entry> found,int depth){
         if(node==null||depth>25||found.size()>2000)return;
         CharSequence cs=node.getText();
@@ -41,78 +41,68 @@ public final class TapService extends AccessibilityService {
         }
         for(int i=0;i<node.getChildCount();i++)collect(node.getChild(i),found,depth+1);
     }
-    private List<Entry> read(){
-        List<Entry> vals=new ArrayList<>();
-        AccessibilityNodeInfo n=getRootInActiveWindow();
-        if(n!=null)collect(n,vals,0);
-        return vals;
-    }
-    private boolean demo(List<Entry> vals){
-        boolean demo=false,button=false,real=false;
-        for(Entry e:vals){
-            String s=e.text.toLowerCase(Locale.ROOT);
-            if(s.contains("conta demo")||s.contains("demo account"))demo=true;
-            if(s.contains("conta real")||s.contains("real account"))real=true;
-            if(s.equals("comprar")||s.equals("vender")||s.equals("buy")||s.equals("sell"))button=true;
-        }
-        return demo&&button&&!real;
-    }
     private boolean isChrome(){
         AccessibilityNodeInfo node=getRootInActiveWindow();
-        return node!=null&&"com.android.chrome".contentEquals(node.getPackageName());
+        return node!=null&&node.getPackageName()!=null
+          &&"com.android.chrome".contentEquals(node.getPackageName());
     }
-    private boolean haveStake(List<Entry> vals,int w,int h,double expected){
-        for(Entry e:vals){
-            double x=e.bounds.exactCenterX()/Math.max(1,w);
-            double y=e.bounds.exactCenterY()/Math.max(1,h);
-            if(x<.06||x>.49||y<.74||y>.97)continue;
-            String text=e.text.replace("€","").replace(" ","").replace(',','.');
-            try{if(Math.abs(Double.parseDouble(text)-expected)<.001)return true;}
-            catch(Exception ignored){}
+    private boolean explicitRealAccountSelected(int w,int h){
+        List<Entry> values=new ArrayList<>();
+        AccessibilityNodeInfo root=getRootInActiveWindow();
+        if(root!=null)collect(root,values,0);
+        for(Entry item:values){
+            String lower=item.text.toLowerCase(Locale.ROOT);
+            double x=item.bounds.exactCenterX()/Math.max(1,w);
+            double y=item.bounds.exactCenterY()/Math.max(1,h);
+            if(x<.50&&y>.13&&y<.31
+                &&(lower.contains("conta real")||lower.contains("real account")))return true;
         }
         return false;
     }
-    private boolean haveExpiry(List<Entry> vals,int w,int h,int expected){
-        for(Entry e:vals){
-            double x=e.bounds.exactCenterX()/Math.max(1,w);
-            double y=e.bounds.exactCenterY()/Math.max(1,h);
-            if(x<.52||x>.96||y<.74||y>.97)continue;
-            String txt=e.text.toLowerCase(Locale.ROOT).trim();
-            if(txt.matches("^"+expected+"\\s*(min|minutos|minute|minutes|m)$"))return true;
-        }
-        return false;
-    }
-    /**
-     * Esta primeira candidata não modifica os valores por tentativa cega:
-     * se o valor/tempo no Chrome não corresponderem ao esperado, aborta.
-     */
     public void placeDemoTrade(boolean buy,int w,int h,int buyX,int buyY,int sellX,int sellY,
-                               double stake,int expiry,Runnable onDone,java.util.function.Consumer<String> onFailure){
-        if(!busy.compareAndSet(false,true)){onFailure.accept("Já existe gesto pendente");return;}
+                               VisualTradeVerifier.Check evidence,Runnable onGestureCompleted,
+                               java.util.function.Consumer<String> onFailure){
+        if(evidence==null||!evidence.allowed()){
+            onFailure.accept(evidence==null?"OCR DEMO indisponível":evidence.reason);
+            return;
+        }
+        if(!busy.compareAndSet(false,true)){
+            onFailure.accept("Gesto anterior ainda em andamento");
+            return;
+        }
         main.post(()->{
-            try{
-                if(!isChrome()){fail("A Hezilex deve estar aberta no Chrome",onFailure);return;}
-                List<Entry> vals=read();
-                if(!demo(vals)){fail("Não foi possível validar CONTA DEMO e botões via acessibilidade",onFailure);return;}
-                if(!haveStake(vals,w,h,stake)){fail("Valor da operação não confirmado. Defina manualmente "+stake+" e volte a observar",onFailure);return;}
-                if(!haveExpiry(vals,w,h,expiry)){fail("Expiração não confirmada. Defina manualmente "+expiry+" min",onFailure);return;}
-                final int x=buy?buyX:sellX,y=buy?buyY:sellY;
-                if(x<0||x>=w||y<0||y>=h){fail("Coordenada fora da tela",onFailure);return;}
+            try {
+                if(!isChrome()){
+                    fail("O Chrome deve estar na frente para operar na Hezilex",onFailure);
+                    return;
+                }
+                if(explicitRealAccountSelected(w,h)){
+                    fail("CONTA REAL encontrada no Chrome. Entrada bloqueada.",onFailure);
+                    return;
+                }
+                final int x=buy?buyX:sellX;
+                final int y=buy?buyY:sellY;
+                if(x<0||x>=w||y<(int)(h*.65)||y>=(int)(h*.88)){
+                    fail("Botão fora da área esperada; não tocar",onFailure);
+                    return;
+                }
                 Path path=new Path();path.moveTo(x,y);
                 GestureDescription.Builder builder=new GestureDescription.Builder();
-                builder.addStroke(new GestureDescription.StrokeDescription(path,0,80));
+                builder.addStroke(new GestureDescription.StrokeDescription(path,0,90));
                 boolean scheduled=dispatchGesture(builder.build(),new GestureResultCallback(){
                     @Override public void onCompleted(GestureDescription g){
                         busy.set(false);
-                        // Isso confirma a conclusão do gesto, NÃO a aceitação da ordem.
-                        onDone.run();
+                        // A callback confirma o gesto Android, NÃO a aceitação da ordem.
+                        onGestureCompleted.run();
                     }
                     @Override public void onCancelled(GestureDescription g){
-                        fail("Gesto cancelado pelo Android",onFailure);
+                        fail("Android cancelou o toque",onFailure);
                     }
                 },main);
-                if(!scheduled)fail("Android recusou o gesto",onFailure);
-            }catch(Exception ex){fail("Erro ao analisar campos: "+ex.getMessage(),onFailure);}
+                if(!scheduled)fail("Android recusou enviar o toque",onFailure);
+            }catch(Exception ex){
+                fail("Falha na validação do gesto: "+ex.getClass().getSimpleName(),onFailure);
+            }
         });
     }
     private void fail(String reason,java.util.function.Consumer<String> cb){
