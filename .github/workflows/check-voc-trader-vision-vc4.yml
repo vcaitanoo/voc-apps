@@ -49,8 +49,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
-      - name: Build debug for structural validation only
-        run: gradle -p trader-vision clean :app:assembleDebug --stacktrace
+      - name: Build debug and unsigned release from exactly the same final source
+        run: gradle -p trader-vision clean :app:assembleDebug :app:assembleRelease --stacktrace
       - name: Verify identity and APK structure (NOT compatible signing)
         shell: bash
         run: |
@@ -63,3 +63,27 @@ jobs:
           unzip -l "$APK" | grep -q resources.arsc
           sha256sum "$APK"
           echo "DEBUG ONLY - DO NOT DISTRIBUTE. Permanent signing required." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify unsigned release and stage exact bytes for offline permanent signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=trader-vision/app/build/outputs/apk/release/app-release-unsigned.apk
+          JAR="$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar"
+          test -s "$APK"
+          test -s "$JAR"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/unsigned-vc4-badging.txt
+          grep -q "package: name='pt.vcaitano.tradervision.gestaoteste' versionCode='4' versionName='0.4.0-demo'" /tmp/unsigned-vc4-badging.txt
+          sha256sum "$APK" | tee /tmp/unsigned-vc4-sha256.txt
+      - name: Upload unsigned exact-build APK and public signer tool for offline signing
+        uses: actions/upload-artifact@v4
+        with:
+          name: VOC-Trader-Vision-VC4-Unsigned-For-Original-Signer
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            trader-vision/app/build/outputs/apk/release/app-release-unsigned.apk
+            trader-vision/security/voc-trader-signing-vc3.encrypted.json
+            /usr/local/lib/android/sdk/build-tools/36.0.0/lib/apksigner.jar
+            /tmp/unsigned-vc4-sha256.txt
+            /tmp/unsigned-vc4-badging.txt
