@@ -1,0 +1,132 @@
+name: Hora V4 - APK separado e publicacao HTTPS
+on:
+  push:
+    branches:
+      - feat/hora-frase-personalizada-v4-20261104
+    paths:
+      - '.github/workflows/hora-v4-download.yml'
+      - 'ci/horajarvis/v4-source/**'
+  workflow_dispatch:
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Restaurar a base VC3 aprovada, verificando hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p HoraJarvis
+          cat ci/horajarvis/source.part{1,2,3,4}.b64 | base64 -d > /tmp/base1.tar.xz
+          echo "5d1e7db08983e3874ead243298e9b95d7eab94b512138595e27498c11d8ff064  /tmp/base1.tar.xz" | sha256sum -c -
+          tar -xJf /tmp/base1.tar.xz -C HoraJarvis
+          cat ci/horajarvis/v2patch.part{1,2,3,4}.b64 | base64 -d > /tmp/v2.patch.xz
+          echo "e6a3451f5e99eb412bf96715f65ede316e1024b55962d53d8ef6d3a14b3649ec  /tmp/v2.patch.xz" | sha256sum -c -
+          xz -dc /tmp/v2.patch.xz > /tmp/v2.patch
+          awk 'index($0,"diff -ruN hj-stable/app/build.gradle ")==1 { printOn=1 } printOn {print}' /tmp/v2.patch > /tmp/v2-code.patch
+          (cd HoraJarvis && patch -p1 --batch --forward < /tmp/v2-code.patch)
+          cat ci/horajarvis/v3patch.part{1,2,3}.b64 | base64 -d > /tmp/v3.patch.xz
+          echo "d0c9b1104f1ee01f830c3c9a243f130c285b77477dba1eceee68f54f609ff826  /tmp/v3.patch.xz" | sha256sum -c -
+          xz -dc /tmp/v3.patch.xz > /tmp/v3.patch
+          (cd HoraJarvis && patch -p1 --batch --forward < /tmp/v3.patch)
+          grep -q "versionCode 3" HoraJarvis/app/build.gradle
+      - name: Aplicar apenas os arquivos V4 autorizados
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="ci/horajarvis/v4-source/app"
+          while IFS= read -r -d '' srcfile; do
+            target="HoraJarvis/app/${srcfile#"$SRC/"}"
+            mkdir -p "$(dirname "$target")"
+            cp "$srcfile" "$target"
+            echo "ALTERADO: ${srcfile#"$SRC/"}"
+          done < <(find "$SRC" -type f -print0 | sort -z)
+          # Nome do pacote exclusivo do teste: nao afeta Hora oficial ja instalado.
+          sed -i "s/applicationIdSuffix '.lab'/applicationIdSuffix '.frases'/" HoraJarvis/app/build.gradle
+          grep -q "versionCode 4" HoraJarvis/app/build.gradle
+          grep -q "versionName '1.3.0-lab'" HoraJarvis/app/build.gradle
+          grep -q "applicationIdSuffix '.frases'" HoraJarvis/app/build.gradle
+          grep -q '<string name="app_name">Hora</string>' HoraJarvis/app/src/main/res/values/strings.xml
+          grep -q "validateCustomLines" HoraJarvis/app/src/main/java/pt/vcaitano/horajarvis/PhraseGenerator.java
+      - name: Instalar Android SDK 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMGR="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          "$SDKMGR" --install "platforms;android-36" "build-tools;36.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Gradle assembleDebug
+        working-directory: HoraJarvis
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Verificar APK, DEX, manifesto, pacote, nome e assinatura
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="HoraJarvis/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          unzip -t "$APK" > /tmp/zip-test.log
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/badging.txt
+          grep -q "package: name='pt.vcaitano.horajarvis.frases'" /tmp/badging.txt
+          grep -q "versionCode='4'" /tmp/badging.txt
+          grep -q "application-label:'Hora'" /tmp/badging.txt
+          unzip -l "$APK" | grep -E 'classes.dex|AndroidManifest.xml|resources.arsc'
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/signature.txt
+          sha256sum "$APK" | tee /tmp/apk-sha256.txt
+          echo "APK independente de teste. Nao atualiza Hora VC3."
+      - name: Publicar APK independente no GitHub, sem alterar catalogo ou stable
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="HoraJarvis/app/build/outputs/apk/debug/app-debug.apk"
+          BASE="Hora-Frases-1.3.0-VC4"
+          SHA=$(sha256sum "$APK" | awk '{print $1}')
+          CERT=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" | awk '/Signer #1 certificate SHA-256 digest:/ {print $NF; exit}')
+          test -n "$CERT"
+          git config user.name 'voc-lab-ci[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git worktree add --detach /tmp/voc-publish origin/main
+          OUT="/tmp/voc-publish/apks/hora-jarvis/teste"
+          mkdir -p "$OUT"
+          cp "$APK" "$OUT/$BASE.apk"
+          echo "$SHA  $BASE.apk" > "$OUT/$BASE.sha256"
+          export APK_HASH="$SHA" CERT_HASH="$CERT"
+          python3 - <<'PY' > "$OUT/$BASE.json"
+          import json, os
+          print(json.dumps({
+            "id": "hora-frases-teste",
+            "packageName": "pt.vcaitano.horajarvis.frases",
+            "versionCode": 4,
+            "versionName": "1.3.0-lab",
+            "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/teste/Hora-Frases-1.3.0-VC4.apk",
+            "sha256": os.environ["APK_HASH"],
+            "signatureSha256": os.environ["CERT_HASH"],
+            "notes": "Hora experimental com frases personalizadas por horario; nao altera o Hora oficial. Assinatura debug temporaria."
+          }, ensure_ascii=False, indent=2))
+          PY
+          git -C /tmp/voc-publish add apks/hora-jarvis/teste/
+          git -C /tmp/voc-publish diff --cached --check
+          git -C /tmp/voc-publish commit -m 'lab(hora): publicar teste separado VC4 com frases personalizadas'
+          git -C /tmp/voc-publish push origin HEAD:main
+          URL="https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/teste/$BASE.apk"
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fLsS --connect-timeout 10 --max-time 30 -o /tmp/voc-downloaded.apk "$URL" \
+              && echo "$SHA  /tmp/voc-downloaded.apk" | sha256sum -c -; then
+              echo "APK HTTPS VERIFICADO: $URL"
+              echo "SHA256: $SHA"
+              echo "CERT_SHA256: $CERT"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "A publicacao ocorreu, mas a verificacao remota falhou."
+          exit 1
