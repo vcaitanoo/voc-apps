@@ -1,0 +1,10 @@
+{
+  "id": "hora-frases-teste",
+  "packageName": "pt.vcaitano.horajarvis.frases",
+  "versionCode": 4,
+  "versionName": "1.3.0-lab",
+  "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/teste/Hora-Frases-1.3.0-VC4.apk",
+  "sha256": "be199a3c81e302c171e80cae9786af6b010dd2810415001f2b02f85e58837e7c",
+  "signatureSha256": "9a00499882708de3de94f3e66417240629866b221d94dd1ce9983f0926143af1",
+  "notes": "Hora experimental com frases personalizadas por horario; nao altera o Hora oficial. Assinatura debug temporaria."
+}
