@@ -97,7 +97,7 @@ public final class VisionService extends Service {
         Intent launch=new Intent(this,MainActivity.class);
         PendingIntent open=PendingIntent.getActivity(this,0,launch,PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
         Notification n=new Notification.Builder(this,"vision")
-          .setSmallIcon(android.R.drawable.ic_menu_view)
+          .setSmallIcon(R.drawable.ic_launcher)
           .setContentTitle("VOC Trader Vision · DEMO")
           .setContentText("Leitura de tela ativa. Toques apenas com autorização e validação.")
           .setOngoing(true).setContentIntent(open).build();
