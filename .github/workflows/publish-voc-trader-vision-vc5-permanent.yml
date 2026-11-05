@@ -1,0 +1,140 @@
+name: Publish VOC Trader Vision VC5 with original permanent certificate
+
+on:
+  push:
+    branches:
+      - fix/voc-trader-vision-vc5-candles-timing-results-20261105
+    paths:
+      - '.github/workflows/publish-voc-trader-vision-vc5-permanent.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: voc-trader-vision-vc5-candidate
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore exact immutable unsigned APK produced by validated VC5 source
+        uses: actions/download-artifact@v4
+        with:
+          name: VOC-Trader-Vision-VC5-Unsigned-For-Permanent-Key
+          run-id: 41940351683
+          repository: vcaitanoo/voc-apps
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: staging-input
+      - name: Reconstruct offline-signed VC5 from public signing block ONLY
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64,gzip,json,struct,hashlib
+          patch=json.loads(gzip.decompress(base64.b64decode(
+              Path('trader-vision/signing/vc5-public-signing-block.json.gz.b64').read_text().strip())))
+          files=list(Path('staging-input').rglob('app-release-unsigned.apk'))
+          assert len(files)==1, f'Expected exact unsigned APK, got {files}'
+          old=files[0].read_bytes()
+          sha=lambda b:hashlib.sha256(b).hexdigest()
+          assert sha(old)==patch['unsignedSha256']=='0c1719188d11fd0de105adbf63b7cd4aabd7fc7ebc75d0008c5a032895557780'
+          eocd=old.rfind(b'PK\x05\x06')
+          assert eocd>0
+          cd=struct.unpack_from('<I',old,eocd+16)[0]
+          assert cd==patch['unsignedCdOffset']
+          block=base64.b64decode(patch['signingBlockBase64'],validate=True)
+          assert len(block)>100
+          end=bytearray(old[eocd:])
+          struct.pack_into('<I',end,16,cd+len(block))
+          signed=old[:cd]+block+old[cd:eocd]+bytes(end)
+          assert sha(signed)==patch['signedSha256']=='6612e077545e4ae901b78d5e2b2dd75bef60763a3a116fa1d12679e73c310670'
+          assert patch['versionCode']==5
+          assert patch['packageName']=='pt.vcaitano.tradervision.gestaoteste'
+          assert patch['signerSha256']=='e52d1c13baa3a4e7f73b71cb7e15bc1fdd8709650aa64fe8a9b86bb26a5491f9'
+          Path('/tmp/voc-trader-vc5-signed.apk').write_bytes(signed)
+          print('Exact byte-for-byte OFFLINE signed APK reconstructed.')
+          print('SHA256: ',sha(signed))
+          PY
+      - name: Install Android SDK build-tools for independent certificate validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="/usr/local/lib/android/sdk"
+          SDKM="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort | tail -1)"
+          test -n "$SDKM"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          yes | "$SDKM" --licenses >/dev/null || true
+          "$SDKM" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - name: Verify package/version, DEX, resources and PINNED original certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=/tmp/voc-trader-vc5-signed.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/vc5-badging.txt
+          grep -q "package: name='pt.vcaitano.tradervision.gestaoteste' versionCode='5' versionName='0.5.0-demo'" /tmp/vc5-badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/vc5-signer.txt
+          CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/vc5-signer.txt | head -1 | tr '[:upper:]' '[:lower:]')"
+          test "$CERT" = "e52d1c13baa3a4e7f73b71cb7e15bc1fdd8709650aa64fe8a9b86bb26a5491f9"
+          unzip -l "$APK" | grep -q 'classes.dex'
+          unzip -l "$APK" | grep -q 'resources.arsc'
+          SHA="$(sha256sum "$APK" | awk '{print $1}')"
+          test "$SHA" = "6612e077545e4ae901b78d5e2b2dd75bef60763a3a116fa1d12679e73c310670"
+          echo "Package, version, DEX, resources, signature and original VC3 certificate verified." >> "$GITHUB_STEP_SUMMARY"
+      - name: Checkout original VOC Lab catalog on main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          path: publish-main
+      - name: Publish VC5 by replacing ONLY candidate of existing Trader Vision entry
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEST="apks/voc-trader-vision-gestao-teste/candidate/VOC-Trader-Vision-0.5.0-demo-VC5.apk"
+          mkdir -p "publish-main/$(dirname "$DEST")"
+          cp /tmp/voc-trader-vc5-signed.apk "publish-main/$DEST"
+          export TV_PATH="$DEST"
+          python3 - <<'PY'
+          import json,os,datetime
+          path='publish-main/lab/catalog.json'
+          cat=json.load(open(path,encoding='utf-8'))
+          matches=[app for app in cat['apps'] if app.get('id')=='voc-trader-vision-gestao-teste']
+          assert len(matches)==1
+          app=matches[0]
+          assert app['packageName']=='pt.vcaitano.tradervision.gestaoteste'
+          assert app['candidate']['versionCode']==4
+          assert app['candidate']['signatureSha256']=='e52d1c13baa3a4e7f73b71cb7e15bc1fdd8709650aa64fe8a9b86bb26a5491f9'
+          assert app['stable']['versionCode']==0
+          app['candidate']={
+            'versionCode':5, 'versionName':'0.5.0-demo',
+            'apkUrl':'https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/'+os.environ['TV_PATH'],
+            'sha256':'6612e077545e4ae901b78d5e2b2dd75bef60763a3a116fa1d12679e73c310670',
+            'signatureSha256':'e52d1c13baa3a4e7f73b71cb7e15bc1fdd8709650aa64fe8a9b86bb26a5491f9',
+            'notes':'VC5 DEMO: corrige detecção de velas finas e junção de candles; ignora a sobreposição do painel. Sincroniza entradas com cronómetro da vela da própria Hezilex (primeiros 15s), sem depender do relógio Android. Após expiração, tenta apurar WIN/LOSS por duas leituras coerentes do saldo demo; sem comprovação, marca resultado não confirmado. Mantém estratégias, gestão, limite de entradas, permissões e um único app/package, assinado com o mesmo certificado VC3/VC4. Testes e APK verificados estruturalmente; execução da VC5 em Android real ainda pendente.'
+          }
+          assert len([a for a in cat['apps'] if 'trader' in a['id']])==1
+          assert all(isinstance(a.get('stable'),dict) for a in cat['apps'])
+          cat['updatedAt']=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds').replace('+00:00','Z')
+          with open(path,'w',encoding='utf-8') as f:json.dump(cat,f,ensure_ascii=False,indent=2);f.write('\n')
+          PY
+          git -C publish-main config user.name "github-actions[bot]"
+          git -C publish-main config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C publish-main add "$DEST" lab/catalog.json
+          git -C publish-main diff --cached --check
+          git -C publish-main commit -m "candidate(trader): VC5 original pinned signer, automatic permission flow and real DEMO OCR verification"
+          git -C publish-main push origin HEAD:main
+      - name: Check remote APK bytes match local signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-trader-vision-gestao-teste/candidate/VOC-Trader-Vision-0.5.0-demo-VC5.apk"
+          curl -fsSL --retry 5 --retry-delay 2 --max-time 180 "$URL" -o /tmp/voc-trader-vc5-remote.apk
+          cmp /tmp/voc-trader-vc5-signed.apk /tmp/voc-trader-vc5-remote.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs /tmp/voc-trader-vc5-remote.apk | grep 'Signer #1 certificate SHA-256 digest: e52d1c13baa3a4e7f73b71cb7e15bc1fdd8709650aa64fe8a9b86bb26a5491f9'
+          sha256sum /tmp/voc-trader-vc5-remote.apk
+          echo "Remote APK verified byte-for-byte and original signing certificate intact." >> "$GITHUB_STEP_SUMMARY"
