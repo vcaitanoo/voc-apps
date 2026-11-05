@@ -6,6 +6,7 @@ on:
       - fix/voc-trader-vision-vc7-signal-clock-20261105
     paths:
       - 'trader-vision/signing/vc7-public-signing-block.json.gz.b64'
+      - '.github/workflows/publish-voc-trader-vision-vc7-permanent.yml'
   workflow_dispatch:
 
 permissions:
