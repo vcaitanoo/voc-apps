@@ -1,0 +1,83 @@
+name: Validate VOC Trader Vision VC6 candles timing outcomes
+on:
+  push:
+    branches:
+      - fix/voc-trader-vision-vc6-from-tested-vc4-20261105
+    paths:
+      - 'trader-vision/**'
+      - '.github/workflows/check-voc-trader-vision-vc6-from-vc4.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify technical strategies and safety rules
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/trader-vc6-tests
+          javac -d /tmp/trader-vc6-tests \
+            trader-vision/app/src/main/java/pt/vcaitano/tradervision/RiskManager.java \
+            trader-vision/app/src/main/java/pt/vcaitano/tradervision/EntryTiming.java \
+            trader-vision/app/src/main/java/pt/vcaitano/tradervision/PanelPosition.java \
+            trader-vision/app/src/main/java/pt/vcaitano/tradervision/VisionEngine.java \
+            trader-vision/app/src/main/java/pt/vcaitano/tradervision/VisualTradeVerifier.java \
+            trader-vision/app/src/main/java/pt/vcaitano/tradervision/CandleClock.java \
+            trader-vision/app/src/main/java/pt/vcaitano/tradervision/OutcomeLedger.java \
+            trader-vision/tests/RiskManagerTest.java \
+            trader-vision/tests/EntryTimingTest.java \
+            trader-vision/tests/PanelPositionTest.java \
+            trader-vision/tests/VisualTradeVerifierTest.java \
+            trader-vision/tests/VisionEngineTest.java \
+            trader-vision/tests/CandleClockTest.java \
+            trader-vision/tests/OutcomeLedgerTest.java
+          for TEST in RiskManagerTest EntryTimingTest PanelPositionTest VisualTradeVerifierTest VisionEngineTest CandleClockTest OutcomeLedgerTest; do
+            java -cp /tmp/trader-vc6-tests "pt.vcaitano.tradervision.$TEST"
+          done
+      - name: Install Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="/usr/local/lib/android/sdk"
+          SDKM="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort | tail -1)"
+          test -n "$SDKM"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          yes | "$SDKM" --licenses >/dev/null || true
+          "$SDKM" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Build one final source as APK and unsigned release
+        run: gradle -p trader-vision clean :app:assembleDebug :app:assembleRelease --stacktrace
+      - name: Verify debug identity and unsigned release structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=trader-vision/app/build/outputs/apk/debug/app-debug.apk
+          RELEASE=trader-vision/app/build/outputs/apk/release/app-release-unsigned.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/vc6-badging.txt
+          grep -q "package: name='pt.vcaitano.tradervision.gestaoteste' versionCode='6' versionName='0.6.0-demo'" /tmp/vc6-badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/vc6-debug-certs.txt
+          test -s "$RELEASE"
+          unzip -l "$RELEASE" | grep -q 'classes.dex'
+          unzip -l "$RELEASE" | grep -q 'resources.arsc'
+          sha256sum "$RELEASE" | tee /tmp/vc6-release-sha256.txt
+          echo "Unsigned release only; MUST sign later using pinned VC3 permanent keystore." >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload unsigned release for original keystore signing
+        uses: actions/upload-artifact@v4
+        with:
+          name: VOC-Trader-Vision-VC6-Unsigned-For-Permanent-Key
+          if-no-files-found: error
+          retention-days: 15
+          path: |
+            trader-vision/app/build/outputs/apk/release/app-release-unsigned.apk
+            /tmp/vc6-release-sha256.txt
+            /tmp/vc6-badging.txt

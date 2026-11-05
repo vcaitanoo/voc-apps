@@ -7,8 +7,8 @@ android {
         applicationId = "pt.vcaitano.tradervision.gestaoteste"
         minSdk = 29
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0-demo"
+        versionCode = 6
+        versionName = "0.6.0-demo"
     }
     // A identidade de assinatura é imutável após esta migração.
     // A keystore nunca é commitada; só é carregada durante o build autorizado.

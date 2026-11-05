@@ -50,88 +50,152 @@ public final class VisionEngine {
         return r>115 && r>g*1.36 && r>b*1.11 && g<170;
     }
     static boolean colored(int p) {return green(p)||red(p);}
+    private static boolean masked(int x,int y,int[] box) {
+        return box!=null&&box.length==4
+            &&x>=box[0]&&x<=box[2]&&y>=box[1]&&y<=box[3];
+    }
     private static int clamp(int a,int mn,int mx){return Math.max(mn,Math.min(mx,a));}
 
     public static Result analyze(int[] pixels,int w,int h,int minimumCandles) {
+        return analyze(pixels,w,h,minimumCandles,null);
+    }
+    /**
+     * The optional occlusion bounds are the real screen coordinates of our
+     * floating overlay. Missing pixels behind that overlay are NEVER inferred.
+     */
+    public static Result analyze(int[] pixels,int w,int h,int minimumCandles,int[] occlusion) {
         Result out=new Result();
         if(pixels==null||w<250||h<350||pixels.length<w*h) {
             out.detail="Imagem inválida"; return out;
         }
-        // Reconhece comprimentos reais dos botões, não memoriza coordenadas
-        int bestY=-1,best=-1;
-        for(int y=(int)(h*.58);y<(int)(h*.87);y+=3) {
-            int ng=0,nr=0;
-            for(int x=(int)(w*.04);x<(int)(w*.46);x+=6)if(green(pixels[y*w+x]))ng++;
-            for(int x=(int)(w*.54);x<(int)(w*.96);x+=6)if(red(pixels[y*w+x]))nr++;
-            int total=ng+nr;
-            if(ng>0.42*w/6*.42 && nr>0.42*w/6*.42 && total>best){best=total;bestY=y;}
+        // Os botões são apenas a calibração PARA EXECUTAR TOQUES.
+        // A leitura das velas deve continuar mesmo quando o painel móvel
+        // encobre Comprar/Vender. A VC5 retornava aqui com 0 velas.
+        int bestY=-1,bestRed=0;
+        int leftSamples=0,rightSamples=0;
+        for(int x=(int)(w*.04);x<(int)(w*.46);x+=6)leftSamples++;
+        for(int x=(int)(w*.54);x<(int)(w*.96);x+=6)rightSamples++;
+        int runStart=-1,bestLength=0,bestStart=-1,bestEnd=-1;
+        for(int y=(int)(h*.58);y<=(int)(h*.87)+3;y+=3) {
+            int ng=0;
+            if(y<(int)(h*.87)){
+                for(int x=(int)(w*.04);x<(int)(w*.46);x+=6)
+                    if(!masked(x,y,occlusion)&&green(pixels[y*w+x]))ng++;
+            }
+            boolean wideGreen=ng>=Math.max(8,(int)(leftSamples*.55));
+            if(wideGreen&&runStart<0)runStart=y;
+            if(!wideGreen&&runStart>=0){
+                int last=y-3;
+                if(last-runStart+3>bestLength){
+                    bestLength=last-runStart+3;bestStart=runStart;bestEnd=last;
+                }
+                runStart=-1;
+            }
         }
-        out.buttons=bestY>=0;
-        out.buyY=out.sellY=bestY+(int)(h*.028);
+        // Posiciona o toque no CENTRO vertical do botão, não no fim da faixa.
+        // Sem faixa reconhecida, ainda analisamos o gráfico, mas bloqueamos toque.
+        if(bestLength>=Math.max(12,(int)(h*.024))){
+            bestY=(bestStart+bestEnd)/2;
+            for(int x=(int)(w*.54);x<(int)(w*.96);x+=6)
+                if(!masked(x,bestY,occlusion)&&red(pixels[bestY*w+x]))bestRed++;
+        }
         out.buyX=(int)(w*.255);out.sellX=(int)(w*.745);
-        if(!out.buttons) {
-            out.detail="Não achei simultaneamente Comprar e Vender; mantenha a Hezilex visível.";
-            return out;
+        out.buyY=out.sellY=bestY;
+        out.buttons=bestY>=0 && bestRed>=Math.max(8,(int)(rightSamples*.40))
+            && !masked(out.buyX,out.buyY,occlusion)
+            && !masked(out.sellX,out.sellY,occlusion);
+        out.chartLeft=(int)(w*.074);
+        out.chartRight=(int)(w*.89); // exclude price labels on the right
+        out.chartTop=(int)(h*.34); // include high candles that V4 cropped
+        // Se nem mesmo Comprar estiver visível, calcular uma área prudente
+        // ainda permite dizer quantas velas há, mas NUNCA autoriza toques.
+        int buttonBoundary=bestY>=0?bestY:(int)(h*.69);
+        out.chartBottom=clamp(buttonBoundary-(int)(h*.043),out.chartTop+40,h-1);
+        if(out.chartBottom-out.chartTop<120) {
+            out.detail="Área visível do gráfico muito pequena";return out;
         }
-        out.chartLeft=(int)(w*.105); out.chartRight=(int)(w*.945);
-        out.chartTop=(int)(h*.38); out.chartBottom=clamp(bestY-(int)(h*.026),out.chartTop+40,h-1);
-        if(out.chartBottom-out.chartTop<120){out.detail="Área de velas demasiado pequena";return out;}
 
-        // Segmenta corpos verdes/vermelhos por colunas. Remove linha horizontal de preço.
+        // 1. Ignore our overlay and horizontal price lines. The V4
+        // segmentation merged adjacent 5-minute candles across gaps of four
+        // pixels, then rejected the merged group as too wide.
         int nX=out.chartRight-out.chartLeft+1;
+        boolean[] priceLine=new boolean[h];
+        int samples=(nX+1)/2;
+        for(int y=out.chartTop;y<out.chartBottom;y++){
+            int painted=0;
+            for(int x=out.chartLeft;x<=out.chartRight;x+=2){
+                if(!masked(x,y,occlusion)&&colored(pixels[y*w+x]))painted++;
+            }
+            priceLine[y]=painted>samples*.25; // horizontal ticker/price stripe
+        }
         boolean[] active=new boolean[nX];
-        for(int x=out.chartLeft;x<=out.chartRight;x++) {
-            int coloredPixels=0;
-            for(int y=out.chartTop;y<out.chartBottom;y+=2)
-                if(colored(pixels[y*w+x]))coloredPixels++;
-            active[x-out.chartLeft]=coloredPixels>=3;
+        for(int x=out.chartLeft;x<=out.chartRight;x++){
+            int columnPixels=0;
+            for(int y=out.chartTop;y<out.chartBottom;y++){
+                if(!priceLine[y]&&!masked(x,y,occlusion)&&colored(pixels[y*w+x]))
+                    columnPixels++;
+            }
+            active[x-out.chartLeft]=columnPixels>=3;
         }
         List<int[]> runs=new ArrayList<>();
-        int st=-1,last=-1;
-        for(int i=0;i<nX;i++){
-            if(active[i]){if(st<0)st=i;last=i;}
-            else if(st>=0 && i-last>4){ if(last-st>=3)runs.add(new int[]{st,last});st=-1;last=-1;}
+        int start=-1;
+        for(int i=0;i<=nX;i++){
+            boolean on=i<nX&&active[i];
+            if(on&&start<0)start=i;
+            if(!on&&start>=0){
+                runs.add(new int[]{start,i-1});
+                start=-1;
+            }
         }
-        if(st>=0&&last-st>=3)runs.add(new int[]{st,last});
+        int maxBodyWidth=Math.max(24,w/24);
         for(int[] rr:runs){
             int x1=out.chartLeft+rr[0],x2=out.chartLeft+rr[1];
-            if(x2-x1>Math.max(45,w/12))continue;
+            int width=x2-x1+1;
+            if(width>maxBodyWidth)continue; // horizontal stripe, banner, etc.
             int greenCount=0,redCount=0,ymin=out.chartBottom,ymax=out.chartTop;
-            int stepX=Math.max(1,(x2-x1)/5);
-            for(int x=x1;x<=x2;x+=stepX)for(int y=out.chartTop;y<out.chartBottom;y++){
-                int p=pixels[y*w+x];
-                if(green(p)){greenCount++;ymin=Math.min(ymin,y);ymax=Math.max(ymax,y);}
-                else if(red(p)){redCount++;ymin=Math.min(ymin,y);ymax=Math.max(ymax,y);}
+            for(int x=x1;x<=x2;x++)for(int y=out.chartTop;y<out.chartBottom;y++){
+                if(priceLine[y]||masked(x,y,occlusion))continue;
+                int pixel=pixels[y*w+x];
+                if(green(pixel)){
+                    greenCount++;ymin=Math.min(ymin,y);ymax=Math.max(ymax,y);
+                }else if(red(pixel)){
+                    redCount++;ymin=Math.min(ymin,y);ymax=Math.max(ymax,y);
+                }
             }
-            boolean isBull=greenCount>=redCount;
-            int votes=Math.max(greenCount,redCount);
-            if(votes<18||ymin>=ymax)continue;
-            int bodyMin=out.chartBottom,bodyMax=out.chartTop;
-            int sampleWidth=Math.max(1,x2-x1+1);
+            if(Math.max(greenCount,redCount)<8||ymax-ymin<2)continue;
+            boolean bull=greenCount>=redCount;
+            int bodyTop=out.chartBottom,bodyBottom=out.chartTop;
             for(int y=ymin;y<=ymax;y++){
-                int n=0;
+                if(priceLine[y])continue;
+                int count=0;
                 for(int x=x1;x<=x2;x++){
-                    int p=pixels[y*w+x];
-                    if(isBull?green(p):red(p))n++;
+                    if(masked(x,y,occlusion))continue;
+                    int pixel=pixels[y*w+x];
+                    if(bull?green(pixel):red(pixel))count++;
                 }
-                if(n>=Math.max(2,(int)(sampleWidth*.35))){
-                    bodyMin=Math.min(bodyMin,y);bodyMax=Math.max(bodyMax,y);
+                if(count>=Math.max(1,(int)Math.ceil(width*.48))){
+                    bodyTop=Math.min(bodyTop,y);
+                    bodyBottom=Math.max(bodyBottom,y);
                 }
             }
-            if(bodyMin>bodyMax)continue;
-            double open=-(isBull?bodyMax:bodyMin);
-            double close=-(isBull?bodyMin:bodyMax);
-            double high=-ymin,low=-ymax;
-            out.candles.add(new Candle((x1+x2)/2,open,high,low,close));
+            if(bodyTop>bodyBottom)continue;
+            double open=-(bull?bodyBottom:bodyTop);
+            double close=-(bull?bodyTop:bodyBottom);
+            out.candles.add(new Candle((x1+x2)/2,open,-ymin,-ymax,close));
         }
         out.candles.sort(Comparator.comparingInt(a->a.x));
         out.bars=out.candles.size();
         if(out.bars>0)out.lastX=out.candles.get(out.bars-1).x;
         if(out.bars<minimumCandles){
-            out.detail="Zoom/histórico insuficiente: requer "+minimumCandles+" velas identificáveis.";
+            out.detail="Detectadas "+out.bars+" velas reais de "+minimumCandles+
+                " necessárias. Verifique painel sobre o gráfico e zoom.";
             return out;
         }
         evaluate(out);
+        if(!out.buttons) {
+            out.detail+=" · BOTÕES PARCIALMENTE OCULTOS: mova o painel para"+
+                " liberar Comprar e Vender. Análise de velas continua ativa.";
+        }
         return out;
     }
     private static double ema(double[]a,int n,int end){

@@ -25,6 +25,16 @@ public final class VisualTradeVerifierTest {
         var moved=screen("Conta Demo","1,00","5 min");
         moved.set(0,new VisualTradeVerifier.Area("Conta Demo",600,40,800,80));
         assertTrue(!VisualTradeVerifier.evaluate(moved,1152,1320,1,5).allowed(),"Text out of active account region is not enough");
+        
+        var account=screen("Conta Demo","1,00","5 min");
+        account.add(new VisualTradeVerifier.Area("€ 32,05",20,245,175,280));
+        account.add(new VisualTradeVerifier.Area("04:58",1040,520,1145,570));
+        Double b=VisualTradeVerifier.demoBalance(account,1152,1320);
+        assertTrue(b!=null&&Math.abs(b-32.05)<.0001,"read balance");
+        Integer countdown=VisualTradeVerifier.candleRemainingSeconds(account,1152,1320);
+        assertTrue(countdown!=null&&countdown==298,"read server candle countdown");
+        account.set(0,new VisualTradeVerifier.Area("Conta Real",15,215,168,240));
+        assertTrue(VisualTradeVerifier.demoBalance(account,1152,1320)==null,"reject real balance");
         System.out.println("VisualTradeVerifier tests passed");
     }
 }
