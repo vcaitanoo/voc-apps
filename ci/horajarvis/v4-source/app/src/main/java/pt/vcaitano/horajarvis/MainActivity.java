@@ -64,6 +64,8 @@ public final class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         prefs = AppSettings.load(this);
         buildUi();
+        // Instalações novas têm permissões independentes: pedir na primeira abertura.
+        getWindow().getDecorView().post(this::requestInitialPermissions);
     }
 
     @Override
@@ -312,13 +314,16 @@ public final class MainActivity extends Activity {
         Button testButton = secondaryButton("▶  TESTAR VOZ AGORA");
         content.addView(withTop(testButton, 10));
         testButton.setOnClickListener(v -> previewVoice());
+        Button testNotification = secondaryButton("🔔  TESTAR NOTIFICAÇÃO AGORA");
+        content.addView(withTop(testNotification, 10));
+        testNotification.setOnClickListener(v -> previewNotification());
         nextText = text("", 13, ACCENT, true);
         nextText.setGravity(Gravity.CENTER);
         content.addView(withTop(nextText, 16));
 
         Button permissionButton = secondaryButton("⚙  PERMISSÕES DE ALARMES");
         content.addView(withTop(permissionButton, 16));
-        permissionButton.setOnClickListener(v -> openExactPermission());
+        permissionButton.setOnClickListener(v -> requestPermissionsIfNeeded());
         content.addView(withTop(text("Para maior fiabilidade, permita notificações, Alarmes e lembretes e coloque o app em Bateria sem restrições. O modo Não incomodar pode impedir voz e vibração. Anúncios não são exibidos sobre outros apps nem na tela bloqueada.", 12, MUTED, false), 14));
 
         updateStatus();
@@ -395,12 +400,47 @@ public final class MainActivity extends Activity {
         if (prefs.enabled) requestPermissionsIfNeeded();
     }
 
+    /** Uma instalação com package novo não herda permissões nem horários de outra instalação. */
+    private void requestInitialPermissions() {
+        android.content.SharedPreferences asked = getSharedPreferences("horajarvis_permissions", MODE_PRIVATE);
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                && !asked.getBoolean("asked_notification", false)) {
+            asked.edit().putBoolean("asked_notification", true).apply();
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_NOTIFICATION);
+            return;
+        }
+        if (!TimeScheduler.preciseAlarmsAllowed(this) && !asked.getBoolean("asked_exact_alarm", false)) {
+            asked.edit().putBoolean("asked_exact_alarm", true).apply();
+            openExactPermission();
+        }
+    }
+
+    private boolean notificationsAllowed() {
+        android.app.NotificationManager nm =
+                (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (nm == null || !nm.areNotificationsEnabled()) return false;
+        return Build.VERSION.SDK_INT < 33
+                || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+    }
+
     private void requestPermissionsIfNeeded() {
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_NOTIFICATION);
+        } else if (!notificationsAllowed()) {
+            try {
+                Intent settings = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                settings.putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+                startActivity(settings);
+            } catch (RuntimeException ex) {
+                startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName())));
+            }
         } else if (!TimeScheduler.preciseAlarmsAllowed(this)) {
             openExactPermission();
+        } else {
+            Toast.makeText(this, "Notificações e alarmes exatos autorizados.", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -408,8 +448,10 @@ public final class MainActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQUEST_NOTIFICATION) {
+            TimeScheduler.replan(this);
             updateStatus();
-            if (!TimeScheduler.preciseAlarmsAllowed(this)) openExactPermission();
+            // Em seguida solicitar o acesso especial aos alarmes, uma só vez na primeira abertura.
+            requestInitialPermissions();
         }
     }
 
@@ -482,6 +524,18 @@ public final class MainActivity extends Activity {
         startActivity(i);
     }
 
+    private void previewNotification() {
+        if (!notificationsAllowed()) {
+            Toast.makeText(this, "Notificações bloqueadas. Autorize para testar.", Toast.LENGTH_LONG).show();
+            requestPermissionsIfNeeded();
+            return;
+        }
+        String words = previewPhrase();
+        if (words == null) return;
+        VoiceService.postTimeNotification(this, words);
+        Toast.makeText(this, "Notificação de teste enviada. Confira também o relógio.", Toast.LENGTH_LONG).show();
+    }
+
     private void previewVoice() {
         String words = previewPhrase();
         if (words == null) return;
@@ -509,11 +563,10 @@ public final class MainActivity extends Activity {
         if (statusText == null) return;
         AppSettings saved = AppSettings.load(this);
         if (!saved.enabled) {
-            statusText.setText("○  Inativo. Configure e salve para começar.");
+            statusText.setText("○  Avisos desligados: ative e toque em SALVAR CONFIGURAÇÃO.");
             statusText.setTextColor(MUTED);
-        } else if (Build.VERSION.SDK_INT >= 33
-                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            statusText.setText("⚠  Permita as notificações nas configurações do Android.");
+        } else if (!notificationsAllowed()) {
+            statusText.setText("⚠  Notificações bloqueadas: autorize para receber no telemóvel/relógio.");
             statusText.setTextColor(Color.rgb(255, 204, 137));
         } else if (!TimeScheduler.preciseAlarmsAllowed(this)) {
             statusText.setText("⚠  Horários aproximados. Autorize Alarmes e lembretes.");
