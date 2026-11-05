@@ -1,0 +1,41 @@
+name: Verify VOC Trader Vision VC6 live catalog and single app
+on:
+  push:
+    branches: [fix/voc-trader-vision-vc6-from-tested-vc4-20261105]
+    paths: ['.github/workflows/verify-voc-trader-vision-vc6-live.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Verify primary VOC Lab catalog and published VC6 URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://temporary-snappy-redwood-yqm3s0d.vercel.app/catalog.json'
+          curl -fsSL --retry 5 --retry-delay 3 --max-time 30 "$URL" -o /tmp/catalog-vc6.json
+          python3 - <<'PY'
+          import json
+          cat=json.load(open('/tmp/catalog-vc6.json',encoding='utf-8'))
+          apps=cat['apps']
+          trader=[a for a in apps if 'trader' in a.get('id','').lower()]
+          assert len(trader)==1, f'Expected one Trader: {len(trader)}'
+          a=trader[0]
+          assert a['id']=='voc-trader-vision-gestao-teste'
+          assert a['packageName']=='pt.vcaitano.tradervision.gestaoteste'
+          c=a['candidate']
+          assert c['versionCode']==6 and c['versionName']=='0.6.0-demo'
+          assert c['signatureSha256']=='e52d1c13baa3a4e7f73b71cb7e15bc1fdd8709650aa64fe8a9b86bb26a5491f9'
+          assert c['sha256']=='3bf00b2b277292aec724d5597f8eee476b4e9eb4764a0641382a778f6052a125'
+          assert a['stable']['versionCode']==0
+          print('VOC Lab original live endpoint: one and only one Trader Vision VC6')
+          print('App count:',len(apps),'signature preserved')
+          PY
+          curl -fsSL --retry 5 --retry-delay 2 --max-time 180 \
+            'https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-trader-vision-gestao-teste/candidate/VOC-Trader-Vision-0.6.0-demo-VC6.apk' \
+            -o /tmp/remote-vc6.apk
+          echo '3bf00b2b277292aec724d5597f8eee476b4e9eb4764a0641382a778f6052a125  /tmp/remote-vc6.apk' | sha256sum -c -
+          echo 'LIVE primary VOC Lab endpoint and VC6 APK SHA256 confirmed.' >> "$GITHUB_STEP_SUMMARY"
