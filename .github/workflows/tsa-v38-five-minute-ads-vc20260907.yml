@@ -1,0 +1,121 @@
+name: TSA V38 1.0.33 AOD Ads 5-min recovery candidate
+
+on:
+  push:
+    paths:
+      - '.github/workflows/tsa-v38-five-minute-ads-vc20260907.yml'
+      - 'lab/patches/tsa-v38-five-minute-ads.patch'
+  pull_request:
+    paths:
+      - '.github/workflows/tsa-v38-five-minute-ads-vc20260907.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Restore exact confirmed 1.0.32 and patch AOD ads only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/tsa-v38"
+          echo "SRC=$SRC" >> "$GITHUB_ENV"
+          mkdir -p "$SRC" "$RUNNER_TEMP/out" "$RUNNER_TEMP/previous"
+          gh run download 41721716089 --repo "$GITHUB_REPOSITORY" --name "TelaSempreAtiva_V37_PLAY_PLAY_vc20260906" --dir "$RUNNER_TEMP/previous"
+          SOURCE="$RUNNER_TEMP/previous/TelaSempreAtiva_V37_FONTE_vc20260906.zip"
+          test -s "$SOURCE"
+          echo '4fb030d5851fbb02be4648fdb92399ff389aa32971e6b7bd3054cf94d22d4f64  '"$SOURCE" | sha256sum -c -
+          unzip -q "$SOURCE" -d "$SRC"
+          test "$(grep -c 'versionCode 20260906' "$SRC/app/build.gradle")" -eq 1
+          test "$(grep -c "versionName '1.0.32'" "$SRC/app/build.gradle")" -eq 1
+          patch --batch --fuzz=0 -p1 -d "$SRC" < "$GITHUB_WORKSPACE/lab/patches/tsa-v38-five-minute-ads.patch"
+          grep -q 'versionCode 20260907' "$SRC/app/build.gradle"
+          grep -q "versionName '1.0.33'" "$SRC/app/build.gradle"
+          grep -q 'onClockTick()' "$SRC/app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java"
+          grep -q 'REQUEST_TIMEOUT_MS' "$SRC/app/src/main/java/pt/vcaitano/telasempreativa/AodAdController.java"
+          (cd "$SRC" && zip -qr "$RUNNER_TEMP/out/TelaSempreAtiva_V38_FONTE_vc20260907.zip" . -x '.gradle/*' 'app/build/*' 'build/*')
+      - name: Build APK first
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$SRC"
+          ./gradlew clean assembleRelease --no-daemon --stacktrace
+
+      - name: Build AAB from the exact same source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$SRC"
+          ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: Sign with historical key
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEY="$RUNNER_TEMP/tela_sempre_ativa_v1.jks"
+          README="$RUNNER_TEMP/signing-readme.txt"
+          curl -fL --retry 3 --retry-delay 2 'https://drive.usercontent.google.com/download?id=1TfGb0ofAVWupoDZwiAwFIdGuaGVivKWI&export=download&confirm=t' -o "$KEY"
+          curl -fL --retry 3 --retry-delay 2 'https://drive.usercontent.google.com/download?id=1EIaAAdAkzu78VUtYS3cJttY_IfxDQtdN&export=download&confirm=t' -o "$README"
+          echo 'c2fbe75c95dec92e3612c9a186dfa654ed0427aa9aeac2ea2caa4b1de749ab03  '"$KEY" | sha256sum -c -
+          PASS="$(sed -n 's/^Senha do ficheiro: //p' "$README" | head -n1 | sed 's/[[:space:]]*$//')"
+          KEYPASS="$(sed -n 's/^Senha da chave: //p' "$README" | head -n1 | sed 's/[[:space:]]*$//')"
+          test -n "$PASS" && test -n "$KEYPASS"
+          export PASS KEYPASS
+          keytool -list -v -keystore "$KEY" -alias telaativa -storepass:env PASS > "$RUNNER_TEMP/keyinfo.txt"
+          CERT="$(sed -n 's/.*SHA256: //p' "$RUNNER_TEMP/keyinfo.txt" | head -n1 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          test "$CERT" = 'f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a'
+          APK_UNSIGNED="$(find "$SRC/app/build/outputs/apk/release" -type f -name '*.apk' | head -n1)"
+          AAB_UNSIGNED="$(find "$SRC/app/build/outputs/bundle/release" -type f -name '*.aab' | head -n1)"
+          test -s "$APK_UNSIGNED" && test -s "$AAB_UNSIGNED"
+          BT="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n1)"
+          "$BT/zipalign" -p -f 4 "$APK_UNSIGNED" "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" sign --ks "$KEY" --ks-key-alias telaativa --ks-pass env:PASS --key-pass env:KEYPASS --out "$RUNNER_TEMP/out/TelaSempreAtiva_V38_PLAY_v1.0.33_vc20260907.apk" "$RUNNER_TEMP/aligned.apk"
+          jarsigner -keystore "$KEY" -storepass:env PASS -keypass:env KEYPASS -signedjar "$RUNNER_TEMP/out/TelaSempreAtiva_V38_PLAY_v1.0.33_vc20260907.aab" "$AAB_UNSIGNED" telaativa
+
+      - name: Structural validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/out"
+          APK="$OUT/TelaSempreAtiva_V38_PLAY_v1.0.33_vc20260907.apk"
+          AAB="$OUT/TelaSempreAtiva_V38_PLAY_v1.0.33_vc20260907.aab"
+          BT="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n1)"
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | tee "$OUT/apk-signature.txt"
+          "$BT/aapt" dump badging "$APK" | tee "$OUT/apk-badging.txt"
+          grep -q "package: name='pt.vcaitano.telasempreativa' versionCode='20260907' versionName='1.0.33'" "$OUT/apk-badging.txt"
+          grep -q 'certificate SHA-256 digest: f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a' "$OUT/apk-signature.txt"
+          unzip -Z -1 "$APK" | grep -F 'AndroidManifest.xml' > /dev/null
+          unzip -Z -1 "$APK" | grep -F 'classes.dex' > /dev/null
+          unzip -Z -1 "$APK" | grep -F 'resources.arsc' > /dev/null
+          jarsigner -verify -verbose -certs "$AAB" > "$OUT/aab-jarsigner-verify.txt"
+          grep -q 'jar verified.' "$OUT/aab-jarsigner-verify.txt"
+          unzip -l "$AAB" > "$OUT/aab-contents.txt"
+          grep -q 'base/manifest/AndroidManifest.xml' "$OUT/aab-contents.txt"
+          grep -q 'base/dex/classes.dex' "$OUT/aab-contents.txt"
+          grep -q 'base/resources.pb' "$OUT/aab-contents.txt"
+          sha256sum "$APK" "$AAB" "$OUT/TelaSempreAtiva_V38_FONTE_vc20260907.zip" > "$OUT/SHA256SUMS.txt"
+          APK_SHA="$(sha256sum "$APK" | awk '{print $1}')"
+          AAB_SHA="$(sha256sum "$AAB" | awk '{print $1}')"
+          printf '%s\n'             'TELA SEMPRE ATIVA — V38 | Temporização anúncios AOD'             'packageName: pt.vcaitano.telasempreativa'             'versionCode: 20260907'             'versionName: 1.0.33'             'certificado SHA-256: f3e732553e25bb86bc5ca7c2aa5a0a6f9f9e798d9def964338a744f399b01d3a'             "APK SHA-256: $APK_SHA"             "AAB SHA-256: $AAB_SHA"             'Base estável ZIP SHA-256: 4fb030d5851fbb02be4648fdb92399ff389aa32971e6b7bd3054cf94d22d4f64'             'Nenhum outro recurso alterado; mostrar depende de ad fill e da visibilidade AOD'             'Ficheiros alterados: app/build.gradle; AodActivity.java; AodAdController.java'             'Validação: compilação e estrutura verificadas; execução em Android real NÃO testada neste workflow.'             > "$OUT/VALIDACAO_V33_PLAY.txt"
+
+      - name: Upload APK AAB source and validation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TelaSempreAtiva_V38_PLAY_PLAY_vc20260907
+          path: ${{ runner.temp }}/out
+          if-no-files-found: error
+          retention-days: 14
