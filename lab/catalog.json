@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-11-05T01:39:23Z",
+  "updatedAt": "2026-11-05T18:11:04Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -125,7 +125,7 @@
     {
       "id": "hora",
       "name": "Hora",
-      "packageName": "pt.vcaitano.horajarvis.frases5",
+      "packageName": "pt.vcaitano.horajarvis.frases6",
       "enabled": true,
       "stable": {
         "versionCode": 0,
@@ -136,12 +136,12 @@
         "notes": "O Hora oficial VC3 foi retirado apenas da listagem, mantendo APK estável e fontes anteriores arquivados para recuperação."
       },
       "candidate": {
-        "versionCode": 5,
-        "versionName": "1.3.1-lab",
-        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/teste/Hora-Frases-1.3.1-VC5.apk",
-        "sha256": "4b5e68212e7ea9cdf8ecfb907701c71aab8f690bfe4ef24a92493f2760f28073",
-        "signatureSha256": "8254f8b635c828029cff88f88555f5b63d307512e57755863e4e29cad864d35c",
-        "notes": "Corrige a fala duplicada nas mensagens personalizadas. Nova instalação separada por assinatura incompatível; desative/remova os apps Hora anteriores do dispositivo para não receber avisos em duplicidade."
+        "versionCode": 6,
+        "versionName": "1.3.2-lab",
+        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/teste/Hora-Notificacoes-1.3.2-VC6.apk",
+        "sha256": "f6e03c18d74e7adf89aca02476124891e2a4e65c9534bd52edc5f372281e83a5",
+        "signatureSha256": "c69713c0051fe396c70343a291d8f34fbd1df72a68ae5970de2bb5c77604ffdd",
+        "notes": "CANDIDATO VC6 para testar correção de notificações: solicita permissão na primeira abertura, avisa quando bloqueada, oferece teste imediato e preserva frases personalizadas. Pacote separado devido à assinatura anterior indisponível. TESTE ANDROID REAL PENDENTE."
       }
     },
     {
