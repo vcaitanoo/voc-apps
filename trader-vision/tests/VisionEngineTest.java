@@ -29,6 +29,8 @@ public final class VisionEngineTest {
   int[] pixels=frame();
   VisionEngine.Result r=VisionEngine.analyze(pixels,W,H,22,new int[]{235,495,565,585});
   check(r.buttons,"expected buy/sell buttons");
+  check(r.buyY>=1010&&r.buyY<=1080,
+      "tap must be calibrated INSIDE the colored button: "+r.buyY);
   check(r.bars>=34,"missed narrow candles: "+r.bars);
   check(r.bars<=42,"false positives: "+r.bars);
   check(!r.regime.equals("SEM DADOS"),"should analyze enough candles");
