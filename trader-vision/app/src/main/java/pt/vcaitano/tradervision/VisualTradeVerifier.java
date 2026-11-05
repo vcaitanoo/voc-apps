@@ -44,6 +44,49 @@ public final class VisualTradeVerifier {
         String regex="(?:^|[^0-9])"+expected+"\\s*(?:min|minutos|mins|minutes|m)(?:$|[^a-z])";
         return Pattern.compile(regex).matcher(s).find();
     }
+    private static final Pattern COUNTDOWN=Pattern.compile("(?<![0-9])([0-9]{1,2}):([0-5][0-9])(?![0-9])");
+    private static final Pattern EURO=Pattern.compile("(?:€\\s*)([0-9]{1,6}[,.][0-9]{2})(?![0-9])");
+    /**
+     * Extracts only the active DEMO account balance from top-left of the
+     * Hezilex screen. Never use chart price or trade amount as balance.
+     * Returns null if the selected account cannot be proved DEMO.
+     */
+    public static Double demoBalance(List<Area> items,int w,int h) {
+        if(items==null||w<=0||h<=0)return null;
+        boolean demo=false,real=false;
+        Double balance=null;
+        for(Area a:items) {
+            if(a==null)continue;
+            double x=(a.left+a.right)*.5/w,y=(a.top+a.bottom)*.5/h;
+            if(x<0||x>.46||y<.13||y>.32)continue;
+            String t=a.text.toLowerCase(Locale.ROOT);
+            if(t.contains("conta real")||t.contains("real account"))real=true;
+            if(t.contains("conta demo")||t.contains("demo account"))demo=true;
+            Matcher m=EURO.matcher(t);
+            if(m.find()){
+                try {
+                    double val=Double.parseDouble(m.group(1).replace(',','.'));
+                    if(Double.isFinite(val)&&val>=0&&val<1000000)balance=val;
+                } catch(NumberFormatException ignored){}
+            }
+        }
+        return demo&&!real?balance:null;
+    }
+    /** Countdown inside the live chart PRICE badge at right, not expiry selector. */
+    public static Integer candleRemainingSeconds(List<Area> items,int w,int h) {
+        if(items==null||w<=0||h<=0)return null;
+        for(Area a:items) {
+            if(a==null)continue;
+            double x=(a.left+a.right)*.5/w,y=(a.top+a.bottom)*.5/h;
+            if(x<.84||x>.995||y<.30||y>.75)continue;
+            Matcher m=COUNTDOWN.matcher(a.text);
+            if(m.find()){
+                try {return Integer.parseInt(m.group(1))*60+Integer.parseInt(m.group(2));}
+                catch(NumberFormatException ignored){}
+            }
+        }
+        return null;
+    }
     public static Check evaluate(List<Area> items,int screenW,int screenH,
                                  double expectedStake,int expectedExpiry) {
         if(items==null||screenW<200||screenH<300)
