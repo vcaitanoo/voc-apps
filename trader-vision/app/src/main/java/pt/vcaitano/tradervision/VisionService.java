@@ -319,6 +319,80 @@ public final class VisionService extends Service {
         if(!reason.startsWith("Verificando campos"))setPanel(display);
     }
 
+    /**
+     * Reconcile a single completed DEMO gesture against the visible account
+     * balance AFTER the broker's configured expiry. We never infer a result
+     * from signal direction or from the predicted candle.
+     */
+    private void reconcilePendingIfDue(SharedPreferences prefs,int[] pixels){
+        long placedAt=prefs.getLong("pendingAt",0L);
+        if(placedAt<=0||textRecognizer==null)return;
+        long elapsed=System.currentTimeMillis()-placedAt;
+        int expiry=prefs.getInt("pendingExpiry",5);
+        long expiryMs=expiry*60000L;
+        if(elapsed<expiryMs+3000L)return;
+        if(elapsed>expiryMs+180000L){
+            if(!outcomeOcrPending.get()){
+                prefs.edit().putLong("pendingAt",0L)
+                    .putInt("unresolved",prefs.getInt("unresolved",0)+1)
+                    .putString("outcomeCandidate","")
+                    .putInt("outcomeConsistent",0).apply();
+                reportGesture("RESULTADO NÃO CONFIRMADO: consulte Histórico na Hezilex. "+
+                    "Não foi contado como WIN nem LOSS.");
+            }
+            return;
+        }
+        long now=SystemClock.elapsedRealtime();
+        if(now-lastOutcomeScanAt<5000L || !outcomeOcrPending.compareAndSet(false,true))return;
+        lastOutcomeScanAt=now;
+        final Bitmap bitmap;
+        try {bitmap=Bitmap.createBitmap(pixels,width,height,Bitmap.Config.ARGB_8888);}
+        catch(Exception e){outcomeOcrPending.set(false);return;}
+        textRecognizer.process(InputImage.fromBitmap(bitmap,0))
+          .addOnSuccessListener(words->{
+              if(disposing||!running||prefs.getLong("pendingAt",0L)!=placedAt)return;
+              List<VisualTradeVerifier.Area> areas=new ArrayList<>();
+              for(Text.TextBlock block:words.getTextBlocks()){
+                  android.graphics.Rect b=block.getBoundingBox();
+                  if(b!=null)areas.add(new VisualTradeVerifier.Area(
+                      block.getText(),b.left,b.top,b.right,b.bottom));
+                  for(Text.Line line:block.getLines()){
+                      android.graphics.Rect lr=line.getBoundingBox();
+                      if(lr!=null)areas.add(new VisualTradeVerifier.Area(
+                          line.getText(),lr.left,lr.top,lr.right,lr.bottom));
+                  }
+              }
+              Double actual=VisualTradeVerifier.demoBalance(areas,width,height);
+              double before=prefs.getFloat("pendingBefore",Float.NaN);
+              double stake=prefs.getFloat("pendingStake",Float.NaN);
+              OutcomeLedger.Result outcome=OutcomeLedger.reconcile(
+                  before,actual,stake,System.currentTimeMillis()-placedAt,expiryMs);
+              if(outcome!=OutcomeLedger.Result.WIN&&outcome!=OutcomeLedger.Result.LOSS)return;
+              String code=outcome.name();
+              String last=prefs.getString("outcomeCandidate","");
+              int confirmed=last.equals(code)?prefs.getInt("outcomeConsistent",0)+1:1;
+              if(confirmed<2){
+                  prefs.edit().putString("outcomeCandidate",code)
+                      .putInt("outcomeConsistent",confirmed).apply();
+                  return;
+              }
+              // A settled result is applied once: pendingAt is set to 0.
+              String counter=outcome==OutcomeLedger.Result.WIN?"wins":"losses";
+              prefs.edit().putLong("pendingAt",0L)
+                  .putString("outcomeCandidate","").putInt("outcomeConsistent",0)
+                  .putInt(counter,prefs.getInt(counter,0)+1).apply();
+              reportGesture((outcome==OutcomeLedger.Result.WIN?"WIN":"LOSS")+
+                  " identificado pelo saldo da Conta Demo após a expiração. "+
+                  "Confirme com o Histórico da Hezilex.");
+          })
+          .addOnFailureListener(error->android.util.Log.w(
+              "VOCVision","OCR do resultado não disponível",error))
+          .addOnCompleteListener(task->{
+              bitmap.recycle();
+              outcomeOcrPending.set(false);
+          });
+    }
+
     private void verifyAndPlaceDemoTrade(VisionEngine.Result result,
                                           SharedPreferences prefs,int[] pixels,
                                           double stake,int expiry){
