@@ -56,7 +56,7 @@ public final class MainActivity extends Activity {
         root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(18),dp(18),dp(18),dp(24));scroll.addView(root);setContentView(scroll);
         TextView title=label("VOC TRADER VISION",23,0xff72e6bd,true);root.addView(title);
-        root.addView(label("V0.5.0 · Entrada DEMO · Hezilex no Chrome",13,0xffd0dae5,false));
+        root.addView(label("V0.6.0 · Entrada DEMO · Hezilex no Chrome",13,0xffd0dae5,false));
         root.addView(label("O bot captura pixels do gráfico, aplica estratégias e somente pode tocar se tiver todos os controles verificados.",13,0xffa4b8cd,false));
 
         demo=new CheckBox(this);demo.setText("Estou usando CONTA DEMO na Hezilex");
