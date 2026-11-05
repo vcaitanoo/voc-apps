@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-11-04T23:14:11Z",
+  "updatedAt": "2026-11-05T00:24:09Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -158,12 +158,12 @@
         "notes": "Sem estável aprovada; somente candidato DEMO V2."
       },
       "candidate": {
-        "versionCode": 4,
-        "versionName": "0.4.0-demo",
-        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-trader-vision-gestao-teste/candidate/VOC-Trader-Vision-0.4.0-demo-VC4.apk",
-        "sha256": "a567f412d23ee308251d752b3e04f2cd21371f9fe4679792a130e234194d441b",
+        "versionCode": 5,
+        "versionName": "0.5.0-demo",
+        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-trader-vision-gestao-teste/candidate/VOC-Trader-Vision-0.5.0-demo-VC5.apk",
+        "sha256": "6612e077545e4ae901b78d5e2b2dd75bef60763a3a116fa1d12679e73c310670",
         "signatureSha256": "e52d1c13baa3a4e7f73b71cb7e15bc1fdd8709650aa64fe8a9b86bb26a5491f9",
-        "notes": "VC4 DEMO: sem cooldown falso quando OCR/gesto falha; confirma Conta Demo, Valor e Expiração no ecrã via ML Kit OCR offline antes de enviar toque no Chrome. Toque Android só inicia intervalo quando concluído, e painel mostra recusa. Permissões solicitadas ao abrir (consentimento manual obrigatório pelo Android), GUARDAR CONFIGURAÇÃO movido para baixo das ativações. Mesmo package e MESMA assinatura permanente VC3, atualização por cima. Gestão/estratégias/painel móvel preservados. Build e estrutura verificados; execução Android real ainda não testada. Scores NÃO representam probabilidade de vitória."
+        "notes": "VC5 DEMO: corrige detecção de velas finas e junção de candles; ignora a sobreposição do painel. Sincroniza entradas com cronómetro da vela da própria Hezilex (primeiros 15s), sem depender do relógio Android. Após expiração, tenta apurar WIN/LOSS por duas leituras coerentes do saldo demo; sem comprovação, marca resultado não confirmado. Mantém estratégias, gestão, limite de entradas, permissões e um único app/package, assinado com o mesmo certificado VC3/VC4. Testes e APK verificados estruturalmente; execução da VC5 em Android real ainda pendente."
       }
     }
   ]
