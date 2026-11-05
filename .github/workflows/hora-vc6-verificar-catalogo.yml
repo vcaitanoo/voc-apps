@@ -1,0 +1,50 @@
+name: Hora VC6 - verificar catalogo real e APK HTTPS
+on:
+  push:
+    branches:
+      - fix/hora-notificacoes-vc6-20261105
+    paths:
+      - '.github/workflows/hora-vc6-verificar-catalogo.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar catalogo do VOC Lab normal e SHA remoto do APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, hashlib, urllib.request
+          urls={
+            "primario":"https://temporary-snappy-redwood-yqm3s0d.vercel.app/catalog.json",
+            "github":"https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/lab/catalog.json"
+          }
+          expected="f6e03c18d74e7adf89aca02476124891e2a4e65c9534bd52edc5f372281e83a5"
+          apk="https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/teste/Hora-Notificacoes-1.3.2-VC6.apk"
+          for name,url in urls.items():
+            req=urllib.request.Request(url+"?v=vc6-20261105",headers={"Cache-Control":"no-cache","User-Agent":"VOC-LAB-VERIFY-VC6"})
+            with urllib.request.urlopen(req,timeout=35) as response:
+              assert response.status==200,(name,response.status)
+              data=json.loads(response.read().decode("utf-8"))
+            apps=data["apps"]; entry=[a for a in apps if a.get("id")=="hora"]
+            assert len(entry)==1,(name,len(entry))
+            one=entry[0]
+            assert one["name"]=="Hora",one
+            assert one["packageName"]=="pt.vcaitano.horajarvis.frases6",one
+            assert one["candidate"]["versionCode"]==6,one
+            assert one["candidate"]["sha256"]==expected,one
+            assert one["candidate"]["apkUrl"]==apk,one
+            assert one["stable"]["versionCode"]==0,(name,"unexpected stable modification")
+            assert len([a for a in apps if a.get("id")!="hora"])>=7,(name,"missing other apps")
+            print("CATALOGO_OK",name,"APPS",len(apps),"HORA_VC6_CONFIRMED","ID",one["packageName"])
+          with urllib.request.urlopen(urllib.request.Request(apk,headers={"User-Agent":"VOC-LAB-VERIFY-VC6"}),timeout=35) as response:
+            assert response.status==200
+            data=response.read()
+          sha=hashlib.sha256(data).hexdigest()
+          assert sha==expected,(sha,expected)
+          assert data[:2]==b"PK"
+          print("APK_HTTPS_VERIFICADO","BYTES",len(data),"SHA256",sha)
+          PY
