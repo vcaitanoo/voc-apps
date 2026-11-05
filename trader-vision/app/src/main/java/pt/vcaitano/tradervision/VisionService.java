@@ -73,8 +73,11 @@ public final class VisionService extends Service {
     private long lastFrame=0,lastAttemptElapsedMs=-1L;
     private volatile String lastGestureMessage="";
     private volatile long lastGestureMessageUntilMs=0L;
-    private String previousSignal="";
-    private int stability=0;
+    private final SignalConfirmation signalConfirmation=new SignalConfirmation();
+    private volatile String candleWaitReason="";
+    private volatile long nextCandleOcrAt=0L;
+    private long lastPanelPaintAt=0L;
+    private String lastPanelPainted="";
     private volatile boolean disposing=false;
     private final AtomicBoolean processing=new AtomicBoolean(false);
 
@@ -265,9 +268,11 @@ public final class VisionService extends Service {
         double stake=plan.stake;
         boolean auto=p.getBoolean("auto",false),demo=p.getBoolean("demo",false);
         boolean hasSignal=(r.direction.equals("COMPRAR")||r.direction.equals("VENDER"))&&r.score>=minScore;
-        String sig=hasSignal?r.direction+"|"+r.strategy:"";
-        if(!sig.isEmpty()&&sig.equals(previousSignal))stability++;else stability=0;
-        previousSignal=sig;
+        // A estratégia mais votada pode mudar a cada captura sem mudar
+        // COMPRAR/VENDER. Confirma 3 de 5 leituras, com no máximo 1 oposta.
+        // O frame atual SEMPRE precisa ter direção e nota válidas.
+        SignalConfirmation.State confirmed=signalConfirmation.observe(
+            r.direction,r.score,minScore);
 
         if(!auto)reason="OBSERVAÇÃO: cliques desativados";
         else if(!demo)reason="BLOQUEADO: confirme CONTA DEMO";
@@ -286,23 +291,32 @@ public final class VisionService extends Service {
             }
             int count=p.getInt("trades",0),losses=p.getInt("losses",0);
             long elapsed=lastAttemptElapsedMs<0?-1L:SystemClock.elapsedRealtime()-lastAttemptElapsedMs;
-            EntryTiming.Decision timing=EntryTiming.evaluate(stability,elapsed,timeframe,expiry);
+            EntryTiming.Decision timing=EntryTiming.evaluate(
+                Math.max(0,confirmed.progress-1),elapsed,timeframe,expiry);
             if(!plan.valid)reason="BLOQUEADO: saldo inferior a €1 ou risco configurado inválido";
             else if(count>=max)reason="Limite diário de operações";
             else if(losses>=3)reason="Limite de 3 perdas apontadas hoje";
             else if(!timing.allowed)reason=timing.message;
             else if(TapService.INSTANCE==null)reason="Ative o serviço de acessibilidade";
             else if(visualVerificationPending.get())reason="Verificando conta DEMO e campos no ecrã...";
+            else if(!confirmed.ready)
+                reason="Confirmação visual "+confirmed.progress+
+                    "/3 na direção "+confirmed.direction+" (últimas 5 capturas)";
             else if(lastVerificationFailureElapsedMs>=0
                  &&SystemClock.elapsedRealtime()-lastVerificationFailureElapsedMs<10000L)
                 reason="Reverificando em "+((10000L-
                     (SystemClock.elapsedRealtime()-lastVerificationFailureElapsedMs)+999L)/1000L)+
                     "s: "+lastGestureMessage;
+            else if(SystemClock.elapsedRealtime()<nextCandleOcrAt)
+                reason=candleWaitReason.isEmpty()?
+                    "Confirmando cronômetro da vela na Hezilex...":candleWaitReason;
             else {
-                // Não iniciar cooldown antes da resposta do Android. Capturas,
-                // gestos recusados e falhas de OCR não contam como operação.
+                // OCR da vela tem limite de 1 leitura/3s. A cada segundo,
+                // repintar/realocar painel e analisar sua própria captura
+                // causava flicker e mensagens de contagem desatualizadas.
+                nextCandleOcrAt=SystemClock.elapsedRealtime()+3000L;
                 verifyAndPlaceDemoTrade(r,p,pixels,stake,expiry);
-                reason="Lendo Conta Demo, Valor e Expiração (OCR)...";
+                reason="Validando Conta Demo, Valor, Expiração e relógio da vela...";
             }
         }
         String gestao=plan.valid?String.format(Locale.US,
@@ -435,10 +449,12 @@ public final class VisionService extends Service {
               CandleClock.Decision clock=CandleClock.check(
                   VisualTradeVerifier.candleRemainingSeconds(areas,width,height),timeframe);
               if(!clock.allowed){
-                  // Not a failed order. Re-check rapidly until a REAL new candle.
-                  reportGesture(clock.reason);
+                  // NÃO persistir esse tempo como alerta por 30 segundos.
+                  // É um cronômetro informativo: pode mudar a cada leitura.
+                  candleWaitReason=clock.reason;
                   return;
               }
+              candleWaitReason="";
               final Double initialBalance=VisualTradeVerifier.demoBalance(areas,width,height);
               if(initialBalance==null){
                   rejectVerification("Saldo da Conta Demo não confirmado no topo da Hezilex");
@@ -484,15 +500,19 @@ public final class VisionService extends Service {
     private void reportGesture(String message){
         lastGestureMessage=message;
         lastGestureMessageUntilMs=SystemClock.elapsedRealtime()+30000L;
-        setPanel(message);
+        setPanel(message,true);
     }
-    private void setPanel(String s){ui.post(()->{
-        if(!disposing&&text!=null){
-            text.setText(s);
-            // OCR e velas devem ignorar a altura ATUAL do painel após
-            // alterações nas linhas, não o retângulo inicial.
-            text.post(this::updateOverlayMask);
-        }
+    private void setPanel(String message){setPanel(message,false);}
+    private void setPanel(String message,boolean urgent){ui.post(()->{
+        if(disposing||text==null)return;
+        long now=SystemClock.elapsedRealtime();
+        if(message.equals(lastPanelPainted))return;
+        if(!urgent&&now-lastPanelPaintAt<2200L)return;
+        lastPanelPainted=message;
+        lastPanelPaintAt=now;
+        text.setText(message);
+        // O overlay mudou? Só então recalibrar a área ocluída.
+        text.post(this::updateOverlayMask);
     });}
     @Override public void onDestroy(){
         disposing=true;running=false;
