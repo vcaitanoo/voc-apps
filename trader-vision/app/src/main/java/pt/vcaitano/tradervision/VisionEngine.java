@@ -71,24 +71,36 @@ public final class VisionEngine {
         // Os botões são apenas a calibração PARA EXECUTAR TOQUES.
         // A leitura das velas deve continuar mesmo quando o painel móvel
         // encobre Comprar/Vender. A VC5 retornava aqui com 0 velas.
-        int bestY=-1,bestGreen=-1,bestRed=0;
+        int bestY=-1,bestRed=0;
         int leftSamples=0,rightSamples=0;
         for(int x=(int)(w*.04);x<(int)(w*.46);x+=6)leftSamples++;
         for(int x=(int)(w*.54);x<(int)(w*.96);x+=6)rightSamples++;
-        for(int y=(int)(h*.58);y<(int)(h*.87);y+=3) {
-            int ng=0,nr=0;
-            for(int x=(int)(w*.04);x<(int)(w*.46);x+=6)
-                if(!masked(x,y,occlusion)&&green(pixels[y*w+x]))ng++;
-            for(int x=(int)(w*.54);x<(int)(w*.96);x+=6)
-                if(!masked(x,y,occlusion)&&red(pixels[y*w+x]))nr++;
-            // Uma única faixa verde suficiente posiciona a área do gráfico;
-            // vermelho encoberto é motivo para BLOQUEAR TOQUE, não análise.
-            if(ng>=Math.max(8,(int)(leftSamples*.55)) && ng>bestGreen) {
-                bestGreen=ng;bestRed=nr;bestY=y;
+        int runStart=-1,bestLength=0,bestStart=-1,bestEnd=-1;
+        for(int y=(int)(h*.58);y<=(int)(h*.87)+3;y+=3) {
+            int ng=0;
+            if(y<(int)(h*.87)){
+                for(int x=(int)(w*.04);x<(int)(w*.46);x+=6)
+                    if(!masked(x,y,occlusion)&&green(pixels[y*w+x]))ng++;
+            }
+            boolean wideGreen=ng>=Math.max(8,(int)(leftSamples*.55));
+            if(wideGreen&&runStart<0)runStart=y;
+            if(!wideGreen&&runStart>=0){
+                int last=y-3;
+                if(last-runStart+3>bestLength){
+                    bestLength=last-runStart+3;bestStart=runStart;bestEnd=last;
+                }
+                runStart=-1;
             }
         }
+        // Posiciona o toque no CENTRO vertical do botão, não no fim da faixa.
+        // Sem faixa reconhecida, ainda analisamos o gráfico, mas bloqueamos toque.
+        if(bestLength>=Math.max(12,(int)(h*.024))){
+            bestY=(bestStart+bestEnd)/2;
+            for(int x=(int)(w*.54);x<(int)(w*.96);x+=6)
+                if(!masked(x,bestY,occlusion)&&red(pixels[bestY*w+x]))bestRed++;
+        }
         out.buyX=(int)(w*.255);out.sellX=(int)(w*.745);
-        out.buyY=out.sellY=bestY<0?-1:bestY+(int)(h*.028);
+        out.buyY=out.sellY=bestY;
         out.buttons=bestY>=0 && bestRed>=Math.max(8,(int)(rightSamples*.40))
             && !masked(out.buyX,out.buyY,occlusion)
             && !masked(out.sellX,out.sellY,occlusion);
