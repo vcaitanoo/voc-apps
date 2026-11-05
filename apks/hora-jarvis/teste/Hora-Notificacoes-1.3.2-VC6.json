@@ -1,0 +1,11 @@
+{
+  "id": "hora",
+  "name": "Hora",
+  "packageName": "pt.vcaitano.horajarvis.frases6",
+  "versionCode": 6,
+  "versionName": "1.3.2-lab",
+  "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/hora-jarvis/teste/Hora-Notificacoes-1.3.2-VC6.apk",
+  "sha256": "f6e03c18d74e7adf89aca02476124891e2a4e65c9534bd52edc5f372281e83a5",
+  "signatureSha256": "c69713c0051fe396c70343a291d8f34fbd1df72a68ae5970de2bb5c77604ffdd",
+  "notes": "Teste: corrigido pedido inicial de notificacoes/alarme exato, exibicao de bloqueio, reagendamento, e teste de notificacao. APK separado por assinatura anterior nao preservada."
+}
