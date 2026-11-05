@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-11-05T00:56:31Z",
+  "updatedAt": "2026-11-05T01:39:23Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -158,12 +158,12 @@
         "notes": "Sem estável aprovada; somente candidato DEMO V2."
       },
       "candidate": {
-        "versionCode": 6,
-        "versionName": "0.6.0-demo",
-        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-trader-vision-gestao-teste/candidate/VOC-Trader-Vision-0.6.0-demo-VC6.apk",
-        "sha256": "3bf00b2b277292aec724d5597f8eee476b4e9eb4764a0641382a778f6052a125",
+        "versionCode": 7,
+        "versionName": "0.7.0-demo",
+        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-trader-vision-gestao-teste/candidate/VOC-Trader-Vision-0.7.0-demo-VC7.apk",
+        "sha256": "a6210df7b93e3658de4314618fa1791e5eeeee757d4b0e06d48e13d8c7279ba3",
         "signatureSha256": "e52d1c13baa3a4e7f73b71cb7e15bc1fdd8709650aa64fe8a9b86bb26a5491f9",
-        "notes": "VC6 DEMO: corrige regressão da VC5 que zerava velas quando o painel móvel encobria Vender. Agora a análise de candles prossegue independentemente dos botões, enquanto toques permanecem BLOQUEADOS se os botões estiverem ocultos. Corrige calibração de toque para centro vertical dos botões e atualiza máscara conforme o painel muda de tamanho. Preserva leitura de velas, timing Hezilex, apuração DEMO, estratégias e gestão. Mesmo package, mesma assinatura VC3/VC4/VC5; instala por cima. Fonte reconstruída da VC4 testada. Build, assinatura, hash e distribuição verificados; execução Android VC6 ainda não testada."
+        "notes": "VC7 DEMO: corrige sinal oscilante que impedia 3 confirmações, agora valida a direção por 3 das últimas 5 capturas e rejeita direções contraditórias. Limita OCR do cronômetro a cada 3s e não mantém contagem antiga no painel por 30s; redesenho limitado para reduzir piscadas. Mantém entradas somente no início da vela confirmada, conta DEMO, gestão, scanner de velas, painel móvel e resultados anteriores. MESMO package e assinatura permanente VC3. Sem novo app. Build, SHA, assinatura e URL verificados; execução real no Android ainda pendente."
       }
     }
   ]
