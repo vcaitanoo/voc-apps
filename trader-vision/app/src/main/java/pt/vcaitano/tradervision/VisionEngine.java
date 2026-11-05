@@ -68,26 +68,37 @@ public final class VisionEngine {
         if(pixels==null||w<250||h<350||pixels.length<w*h) {
             out.detail="Imagem inválida"; return out;
         }
-        // Reconhece comprimentos reais dos botões, não memoriza coordenadas
-        int bestY=-1,best=-1;
+        // Os botões são apenas a calibração PARA EXECUTAR TOQUES.
+        // A leitura das velas deve continuar mesmo quando o painel móvel
+        // encobre Comprar/Vender. A VC5 retornava aqui com 0 velas.
+        int bestY=-1,bestGreen=-1,bestRed=0;
+        int leftSamples=0,rightSamples=0;
+        for(int x=(int)(w*.04);x<(int)(w*.46);x+=6)leftSamples++;
+        for(int x=(int)(w*.54);x<(int)(w*.96);x+=6)rightSamples++;
         for(int y=(int)(h*.58);y<(int)(h*.87);y+=3) {
             int ng=0,nr=0;
-            for(int x=(int)(w*.04);x<(int)(w*.46);x+=6)if(green(pixels[y*w+x]))ng++;
-            for(int x=(int)(w*.54);x<(int)(w*.96);x+=6)if(red(pixels[y*w+x]))nr++;
-            int total=ng+nr;
-            if(ng>0.42*w/6*.42 && nr>0.42*w/6*.42 && total>best){best=total;bestY=y;}
+            for(int x=(int)(w*.04);x<(int)(w*.46);x+=6)
+                if(!masked(x,y,occlusion)&&green(pixels[y*w+x]))ng++;
+            for(int x=(int)(w*.54);x<(int)(w*.96);x+=6)
+                if(!masked(x,y,occlusion)&&red(pixels[y*w+x]))nr++;
+            // Uma única faixa verde suficiente posiciona a área do gráfico;
+            // vermelho encoberto é motivo para BLOQUEAR TOQUE, não análise.
+            if(ng>=Math.max(8,(int)(leftSamples*.55)) && ng>bestGreen) {
+                bestGreen=ng;bestRed=nr;bestY=y;
+            }
         }
-        out.buttons=bestY>=0;
-        out.buyY=out.sellY=bestY+(int)(h*.028);
         out.buyX=(int)(w*.255);out.sellX=(int)(w*.745);
-        if(!out.buttons) {
-            out.detail="Não achei simultaneamente Comprar e Vender; mantenha a Hezilex visível.";
-            return out;
-        }
+        out.buyY=out.sellY=bestY<0?-1:bestY+(int)(h*.028);
+        out.buttons=bestY>=0 && bestRed>=Math.max(8,(int)(rightSamples*.40))
+            && !masked(out.buyX,out.buyY,occlusion)
+            && !masked(out.sellX,out.sellY,occlusion);
         out.chartLeft=(int)(w*.074);
         out.chartRight=(int)(w*.89); // exclude price labels on the right
         out.chartTop=(int)(h*.34); // include high candles that V4 cropped
-        out.chartBottom=clamp(bestY-(int)(h*.043),out.chartTop+40,h-1);
+        // Se nem mesmo Comprar estiver visível, calcular uma área prudente
+        // ainda permite dizer quantas velas há, mas NUNCA autoriza toques.
+        int buttonBoundary=bestY>=0?bestY:(int)(h*.69);
+        out.chartBottom=clamp(buttonBoundary-(int)(h*.043),out.chartTop+40,h-1);
         if(out.chartBottom-out.chartTop<120) {
             out.detail="Área visível do gráfico muito pequena";return out;
         }
@@ -169,6 +180,10 @@ public final class VisionEngine {
             return out;
         }
         evaluate(out);
+        if(!out.buttons) {
+            out.detail+=" · BOTÕES PARCIALMENTE OCULTOS: mova o painel para"+
+                " liberar Comprar e Vender. Análise de velas continua ativa.";
+        }
         return out;
     }
     private static double ema(double[]a,int n,int end){
