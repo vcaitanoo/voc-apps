@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-11-05T00:24:09Z",
+  "updatedAt": "2026-11-05T00:56:31Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -158,12 +158,12 @@
         "notes": "Sem estável aprovada; somente candidato DEMO V2."
       },
       "candidate": {
-        "versionCode": 5,
-        "versionName": "0.5.0-demo",
-        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-trader-vision-gestao-teste/candidate/VOC-Trader-Vision-0.5.0-demo-VC5.apk",
-        "sha256": "6612e077545e4ae901b78d5e2b2dd75bef60763a3a116fa1d12679e73c310670",
+        "versionCode": 6,
+        "versionName": "0.6.0-demo",
+        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/voc-trader-vision-gestao-teste/candidate/VOC-Trader-Vision-0.6.0-demo-VC6.apk",
+        "sha256": "3bf00b2b277292aec724d5597f8eee476b4e9eb4764a0641382a778f6052a125",
         "signatureSha256": "e52d1c13baa3a4e7f73b71cb7e15bc1fdd8709650aa64fe8a9b86bb26a5491f9",
-        "notes": "VC5 DEMO: corrige detecção de velas finas e junção de candles; ignora a sobreposição do painel. Sincroniza entradas com cronómetro da vela da própria Hezilex (primeiros 15s), sem depender do relógio Android. Após expiração, tenta apurar WIN/LOSS por duas leituras coerentes do saldo demo; sem comprovação, marca resultado não confirmado. Mantém estratégias, gestão, limite de entradas, permissões e um único app/package, assinado com o mesmo certificado VC3/VC4. Testes e APK verificados estruturalmente; execução da VC5 em Android real ainda pendente."
+        "notes": "VC6 DEMO: corrige regressão da VC5 que zerava velas quando o painel móvel encobria Vender. Agora a análise de candles prossegue independentemente dos botões, enquanto toques permanecem BLOQUEADOS se os botões estiverem ocultos. Corrige calibração de toque para centro vertical dos botões e atualiza máscara conforme o painel muda de tamanho. Preserva leitura de velas, timing Hezilex, apuração DEMO, estratégias e gestão. Mesmo package, mesma assinatura VC3/VC4/VC5; instala por cima. Fonte reconstruída da VC4 testada. Build, assinatura, hash e distribuição verificados; execução Android VC6 ainda não testada."
       }
     }
   ]
