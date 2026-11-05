@@ -56,7 +56,7 @@ public final class MainActivity extends Activity {
         root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(18),dp(18),dp(18),dp(24));scroll.addView(root);setContentView(scroll);
         TextView title=label("VOC TRADER VISION",23,0xff72e6bd,true);root.addView(title);
-        root.addView(label("V0.4.0 · Entrada DEMO · Hezilex no Chrome",13,0xffd0dae5,false));
+        root.addView(label("V0.6.0 · Entrada DEMO · Hezilex no Chrome",13,0xffd0dae5,false));
         root.addView(label("O bot captura pixels do gráfico, aplica estratégias e somente pode tocar se tiver todos os controles verificados.",13,0xffa4b8cd,false));
 
         demo=new CheckBox(this);demo.setText("Estou usando CONTA DEMO na Hezilex");
@@ -106,7 +106,7 @@ public final class MainActivity extends Activity {
             Intent i=new Intent(this,VisionService.class);i.setAction(VisionService.ACTION_STOP);
             startService(i);msg("Paragem solicitada");
         });
-        root.addView(label("Resultados registrados manualmente (não estimados pelo gráfico)",14,0xffdbe7f4,true));
+        root.addView(label("Resultados: apuração pelo saldo DEMO após expiração; em caso de dúvida, marcar manualmente",14,0xffdbe7f4,true));
         Button win=button("MARCAR WIN",0xff147b58);root.addView(win);
         win.setOnClickListener(v->mark(true));
         Button loss=button("MARCAR LOSS",0xffa44343);root.addView(loss);
@@ -180,7 +180,11 @@ public final class MainActivity extends Activity {
     private void mark(boolean win){
         String day=java.time.LocalDate.now().toString();
         if(!day.equals(prefs.getString("day","")))prefs.edit().putString("day",day).putInt("wins",0).putInt("losses",0).putInt("trades",0).apply();
-        prefs.edit().putInt(win?"wins":"losses",prefs.getInt(win?"wins":"losses",0)+1).apply();
+        prefs.edit().putInt(win?"wins":"losses",prefs.getInt(win?"wins":"losses",0)+1)
+          .putLong("pendingAt",0L)
+          .putString("outcomeCandidate","")
+          .putInt("outcomeConsistent",0)
+          .apply();
         updateStatus();
     }
     private void msg(String s){android.widget.Toast.makeText(this,s,android.widget.Toast.LENGTH_LONG).show();}
@@ -190,10 +194,10 @@ public final class MainActivity extends Activity {
         int l=day.equals(prefs.getString("day",""))?prefs.getInt("losses",0):0;
         int t=day.equals(prefs.getString("day",""))?prefs.getInt("trades",0):0;
         if(status!=null)status.setText(String.format(Locale.US,
-            "Operações tentadas hoje: %d | WIN: %d | LOSS: %d\n"+
+            "Gestos hoje: %d | WIN: %d | LOSS: %d | SEM CONFIRMAÇÃO: %d\n"+
             "Acessibilidade: %s | Captura: %s\n"+
             "Estado: fase experimental; execução real no dispositivo ainda não validada.",
-            t,w,l,TapService.INSTANCE==null?"desligada":"ligada",
+            t,w,l,prefs.getInt("unresolved",0),TapService.INSTANCE==null?"desligada":"ligada",
             VisionService.running?"ativa":"parada"));
     }
     private boolean accessibilityEnabled(){
