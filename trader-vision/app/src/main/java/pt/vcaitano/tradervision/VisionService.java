@@ -486,7 +486,14 @@ public final class VisionService extends Service {
         lastGestureMessageUntilMs=SystemClock.elapsedRealtime()+30000L;
         setPanel(message);
     }
-    private void setPanel(String s){ui.post(()->{if(!disposing&&text!=null)text.setText(s);});}
+    private void setPanel(String s){ui.post(()->{
+        if(!disposing&&text!=null){
+            text.setText(s);
+            // OCR e velas devem ignorar a altura ATUAL do painel após
+            // alterações nas linhas, não o retângulo inicial.
+            text.post(this::updateOverlayMask);
+        }
+    });}
     @Override public void onDestroy(){
         disposing=true;running=false;
         if(reader!=null){try{reader.setOnImageAvailableListener(null,null);reader.close();}catch(Exception ignored){}reader=null;}
