@@ -65,6 +65,9 @@ public final class VisionService extends Service {
     private PowerManager.WakeLock wake;
     private TextRecognizer textRecognizer;
     private final AtomicBoolean visualVerificationPending=new AtomicBoolean(false);
+    private final AtomicBoolean outcomeOcrPending=new AtomicBoolean(false);
+    private volatile int[] overlayMaskBounds;
+    private long lastOutcomeScanAt=0L;
     private long lastVerificationFailureElapsedMs=-1L;
     private int width,height,density;
     private long lastFrame=0,lastAttemptElapsedMs=-1L;
@@ -162,6 +165,7 @@ public final class VisionService extends Service {
         installPanelDrag(dragHandle);
         installPanelDrag(text);
         windows.addView(overlay,lp);
+        overlay.post(this::updateOverlayMask);
         // A posição é salva como fração da área disponível: mantém-se
         // acessível após mudança da altura do painel ou do tamanho da tela.
         overlay.post(()->{
@@ -173,8 +177,16 @@ public final class VisionService extends Service {
                 lp.x=PanelPosition.restore(rx,availableWidth(),dp(4));
                 lp.y=PanelPosition.restore(ry,availableHeight(),dp(42));
                 windows.updateViewLayout(overlay,lp);
+                overlay.post(this::updateOverlayMask);
             }
         });
+    }
+    private void updateOverlayMask(){
+        if(disposing||overlay==null||overlay.getWidth()==0)return;
+        int[] xy=new int[2];
+        overlay.getLocationOnScreen(xy);
+        overlayMaskBounds=new int[]{xy[0]-dp(4),xy[1]-dp(4),
+            xy[0]+overlay.getWidth()+dp(4),xy[1]+overlay.getHeight()+dp(4)};
     }
     private int availableWidth(){
         return Math.max(0,width-(overlay==null?dp(252):overlay.getWidth()));
@@ -200,6 +212,7 @@ public final class VisionService extends Service {
                     overlayParams.y=PanelPosition.move(originXY[1],
                         event.getRawY()-originRaw[1],availableHeight());
                     windows.updateViewLayout(overlay,overlayParams);
+                    overlay.post(this::updateOverlayMask);
                     return true;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
@@ -234,7 +247,8 @@ public final class VisionService extends Service {
             whole.getPixels(argb,0,width,0,0,width,height);whole.recycle();
             SharedPreferences p=getSharedPreferences("vision",MODE_PRIVATE);
             int minBars=Math.max(18,Math.min(100,MainActivity.getI(p,"candles",22)));
-            VisionEngine.Result r=VisionEngine.analyze(argb,width,height,minBars);
+            VisionEngine.Result r=VisionEngine.analyze(argb,width,height,minBars,overlayMaskBounds);
+            reconcilePendingIfDue(p,argb);
             int minScore=Math.max(60,Math.min(99,MainActivity.getI(p,"score",78)));
             evaluateSignal(r,minScore,p,argb);
         }catch(Throwable ex){android.util.Log.w("VOCVision","Falha leitura",ex);}
@@ -257,6 +271,8 @@ public final class VisionService extends Service {
 
         if(!auto)reason="OBSERVAÇÃO: cliques desativados";
         else if(!demo)reason="BLOQUEADO: confirme CONTA DEMO";
+        else if(p.getLong("pendingAt",0L)>0L)
+            reason="Aguardando resultado da entrada anterior na conta DEMO";
         else if(!r.buttons)reason="BLOQUEADO: botões não identificados";
         else if(!hasSignal)reason="Aguardando nota mínima "+minScore;
         else {
@@ -295,8 +311,9 @@ public final class VisionService extends Service {
             plan.aboveTarget?" (mínimo obrigatório)":""):
             "GESTÃO: saldo/risco inválido";
         String display=r.panel()+"\n"+gestao+"\n"+
-            "TENTATIVAS "+p.getInt("trades",0)+" · WIN "+p.getInt("wins",0)+
-            " · LOSS "+p.getInt("losses",0)+"\n"+reason;
+            "GESTOS "+p.getInt("trades",0)+" · WIN "+p.getInt("wins",0)+
+            " · LOSS "+p.getInt("losses",0)+" · NÃO CONFIRMADOS "+
+            p.getInt("unresolved",0)+"\n"+reason;
         if(SystemClock.elapsedRealtime()<lastGestureMessageUntilMs&&!lastGestureMessage.isEmpty())
             display+="\n"+lastGestureMessage;
         if(!reason.startsWith("Verificando campos"))setPanel(display);
@@ -340,6 +357,19 @@ public final class VisionService extends Service {
                   rejectVerification(verified.reason);
                   return;
               }
+              int timeframe=MainActivity.getI(prefs,"tf",5);
+              CandleClock.Decision clock=CandleClock.check(
+                  VisualTradeVerifier.candleRemainingSeconds(areas,width,height),timeframe);
+              if(!clock.allowed){
+                  // Not a failed order. Re-check rapidly until a REAL new candle.
+                  reportGesture(clock.reason);
+                  return;
+              }
+              final Double initialBalance=VisualTradeVerifier.demoBalance(areas,width,height);
+              if(initialBalance==null){
+                  rejectVerification("Saldo da Conta Demo não confirmado no topo da Hezilex");
+                  return;
+              }
               // A análise pode mudar durante o OCR; só autorizar o sinal
               // que estava estável quando a imagem foi capturada.
               TapService tap=TapService.INSTANCE;
@@ -351,7 +381,15 @@ public final class VisionService extends Service {
                     lastAttemptElapsedMs=SystemClock.elapsedRealtime();
                     lastVerificationFailureElapsedMs=-1L;
                     int count=prefs.getInt("trades",0);
-                    prefs.edit().putInt("trades",count+1).apply();
+                    prefs.edit()
+                        .putInt("trades",count+1)
+                        .putLong("pendingAt",System.currentTimeMillis())
+                        .putFloat("pendingBefore",initialBalance.floatValue())
+                        .putFloat("pendingStake",(float)stake)
+                        .putInt("pendingExpiry",expiry)
+                        .putString("outcomeCandidate","")
+                        .putInt("outcomeConsistent",0)
+                        .apply();
                     reportGesture("TOQUE "+(buy?"COMPRAR":"VENDER")+
                         " enviado ao Android. Verifique no histórico da Hezilex"+
                         " se a ordem DEMO foi realmente aceite.");
@@ -384,6 +422,7 @@ public final class VisionService extends Service {
         if(overlay!=null&&windows!=null){try{windows.removeViewImmediate(overlay);}catch(Exception ignored){}overlay=null;overlayParams=null;}
         if(wake!=null&&wake.isHeld()){wake.release();wake=null;}
         if(textRecognizer!=null){textRecognizer.close();textRecognizer=null;}
+        overlayMaskBounds=null;
         super.onDestroy();
     }
 }
