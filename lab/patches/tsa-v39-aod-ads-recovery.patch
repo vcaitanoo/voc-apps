@@ -1,0 +1,362 @@
+diff -ruN a/app/build.gradle b/app/build.gradle
+--- a/app/build.gradle	2026-11-03 21:26:27.000000000 +0000
++++ b/app/build.gradle	2026-11-06 18:26:34.958990233 +0000
+@@ -8,8 +8,8 @@
+         applicationId 'pt.vcaitano.telasempreativa'
+         minSdk 27
+         targetSdk 36
+-        versionCode 20260906
+-        versionName '1.0.32'
++        versionCode 20260908
++        versionName '1.0.34'
+         manifestPlaceholders = [admobAppId: 'ca-app-pub-4663833571268509~7119728069']
+         buildConfigField 'String', 'SETTINGS_NATIVE_AD_ID', '"ca-app-pub-4663833571268509/7487393728"'
+         buildConfigField 'String', 'AOD_BANNER_AD_ID', '"ca-app-pub-4663833571268509/6921131529"'
+diff -ruN a/app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java b/app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java
+--- a/app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java	2026-11-03 21:26:24.000000000 +0000
++++ b/app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java	2026-11-06 18:26:34.958252948 +0000
+@@ -155,6 +155,7 @@
+         @Override public void run() {
+             updateClockAndDate();
+             mediaBar.updateProgress();
++            if (adController != null) adController.onClockTick();
+             handler.postDelayed(this, 1000L);
+         }
+     };
+diff -ruN a/app/src/main/java/pt/vcaitano/telasempreativa/AodAdController.java b/app/src/main/java/pt/vcaitano/telasempreativa/AodAdController.java
+--- a/app/src/main/java/pt/vcaitano/telasempreativa/AodAdController.java	2026-11-03 21:26:27.000000000 +0000
++++ b/app/src/main/java/pt/vcaitano/telasempreativa/AodAdController.java	2026-11-06 18:26:35.855630382 +0000
+@@ -15,6 +15,7 @@
+ import android.graphics.Color;
+ import android.os.Handler;
+ import android.os.Looper;
++import android.os.SystemClock;
+ import android.view.Gravity;
+ import android.view.View;
+ import android.view.ViewParent;
+@@ -46,6 +47,7 @@
+     static final long INTERVAL_MS = 300_000L;
+     static final long VISIBLE_MS = 10_000L;
+     static final long RETRY_MS = 30_000L;
++    private static final long LOAD_TIMEOUT_MS = 35_000L;
+     static final String BANNER_ID = BuildConfig.AOD_BANNER_AD_ID;
+     static final String NATIVE_ID = BuildConfig.AOD_NATIVE_AD_ID;
+ 
+@@ -63,6 +65,20 @@
+     private boolean nextIsNative;
+     private boolean fallbackAttempted;
+     private int activeRequest;
++    private int requestSerial;
++    private boolean loading;
++    private boolean loadingNative;
++    private boolean initializeRequested;
++    private boolean firstRequestDispatched;
++    private long nextDueElapsed;
++    private int requestedCount;
++    private int displayedCount;
++    private int failedCount;
++    private final Runnable loadTimeout = () -> {
++        if (!running || !loading) return;
++        boolean wasNative = loadingNative;
++        onLoadFailure(wasNative, "Sem retorno do AdMob após 35 segundos");
++    };
+     private static final String DIAG_PREFS = "tsa_aod_ads_diagnostic";
+     private static final String TAG = "TsaAodAds";
+ 
+@@ -76,6 +92,11 @@
+         } else {
+             Log.i(TAG, message);
+         }
++        editor.putInt("requested", requestedCount)
++                .putInt("displayed", displayedCount)
++                .putInt("errors", failedCount)
++                .putLong("next_due_epoch_ms", nextDueElapsed == 0L ? 0L :
++                        System.currentTimeMillis() + Math.max(0L, nextDueElapsed - SystemClock.elapsedRealtime()));
+         editor.apply();
+     }
+ 
+@@ -88,8 +109,15 @@
+                 "Versão: " + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")\n" +
+                 "Último estado: " + state + "\n" +
+                 "Última falha: " + failure + "\n" +
++                "Pedidos nesta sessão: " + prefs.getInt("requested", 0) +
++                " | Apresentados: " + prefs.getInt("displayed", 0) +
++                " | Falhas: " + prefs.getInt("errors", 0) + "\n" +
++                "Último anúncio: " + prefs.getString("last_displayed", "Não registado") + "\n" +
++                "Próxima tentativa: " + (prefs.getLong("next_due_epoch_ms", 0L) == 0L ?
++                        "Por agendar" : DateFormat.getDateTimeInstance().format(
++                                new Date(prefs.getLong("next_due_epoch_ms", 0L)))) + "\n" +
+                 "Intervalo pretendido: 5 minutos após anúncio apresentado.\n" +
+-                "A exibição depende do consentimento e da disponibilidade do AdMob.";
++                "A exibição real depende da rede AdMob.";
+         new AlertDialog.Builder(activity)
+                 .setTitle("Diagnóstico dos anúncios")
+                 .setMessage(report)
+@@ -116,29 +144,55 @@
+         if (running) return;
+         running = true;
+         final int session = ++activeRequest;
+-        status("AOD iniciou; atualização de consentimento UMP em curso", false);
+-        // UMP canRequestAds() permanece false nesta sessão até requestConsentInfoUpdate.
+-        // Não apresentar formulários sobre o ecrã bloqueado: a MainActivity já os gere.
++        initializeRequested = false;
++        firstRequestDispatched = false;
++        nextDueElapsed = 0L;
++        status("AOD aberto: validar consentimento e preparar anúncio", false);
++        // Consentimento obtido em configurações pode estar disponível imediatamente.
++        if (AdConsent.canRequestAds(activity)) initializeAds(session);
+         AdConsent.refreshSilently(activity, () -> {
+             if (!running || session != activeRequest) return;
+-            if (!AdConsent.canRequestAds(activity)) {
+-                status("Consentimento ainda não autoriza anúncios. Abrir configurações e verificar privacidade.", true);
+-                handler.removeCallbacks(requestAd);
+-                handler.postDelayed(requestAd, 5_000L);
+-                return;
++            if (AdConsent.canRequestAds(activity)) initializeAds(session);
++            else {
++                status("UMP ainda não permite anúncios nesta sessão", true);
++                scheduleRetry();
+             }
+-            status("Consentimento autorizado; inicializando AdMob", false);
+-            MobileAds.initialize(activity, init -> root.post(() -> {
+-                if (running && session == activeRequest) requestAd.run();
+-            }));
+         });
++        if (!AdConsent.canRequestAds(activity)) scheduleRetry();
++    }
++
++    private void initializeAds(int session) {
++        if (!running || initializeRequested || session != activeRequest) return;
++        initializeRequested = true;
++        status("Consentimento autorizado; inicializando AdMob", false);
++        MobileAds.initialize(activity, unused -> root.post(() -> requestFirstAd(session)));
++        // A inicialização do SDK pode não responder em alguns ecrãs bloqueados.
++        handler.postDelayed(() -> requestFirstAd(session), 10_000L);
++    }
++
++    private void requestFirstAd(int session) {
++        if (!running || session != activeRequest || firstRequestDispatched) return;
++        firstRequestDispatched = true;
++        handler.removeCallbacks(requestAd);
++        requestAd();
++    }
++
++    /** Revalidação de temporização pelo relógio já existente do AOD. */
++    void onClockTick() {
++        if (!running || loading || nextDueElapsed == 0L
++                || SystemClock.elapsedRealtime() < nextDueElapsed) return;
++        handler.removeCallbacks(requestAd);
++        nextDueElapsed = 0L;
++        requestAd();
+     }
+ 
+     void stop() {
+         running = false;
+         activeRequest++;
++        nextDueElapsed = 0L;
+         handler.removeCallbacks(requestAd);
+         handler.removeCallbacks(hideAd);
++        clearPendingLoad();
+         hideCurrentAd();
+     }
+ 
+@@ -152,39 +206,76 @@
+     }
+ 
+     private void requestAd() {
+-        if (!running || activity.isFinishing() || activity.isDestroyed()) return;
++        if (!running || loading || activity.isFinishing() || activity.isDestroyed()) return;
++        nextDueElapsed = 0L;
+         if (!AdConsent.canRequestAds(activity)) {
+-            status("Pedido bloqueado: consentimento UMP pendente", true);
+-            handler.removeCallbacks(requestAd);
+-            handler.postDelayed(requestAd, 10_000L);
++            status("Consentimento UMP pendente no AOD: a revalidar", true);
++            int session = activeRequest;
++            AdConsent.refreshSilently(activity, () -> {
++                if (running && session == activeRequest && AdConsent.canRequestAds(activity)) {
++                    if (!initializeRequested) initializeAds(session);
++                    else if (firstRequestDispatched) requestAd();
++                }
++            });
++            scheduleRetry();
+             return;
+         }
+         if (root.getWidth() <= 0 || root.getHeight() <= 0) {
+-            status("A aguardar o ecrã AOD ficar medido", false);
+-            handler.removeCallbacks(requestAd);
+-            handler.postDelayed(requestAd, 500L);
++            status("A aguardar medição do ecrã AOD", false);
++            scheduleRequestIn(500L);
+             return;
+         }
+         fallbackAttempted = false;
+         removeAdView();
+-        status("A pedir anúncio " + (nextIsNative ? "nativo" : "banner") + " ao AdMob", false);
+-        if (nextIsNative) requestNativeAd();
+-        else requestBannerAd();
++        requestedCount++;
++        // O banner de 50dp é a primeira opção, com maior hipótese de caber.
++        nextIsNative = false;
++        status("A pedir banner AOD ao AdMob", false);
++        requestBannerAd();
++    }
++
++    private int beginLoad(boolean isNative) {
++        clearPendingLoad();
++        int request = ++requestSerial;
++        loading = true;
++        loadingNative = isNative;
++        handler.postDelayed(loadTimeout, LOAD_TIMEOUT_MS);
++        return request;
++    }
++
++    private void clearPendingLoad() {
++        loading = false;
++        handler.removeCallbacks(loadTimeout);
+     }
+ 
+-    /** Se a primeira unidade não preencher, tentar a outra antes do retry de 30 s. */
++    private void markDisplayed(String format) {
++        displayedCount++;
++        activity.getSharedPreferences(DIAG_PREFS, Context.MODE_PRIVATE).edit()
++                .putString("last_displayed", new Date().toString() + " — " + format).apply();
++        status(format + " apresentado por 10 segundos; próximo pedido em cinco minutos", false);
++        nextIsNative = false; // banner primeiro em todos os ciclos
++        scheduleNext();
++    }
++
++    /** Mantém a recuperação do controlador 1.0.32, incluindo falta de espaço. */
+     private void onLoadFailure(boolean wasNative, LoadAdError error) {
++        onLoadFailure(wasNative, "código " + error.getCode() + ": " + error.getMessage());
++    }
++
++    private void onLoadFailure(boolean wasNative, String reason) {
+         if (!running) return;
+-        status((wasNative ? "Nativo" : "Banner") + " não carregou: código " +
+-                error.getCode() + ", " + error.getMessage(), true);
++        clearPendingLoad();
++        failedCount++;
++        status((wasNative ? "Nativo" : "Banner") + " indisponível: " + reason, true);
+         removeAdView();
+         if (!fallbackAttempted) {
+             fallbackAttempted = true;
+-            nextIsNative = !wasNative;
++            // Se a unidade nativa estiver indisponível, recuperar o banner.
++            final boolean tryNative = !wasNative;
+             handler.post(() -> {
+                 if (!running || activity.isFinishing() || activity.isDestroyed()) return;
+-                status("A tentar unidade alternativa: " + (nextIsNative ? "nativa" : "banner"), false);
+-                if (nextIsNative) requestNativeAd();
++                status("A tentar unidade alternativa: " + (tryNative ? "nativa" : "banner"), false);
++                if (tryNative) requestNativeAd();
+                 else requestBannerAd();
+             });
+         } else {
+@@ -193,25 +284,24 @@
+     }
+ 
+     private void requestBannerAd() {
++        final int myRequest = beginLoad(false);
+         createContainer(dp(320), dp(50));
+         adView = new AdView(activity);
+         adView.setAdSize(AdSize.BANNER);
+         adView.setAdUnitId(BANNER_ID);
+         adView.setAdListener(new AdListener() {
+             @Override public void onAdLoaded() {
+-                if (!running || container == null || adView == null) return;
++                if (!running || myRequest != requestSerial || container == null || adView == null) return;
++                clearPendingLoad();
+                 if (!showLoadedAd(dp(50))) {
+-                    status("Banner carregado, mas não há espaço livre suficiente no AOD", true);
+-                    removeAdView();
+-                    scheduleRetry();
++                    onLoadFailure(false, "não encontrou espaço livre para 50dp no AOD");
+                     return;
+                 }
+-                status("Banner visível durante 10 segundos; próximo pedido em 5 minutos", false);
+-                nextIsNative = true;
+-                scheduleNext();
++                markDisplayed("Banner AOD");
+             }
+ 
+             @Override public void onAdFailedToLoad(LoadAdError error) {
++                if (!running || myRequest != requestSerial) return;
+                 onLoadFailure(false, error);
+             }
+         });
+@@ -221,31 +311,30 @@
+     }
+ 
+     private void requestNativeAd() {
++        final int myRequest = beginLoad(true);
+         final int nativeHeight = dp(96);
+         createContainer(dp(336), nativeHeight);
+         new AdLoader.Builder(activity, NATIVE_ID)
+                 .forNativeAd(loadedAd -> {
+-                    if (!running || container == null || activity.isFinishing()) {
++                    if (!running || myRequest != requestSerial || container == null || activity.isFinishing()) {
+                         loadedAd.destroy();
+                         return;
+                     }
++                    clearPendingLoad();
+                     nativeAd = loadedAd;
+                     nativeAdView = buildCompactNativeAd(loadedAd);
+                     container.removeAllViews();
+                     container.addView(nativeAdView, new FrameLayout.LayoutParams(
+                             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+                     if (!showLoadedAd(nativeHeight)) {
+-                        status("Nativo carregado, mas não há espaço livre suficiente no AOD", true);
+-                        removeAdView();
+-                        scheduleRetry();
++                        onLoadFailure(true, "não encontrou espaço livre para 96dp no AOD");
+                         return;
+                     }
+-                    status("Nativo visível durante 10 segundos; próximo pedido em 5 minutos", false);
+-                    nextIsNative = false;
+-                    scheduleNext();
++                    markDisplayed("Nativo AOD");
+                 })
+                 .withAdListener(new AdListener() {
+                     @Override public void onAdFailedToLoad(LoadAdError error) {
++                        if (!running || myRequest != requestSerial) return;
+                         onLoadFailure(true, error);
+                     }
+                 })
+@@ -495,16 +584,21 @@
+     }
+ 
+     private void scheduleNext() {
+-        handler.removeCallbacks(requestAd);
+-        if (running) handler.postDelayed(requestAd, INTERVAL_MS);
++        scheduleRequestIn(INTERVAL_MS);
+     }
+ 
+     private void scheduleRetry() {
++        if (running) status("Nova tentativa em 30 segundos", false);
++        scheduleRequestIn(RETRY_MS);
++    }
++
++    private void scheduleRequestIn(long delayMs) {
+         handler.removeCallbacks(requestAd);
+-        if (running) {
+-            status("Aguardando 30 segundos para tentar novamente", false);
+-            handler.postDelayed(requestAd, RETRY_MS);
+-        }
++        if (!running) return;
++        nextDueElapsed = SystemClock.elapsedRealtime() + delayMs;
++        handler.postDelayed(requestAd, delayMs);
++        // Diagnóstico da próxima tentativa visível nas configurações.
++        status("Próxima tentativa agendada", false);
+     }
+ 
+     private void hideCurrentAd() {
+@@ -513,6 +607,8 @@
+     }
+ 
+     private void removeAdView() {
++        requestSerial++; // Cancela callbacks atrasados da unidade anterior.
++        clearPendingLoad();
+         touchBounds.setEmpty();
+         if (adView != null) {
+             adView.destroy();
