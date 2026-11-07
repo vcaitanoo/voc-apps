@@ -1,3 +1,10 @@
+# VOC Trader Vision PC — Portable 0.1.2 beta (Windows x64)
+
+**Correção da execução silenciosa (VC0.1.2):** marcar ARMAR CLIQUES agora ativa o sinal real do executor e inicia a observação automaticamente após confirmação; mostra no painel se faltam velas, se o OCR/Tesseract está indisponível, se a Hezilex não é DEMO ou se o risco impede €1. Preserva limites de 1% e calibração obrigatória. Isso NÃO garante a aceitação de qualquer ordem ou a existência de oportunidades de mercado.
+
+**Baixe o EXE portátil, não o código-fonte:**
+https://github.com/vcaitanoo/voc-apps/releases/download/voc-trader-vision-pc-v0.1.2-beta/VOC-Trader-Vision-PC-0.1.2-beta.zip
+
 # VOC Trader Vision PC — Portable 0.1.1 beta (Windows x64)
 
 **IMPORTANTE: não é necessário instalar Python.** Baixe a versão executável correta no GitHub Releases:
