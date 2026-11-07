@@ -125,6 +125,33 @@ class ScreenObserver:
         self.calibration=calibration
         self.tesseract_path=tesseract_path
         self.timeframe=timeframe
+        self._ocr_checked=False
+        self._ocr_error=None
+    def _check_ocr(self):
+        """Report missing Tesseract immediately; chart analysis still runs."""
+        if self._ocr_checked:return
+        self._ocr_checked=True
+        import os,shutil
+        from pathlib import Path
+        import pytesseract
+        supplied=self.tesseract_path.strip().strip('"')
+        system=shutil.which('tesseract')
+        choices=[supplied,system]
+        if os.name=='nt':
+            choices.extend([str(Path(os.environ.get('ProgramFiles',r'C:\\Program Files'))/
+                                'Tesseract-OCR'/'tesseract.exe'),
+                            str(Path(os.environ.get('ProgramFiles(x86)',r'C:\\Program Files (x86)'))/
+                                'Tesseract-OCR'/'tesseract.exe')])
+        chosen=next((p for p in choices if p and Path(p).is_file()),None)
+        if chosen is None:
+            self._ocr_error=('TESSERACT NÃO ENCONTRADO: instale Tesseract OCR '
+                             'ou indique Tesseract.exe no painel; sem OCR não há toques DEMO.')
+            return
+        pytesseract.pytesseract.tesseract_cmd=str(chosen)
+        try:pytesseract.get_tesseract_version()
+        except Exception as exc:
+            self._ocr_error=('TESSERACT NÃO INICIA: '+str(exc)[:180]+
+                             '. Verifique o campo Tesseract.exe.')
     def capture(self):
         import mss
         with mss.mss() as s:
@@ -133,11 +160,11 @@ class ScreenObserver:
             return cv2.cvtColor(raw,cv2.COLOR_BGRA2BGR)
     def read(self,frame:np.ndarray)->ObservedScreen:
         import pytesseract
-        if self.tesseract_path:
-            pytesseract.pytesseract.tesseract_cmd=self.tesseract_path
+        self._check_ocr()
         H,W=frame.shape[:2]
         rois=self.calibration.get('rois',{})
         blockers=[f'Calibre: {name}' for name in self.REQUIRED if name not in rois]
+        if self._ocr_error:blockers.append(self._ocr_error)
         if self.calibration.get('dimensions') and tuple(self.calibration['dimensions'])!=(W,H):
             blockers.append('Resolução mudou desde a calibração. Recalibre a tela.')
         def crop(name):
@@ -146,6 +173,7 @@ class ScreenObserver:
             if x1<=x0 or y1<=y0:return None
             return frame[y0:y1,x0:x1]
         def ocr(name,psm=6):
+            if self._ocr_error:return ''
             patch=crop(name)
             if patch is None:return ''
             img=cv2.resize(patch,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC)
