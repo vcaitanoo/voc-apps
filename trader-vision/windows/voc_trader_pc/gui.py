@@ -16,7 +16,7 @@ BG='#0a1220'; PANEL='#111f34'; TEXT='#f0f6ff'; MUTED='#a3bad1'; ACCENT='#50e8bd'
 
 class TraderApp:
     def __init__(self,root):
-        self.root=root;self.root.title('VOC Trader Vision PC · Análise Adaptativa DEMO v0.1')
+        self.root=root;self.root.title('VOC Trader Vision PC · Análise Adaptativa DEMO v0.1.2')
         self.root.geometry('1180x765');self.root.minsize(910,650);self.root.configure(bg=BG)
         self.settings=load_settings();self.journal=Journal(JOURNAL_FILE);self.tracker=DemoTracker(self.journal)
         self.events=queue.Queue();self.stop_event=threading.Event();self.demo_event=threading.Event();self.thread=None;self.last_click_key=None
@@ -107,13 +107,53 @@ class TraderApp:
         if not 1<=s.expiry_min<=120:raise ValueError('Expiração entre 1 e 120 minutos')
         return s
     def save(self):
-        try:save_settings(self._read_settings());self._log('Configurações salvas (arme cliques novamente a cada execução).')
+        try:save_settings(self._read_settings());self._log('Configurações salvas. Armamento permanece desativado após reiniciar o programa.')
         except Exception as e:messagebox.showerror('Configuração inválida',str(e),parent=self.root)
     def _armed(self):
-        if self.demo.get():
-            if not messagebox.askyesno('Somente DEMO','Autorizar cliques automáticos SOMENTE quando todas as verificações provarem CONTA DEMO, URL, valor, expiração, botão e risco ≤1%? Não altera campos sozinho.',parent=self.root):
-                self.demo.set(False)
-        self._log('Cliques DEMO: '+('ARMADOS (dependem de todas as verificações)' if self.demo.get() else 'DESARMADOS'))
+        # VC0.1.1 BUG: marking the checkbox NEVER set demo_event.
+        # The executor checked demo_event, so clicking was impossible.
+        if not self.demo.get():
+            self.demo_event.clear()
+            self._log('Cliques DEMO DESARMADOS; análise pode continuar.')
+            return
+        try:
+            self._read_settings()
+        except Exception as exc:
+            self.demo.set(False)
+            self.demo_event.clear()
+            messagebox.showerror('Configuração inválida',str(exc),parent=self.root)
+            return
+        if self.settings.source!='SCREEN':
+            self.demo.set(False)
+            self.demo_event.clear()
+            messagebox.showwarning('Somente Hezilex DEMO',
+                'Cliques são permitidos apenas na fonte SCREEN. MT5 e CSV são somente análise.',
+                parent=self.root)
+            return
+        if not self.settings.calibration or not self.settings.calibration.get('rois'):
+            self.demo.set(False)
+            self.demo_event.clear()
+            messagebox.showwarning('Calibração necessária',
+                'Primeiro calibre as 10 regiões da Hezilex. Não é seguro clicar por posições estimadas.',
+                parent=self.root)
+            return
+        if not messagebox.askyesno('Somente DEMO',
+            'Autorizar cliques automáticos SOMENTE quando todas as verificações provarem CONTA DEMO, URL, valor, expiração, botão e risco ≤1%? Não altera campos sozinho.',
+            parent=self.root):
+            self.demo.set(False)
+            self.demo_event.clear()
+            return
+        self.demo_event.set()
+        self._log('Cliques DEMO ARMADOS: motor ativo; aguardando condições verificadas.')
+        preliminary=stake_verdict(self.settings.balance,self.settings.risk_pct,self.settings.min_stake)
+        if not preliminary.allowed:
+            self._log('ATENÇÃO RISCO: '+preliminary.reason+
+                      ' | saldo configurado apenas para estimativa; saldo OCR será verificado.')
+        # Explicit arming starts observation as well; do not leave the checkbox
+        # checked while the analysis thread is stopped.
+        if not self.thread or not self.thread.is_alive():
+            self.start()
+        self.status.set('MONITORANDO DEMO · aguardando confirmação dos dados')
     def calibrate(self):
         if self.thread and self.thread.is_alive():messagebox.showwarning('Interrompa','Pare a observação antes de calibrar.',parent=self.root);return
         try:
@@ -134,9 +174,10 @@ class TraderApp:
         except Exception:return
         if s.source=='SCREEN' and not s.calibration:
             messagebox.showwarning('Calibração necessária','Capture as 10 regiões na tela do PC antes de iniciar.',parent=self.root);return
-        self.stop_event.clear();self.status.set('MONITORANDO · '+s.source)
+        self.stop_event.clear();self.status.set('CAPTURANDO DADOS · '+s.source)
+        self.summary.set('Monitoramento iniciado. Lendo tela e campos calibrados; confira a aba Log / diagnóstico.')
         self.thread=threading.Thread(target=self._loop,daemon=True);self.thread.start()
-        self._log('Monitoramento iniciado. Cliques '+('armados' if self.demo.get() else 'desarmados')+'.')
+        self._log('Monitoramento iniciado. Cliques '+('armados' if self.demo_event.is_set() else 'desarmados')+'.')
     def stop(self):
         self.stop_event.set();self.demo_event.clear();self.demo.set(False)
         self.status.set('PARADO · SEM CLIQUES');self._log('Observação interrompida; execução DEMO desarmada.')
@@ -160,9 +201,13 @@ class TraderApp:
         from .screen import ScreenObserver,safe_click
         s=self.settings
         obs=ScreenObserver(s.calibration,s.tesseract_path,int(s.timeframe[1:])) if s.source=='SCREEN' else None
+        first_capture=True
         while not self.stop_event.is_set():
             try:
                 if s.source=='SCREEN':
+                    if first_capture:
+                        self.events.put(('stage','Capturando monitor calibrado e lendo OCR...'))
+                        first_capture=False
                     frame=obs.capture();screen=obs.read(frame)
                     data={s.timeframe:screen.candles}
                     decision=engine.evaluate(s.symbol,data,self.journal,source='SCREEN',minimum_score=s.min_score,allow_limited_context=s.allow_single_tf_demo)
@@ -171,15 +216,27 @@ class TraderApp:
                     status=self.tracker.observe(screen.balance)
                     if status and status not in ('AGUARDANDO_EXPIRACAO','OCR_SALDO_INDISPONIVEL'):
                         events.append('Resultado: '+status)
-                    if self.demo_event.is_set() and decision.status=='ELEGÍVEL' and self.tracker.pending is None:
-                        day_pnl,day_entries=self.journal.today_stats()
-                        verdict=stake_verdict(screen.balance or 0,s.risk_pct,s.min_stake,day_pnl=day_pnl,trades_today=day_entries,max_daily_loss_pct=s.max_daily_loss_pct,target_daily_pct=s.target_daily_pct,max_daily_entries=s.max_daily_entries)
+                    day_pnl,day_entries=self.journal.today_stats()
+                    verdict=stake_verdict(screen.balance if screen.balance is not None else 0,
+                                          s.risk_pct,s.min_stake,day_pnl=day_pnl,
+                                          trades_today=day_entries,max_daily_loss_pct=s.max_daily_loss_pct,
+                                          target_daily_pct=s.target_daily_pct,max_daily_entries=s.max_daily_entries)
+                    # Always show the decisive blocker; VC0.1.1 showed no
+                    # explanation unless an eligible signal had already appeared.
+                    if not self.demo_event.is_set():
+                        events.append('EXECUÇÃO DESARMADA: marcar ARMAR CLIQUES para permitir tentativas DEMO.')
+                    elif not verdict.allowed:
+                        events.append('BLOQUEADO POR RISCO: '+verdict.reason)
+                    elif self.tracker.pending is not None:
+                        events.append('AGUARDANDO RESULTADO da operação DEMO anterior.')
+                    elif decision.status!='ELEGÍVEL':
+                        events.append('AGUARDANDO SETUP: '+decision.explanation)
+                    else:
                         clk=screen.clock_remaining
                         total=int(s.timeframe[1:])*60
                         started=clk is not None and total-15<=clk<=total-1
                         # Every screen guard is rechecked on the SAME freshly captured frame.
-                        if not verdict.allowed:events.append('Sem toque: '+verdict.reason)
-                        elif not started:events.append(f'Sem toque: aguardando nova vela pelo relógio Hezilex ({clk}s)')
+                        if not started:events.append(f'Sem toque: aguardando nova vela pelo relógio Hezilex ({clk}s)')
                         elif screen.blockers:events.append('Sem toque: '+', '.join(screen.blockers))
                         elif screen.stake is None or abs(screen.stake-verdict.stake)>.005:
                             events.append(f'Sem toque: valor visível não corresponde ao risco €{verdict.stake:.2f}')
@@ -187,12 +244,16 @@ class TraderApp:
                         else:
                             key=(s.symbol,int(time.time()//(total or 300)))
                             if key!=self.last_click_key:
-                                _,_,latest_balance=safe_click(obs,screen,s.calibration,decision.candidate.direction,verdict.stake,s.expiry_min,
-                                           s.symbol,int(s.calibration.get('monitor',1)))
-                                self.last_click_key=key
-                                self.tracker.begin(s.symbol,decision.candidate.strategy,decision.candidate.regime,
-                                                   decision.candidate.direction,latest_balance,verdict.stake,s.expiry_min)
-                                events.append('GESTO DEMO ENVIADO; aceitação da ordem NÃO VERIFICADA')
+                                try:
+                                    _,_,latest_balance=safe_click(obs,screen,s.calibration,decision.candidate.direction,verdict.stake,s.expiry_min,
+                                              s.symbol,int(s.calibration.get('monitor',1)))
+                                except Exception as exc:
+                                    events.append(f'TOQUE RECUSADO: {type(exc).__name__}: {exc}')
+                                else:
+                                    self.last_click_key=key
+                                    self.tracker.begin(s.symbol,decision.candidate.strategy,decision.candidate.regime,
+                                                       decision.candidate.direction,latest_balance,verdict.stake,s.expiry_min)
+                                    events.append('GESTO DEMO ENVIADO; aceitação da ordem NÃO VERIFICADA')
                     self.events.put(('decision',decision,events,screen.balance))
                 elif s.source=='MT5':
                     data=feeds.load_mt5(s.mt5_symbol)
@@ -208,13 +269,29 @@ class TraderApp:
         try:
             for _ in range(12):
                 e=self.events.get_nowait()
-                if e[0]=='error':self._log('ERRO: '+e[1]);self.status.set('ERRO DE LEITURA · SEM CLIQUES')
-                else:self._update(*e[1:])
+                if e[0]=='error':
+                    self._log('ERRO: '+e[1])
+                    self.status.set('ERRO DE LEITURA · SEM CLIQUES')
+                    self.summary.set(e[1]+'\nConfira OCR, calibração e visibilidade do navegador.')
+                elif e[0]=='stage':
+                    self.status.set('LENDO TELA · SCREEN')
+                    self.summary.set(e[1])
+                else:
+                    self._update(*e[1:])
         except queue.Empty:pass
         self.root.after(200,self.poll)
     def _update(self,d:Decision,extras:list[str],balance:float|None):
-        self.status.set(d.status+' · '+d.symbol)
-        self.summary.set(d.explanation)
+        execution=next((e for e in extras if e.startswith(('BLOQUEADO POR RISCO:',
+                      'EXECUÇÃO DESARMADA:', 'AGUARDANDO SETUP:',
+                      'AGUARDANDO RESULTADO', 'Sem toque:', 'TOQUE RECUSADO:'))), '')
+        if d.source=='SCREEN' and self.demo_event.is_set() and execution.startswith('BLOQUEADO'):
+            self.status.set('DEMO ARMADA · BLOQUEIO DE RISCO')
+        elif d.source=='SCREEN':
+            self.status.set(d.status+' · '+d.symbol+
+                            (' · DEMO ARMADA' if self.demo_event.is_set() else ' · CLIQUES OFF'))
+        else:
+            self.status.set(d.status+' · '+d.symbol+' · SOMENTE ANÁLISE')
+        self.summary.set(d.explanation+('\n'+execution if execution else ''))
         ctx=[]
         for tf in ('H4','H1','M15','M5','M1'):
             c=d.contexts.get(tf)
