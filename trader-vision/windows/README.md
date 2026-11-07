@@ -1,3 +1,22 @@
+# VOC Trader Vision PC — Portable 0.1.1 beta (Windows x64)
+
+**IMPORTANTE: não é necessário instalar Python.** Baixe a versão executável correta no GitHub Releases:
+
+https://github.com/vcaitanoo/voc-apps/releases/download/voc-trader-vision-pc-v0.1.1-beta/VOC-Trader-Vision-PC-0.1.1-beta.zip
+
+1. Extraia o ZIP inteiro numa pasta (não abra o executável de dentro do arquivo ZIP).
+2. Execute **VOC-Trader-Vision-PC.exe**, na RAIZ da pasta extraída.
+3. Mantenha a pasta **_internal** junto ao .exe. Não mova apenas o executável.
+4. O programa inicia com cliques DESATIVADOS, aguardando sua calibração da Conta Demo.
+
+**NÃO use** `START_WINDOWS.bat` ou `run.py` para iniciar a versão portátil. Esses dois arquivos são exclusivos do **pacote de código-fonte**, destinado a desenvolvedores, e exigem Python instalado. A janela `No suitable Python runtime found` significa que foi aberto `START_WINDOWS.bat` da fonte, **não o executável portátil**.
+
+A V0.1.1 mantém o motor, a gestão e o painel da V0.1.0. A única correção é o empacotamento: instalador Python independente, executável em primeiro nível e teste de inicialização do pacote sem Python no PATH.
+
+**Tesseract OCR é outra dependência**: para reconhecer os campos e autorizar cliques na conta DEMO, ele ainda precisa estar instalado/configurado; sem Tesseract, o modo de análise não deve enviar ordens.
+
+---
+
 # VOC Trader Vision PC — Beta 0.1.0 (Windows 11)
 
 **Primeiro candidato de Windows, separado do app Android existente.** Este pacote não substitui a VC7 no VOC Lab, não altera qualquer app Android e não usa a keystore Android. O objetivo é testar o monitoramento e a calibração na Hezilex **DEMO** e analisar dados reais multi-timeframe do MT5 sem enviar ordens.
