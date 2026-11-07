@@ -3,7 +3,7 @@ name: VOC Trader Vision PC Portable 0.1.2 - No Python Required
 on:
   push:
     branches:
-      - fix/voc-trader-vision-pc-portable-no-python-v012-20261107
+      - fix/voc-trader-pc-v012-activate-and-diagnose-20261107
     paths:
       - '.github/workflows/build-voc-trader-pc-portable-v012.yml'
       - 'trader-vision/windows/run.py'
