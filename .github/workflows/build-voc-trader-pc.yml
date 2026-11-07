@@ -1,0 +1,93 @@
+name: Build VOC Trader Vision PC Candidate
+on:
+  push:
+    branches:
+      - feature/voc-trader-vision-windows-adaptive-20261107
+    paths:
+      - 'trader-vision/windows/source.tar.xz.b64'
+      - '.github/workflows/build-voc-trader-pc.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: trader-vision/windows
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: x64
+      - name: Restore exact tested source archive and validate SHA256
+        shell: pwsh
+        run: |
+          $script = @'
+          from pathlib import Path
+          import base64,hashlib,io,lzma,tarfile
+          root=Path('.').resolve()
+          packed=base64.b64decode(''.join((root/'source.tar.xz.b64').read_text(encoding='ascii').split()),validate=True)
+          digest=hashlib.sha256(packed).hexdigest()
+          expected='707ad38dc8b7cfd39cfc6a2a0f2a39b9479f4ac4e8a25f99bf5cf7170281aa83'
+          assert digest==expected,(digest,expected)
+          with tarfile.open(fileobj=io.BytesIO(packed),mode='r:xz') as archive:
+              names=archive.getnames()
+              assert all(not n.startswith('/') and '..' not in Path(n).parts for n in names)
+              archive.extractall(root)
+          assert (root/'run.py').is_file()
+          assert (root/'voc_trader_pc'/'engine.py').is_file()
+          print('EXACT source SHA-256 verified:',digest,'files:',len(names))
+          '@
+          $script | python -
+      - name: Install dependencies for Python 3.11 Windows
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest pyinstaller
+          python -m pip install MetaTrader5
+      - name: Unit tests of adaptive engine, risk and screenshot
+        run: python -m pytest -q
+      - name: Build unsigned candidate Windows EXE
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --windowed --onedir --name VOC-Trader-Vision-PC --collect-all mss --collect-all MetaTrader5 run.py
+          $exe='dist/VOC-Trader-Vision-PC/VOC-Trader-Vision-PC.exe'
+          if (!(Test-Path $exe)) { throw 'EXE not produced' }
+          Get-FileHash $exe -Algorithm SHA256
+      - name: Create portable package with setup notes
+        shell: pwsh
+        run: |
+          Copy-Item README.md 'dist/VOC-Trader-Vision-PC/LEIA-ME.txt'
+          Compress-Archive -Path dist/VOC-Trader-Vision-PC -DestinationPath VOC-Trader-Vision-PC-0.1.0-beta.zip -Force
+          if (!(Test-Path VOC-Trader-Vision-PC-0.1.0-beta.zip)) { throw 'ZIP missing' }
+          Get-FileHash VOC-Trader-Vision-PC-0.1.0-beta.zip -Algorithm SHA256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VOC-Trader-Vision-PC-0.1.0-beta
+          path: trader-vision/windows/VOC-Trader-Vision-PC-0.1.0-beta.zip
+          retention-days: 30
+          if-no-files-found: error
+      - name: Commit expanded Python source for durable project continuity
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- run.py requirements.txt README.md START_WINDOWS.bat voc_trader_pc tests
+          if (!(git diff --cached --quiet)) {
+            git diff --cached --check
+            git commit -m "feat(trader-pc): expand tested adaptive Windows source, panel and calibration"
+            git push origin HEAD:feature/voc-trader-vision-windows-adaptive-20261107
+          }
+      - name: Publish separate WINDOWS candidate as prerelease (Android unchanged)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag='voc-trader-vision-pc-v0.1.0-beta'
+          $head=(git rev-parse HEAD).Trim()
+          gh release create $tag 'VOC-Trader-Vision-PC-0.1.0-beta.zip' --repo '${{ github.repository }}' --target $head --title 'VOC Trader Vision PC 0.1.0 Beta (Windows)' --prerelease --notes 'Windows candidate, unsigned EXE. DEMO only and disarmed by default. PC calibration + Tesseract OCR required for Hezilex controls; up to 1% strict risk. MT5 five-timeframe live data READ-ONLY, no MT5 orders. Windows device/runtime and live Hezilex not yet tested. Android VOC Lab catalog and VC7 not modified.'
