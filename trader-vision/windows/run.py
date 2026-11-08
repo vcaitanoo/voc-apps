@@ -21,7 +21,7 @@ def main():
         import pyautogui
         info = {
             "application": "VOC Trader Vision PC",
-            "version": "0.1.2-beta",
+            "version": "0.1.3-beta",
             "bundled_python": bool(getattr(sys, "frozen", False)),
             "imported": ["gui", "engine", "feeds", "screen", "risk", "tracker",
                          "cv2", "numpy", "PIL", "mss", "pyautogui"],
