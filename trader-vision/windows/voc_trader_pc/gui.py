@@ -13,12 +13,13 @@ from .risk import stake_verdict
 from .tracker import DemoTracker
 from .overlay import FloatingOverlay, OverlayState
 from .session_report import SessionReporter
+from .desktop_layout import desktop_diagnostics
 
 BG='#0a1220'; PANEL='#111f34'; TEXT='#f0f6ff'; MUTED='#a3bad1'; ACCENT='#50e8bd'; GOLD='#e5ad60'
 
 class TraderApp:
     def __init__(self,root):
-        self.root=root;self.root.title('VOC Trader Vision PC · Análise Adaptativa DEMO v0.1.4')
+        self.root=root;self.root.title('VOC Trader Vision PC · Análise Adaptativa DEMO v0.1.5')
         screen_width=max(940,self.root.winfo_screenwidth())
         screen_height=max(610,self.root.winfo_screenheight())
         self.root.geometry(f'{min(1180,screen_width-30)}x{min(765,screen_height-85)}')
@@ -198,12 +199,20 @@ class TraderApp:
             self.start()
         self.status.set('MONITORANDO DEMO · aguardando confirmação dos dados')
     def calibrate(self):
-        if self.thread and self.thread.is_alive():messagebox.showwarning('Interrompa','Pare a observação antes de calibrar.',parent=self.root);return
+        if self.thread and self.thread.is_alive():
+            messagebox.showwarning('Interrompa','Pare a observação antes de calibrar.',parent=self.root)
+            return
+        was_visible=self.overlay.visible
+        if was_visible:self.overlay.hide()  # Never capture overlay over calibration.
+        restore=lambda: self.overlay.show(force=True) if was_visible else None
         try:
             from .calibration import CalibrationWindow
-            CalibrationWindow(self.root,self.settings,lambda s:save_settings(s))
+            CalibrationWindow(self.root,self.settings,lambda s:save_settings(s),
+                              on_close=restore)
         except Exception as e:
-            self.root.deiconify();messagebox.showerror('Calibração',f'Não consegui capturar o monitor: {e}',parent=self.root)
+            self.root.deiconify()
+            restore()
+            messagebox.showerror('Calibração',f'Não consegui capturar o monitor: {e}',parent=self.root)
     def pick_csv(self):
         p=filedialog.askdirectory(title='Selecione uma pasta com EURUSD_H4.csv, EURUSD_H1.csv, ...')
         if not p:return
@@ -294,6 +303,12 @@ class TraderApp:
                     decision=engine.evaluate(s.symbol,data,self.journal,source='SCREEN',minimum_score=s.min_score,allow_limited_context=s.allow_single_tf_demo)
                     events=[f'Hezilex OCR: DEMO={screen.account_demo}, REAL={screen.account_real}, saldo={screen.balance}, valor={screen.stake}, expiração={screen.expiry}, vela={screen.clock_remaining}s',
                             f'Ativo OCR: {screen.asset_text} | Candles visíveis: {len(screen.candles)}; Bloqueios visuais: '+(', '.join(screen.blockers) or 'nenhum')]
+                    issues=desktop_diagnostics(
+                        s.symbol,screen.asset_text,len(screen.candles),
+                        screen.balance,screen.stake,s.risk_pct)
+                    events.extend('AJUSTE: '+msg for msg in issues)
+                    # Report visual blockers even if the executor is disarmed.
+                    # This avoids a silent 0-operations overnight report.
                     status=self.tracker.observe(screen.balance)
                     if status and status not in ('AGUARDANDO_EXPIRACAO','OCR_SALDO_INDISPONIVEL'):
                         events.append('Resultado: '+status)
@@ -306,6 +321,8 @@ class TraderApp:
                     # explanation unless an eligible signal had already appeared.
                     if not self.demo_event.is_set():
                         events.append('EXECUÇÃO DESARMADA: marcar ARMAR CLIQUES para permitir tentativas DEMO.')
+                    elif issues:
+                        events.append('BLOQUEADO POR CONFIGURAÇÃO: '+issues[0])
                     elif not verdict.allowed:
                         events.append('BLOQUEADO POR RISCO: '+verdict.reason)
                     elif self.tracker.pending is not None:
@@ -385,9 +402,11 @@ class TraderApp:
         self.root.after(200,self.poll)
     def _update(self,d:Decision,extras:list[str],balance:float|None,
                 telemetry:dict|None=None):
-        execution=next((e for e in extras if e.startswith(('BLOQUEADO POR RISCO:',
-                      'EXECUÇÃO DESARMADA:', 'AGUARDANDO SETUP:',
-                      'AGUARDANDO RESULTADO', 'Sem toque:', 'TOQUE RECUSADO:'))), '')
+        execution=next((e for e in extras if e.startswith((
+                      'AJUSTE:', 'BLOQUEADO POR CONFIGURAÇÃO:',
+                      'BLOQUEADO POR RISCO:', 'TOQUE RECUSADO:',
+                      'Sem toque:', 'AGUARDANDO RESULTADO',
+                      'AGUARDANDO SETUP:', 'EXECUÇÃO DESARMADA:'))), '')
         if d.source=='SCREEN' and self.demo_event.is_set() and execution.startswith('BLOQUEADO'):
             self.status.set('DEMO ARMADA · BLOQUEIO DE RISCO')
         elif d.source=='SCREEN':
@@ -421,6 +440,7 @@ class TraderApp:
         self._render('Risco & resultados',self._risk_text(balance))
         telemetry=telemetry or {}
         blocker=next((e for e in extras if e.startswith((
+            'AJUSTE:', 'BLOQUEADO POR CONFIGURAÇÃO:',
             'BLOQUEADO POR RISCO:', 'TOQUE RECUSADO:', 'Sem toque:',
             'AGUARDANDO RESULTADO', 'AGUARDANDO SETUP:',
             'EXECUÇÃO DESARMADA:'))),'')
@@ -430,9 +450,10 @@ class TraderApp:
                 self._overlay_last_action=event
         summary=self.journal.summary()
         armed=self.demo_event.is_set()
-        phase='BLOQUEADO' if blocker.startswith(('BLOQUEADO','TOQUE RECUSADO')) else (
+        phase='AJUSTAR LAYOUT / RISCO' if blocker.startswith('AJUSTE:') else (
+              'BLOQUEADO' if blocker.startswith(('BLOQUEADO','TOQUE RECUSADO')) else (
               'AGUARDANDO RESULTADO' if self.tracker.pending is not None else (
-              'OBSERVANDO' if not armed and d.source=='SCREEN' else d.status))
+              'OBSERVANDO' if not armed and d.source=='SCREEN' else d.status)))
         p=d.candidate
         model=OverlayState(
             phase=phase,source=d.source,armed=armed,
