@@ -118,20 +118,33 @@ class MonitorOverlay:
         if os.name!="nt":return
         try:
             import ctypes
+            from ctypes import wintypes
             u=ctypes.windll.user32
-            hwnd=u.GetAncestor(int(self.win.winfo_id()),2)
-            # WS_EX_NOACTIVATE prevents the floating panel from stealing
-            # foreground focus from the Chrome Hezilex tab.
-            GWL_EXSTYLE=-20;WS_EX_NOACTIVATE=0x08000000
+            u.GetAncestor.argtypes=[wintypes.HWND,wintypes.UINT]
+            u.GetAncestor.restype=wintypes.HWND
+            hwnd=u.GetAncestor(self.win.winfo_id(),2)
+            if not hwnd:return
+            # No-activate + toolwindow: floating UI stays above the Chrome tab
+            # but doesn't become the foreground program each capture cycle.
+            GWL_EXSTYLE=-20
+            WS_EX_NOACTIVATE=0x08000000
+            WS_EX_TOOLWINDOW=0x00000080
             if ctypes.sizeof(ctypes.c_void_p)==8:
+                u.GetWindowLongPtrW.argtypes=[wintypes.HWND,ctypes.c_int]
                 u.GetWindowLongPtrW.restype=ctypes.c_longlong
-                u.SetWindowLongPtrW.argtypes=[ctypes.c_void_p,ctypes.c_int,
-                                              ctypes.c_longlong]
+                u.SetWindowLongPtrW.argtypes=[
+                    wintypes.HWND,ctypes.c_int,ctypes.c_longlong]
                 prev=u.GetWindowLongPtrW(hwnd,GWL_EXSTYLE)
-                u.SetWindowLongPtrW(hwnd,GWL_EXSTYLE,prev|WS_EX_NOACTIVATE)
+                u.SetWindowLongPtrW(hwnd,GWL_EXSTYLE,
+                    prev|WS_EX_NOACTIVATE|WS_EX_TOOLWINDOW)
             else:
+                u.GetWindowLongW.argtypes=[wintypes.HWND,ctypes.c_int]
+                u.GetWindowLongW.restype=ctypes.c_long
+                u.SetWindowLongW.argtypes=[
+                    wintypes.HWND,ctypes.c_int,ctypes.c_long]
                 prev=u.GetWindowLongW(hwnd,GWL_EXSTYLE)
-                u.SetWindowLongW(hwnd,GWL_EXSTYLE,prev|WS_EX_NOACTIVATE)
+                u.SetWindowLongW(hwnd,GWL_EXSTYLE,
+                    prev|WS_EX_NOACTIVATE|WS_EX_TOOLWINDOW)
         except (OSError,AttributeError,ValueError):
             pass
 
@@ -145,10 +158,17 @@ class MonitorOverlay:
         if os.name=="nt":
             try:
                 import ctypes
+                from ctypes import wintypes
                 u=ctypes.windll.user32
-                hwnd=u.GetAncestor(int(self.win.winfo_id()),2)
-                u.SetWindowPos(hwnd,-1,0,0,0,0,
-                               0x0001|0x0002|0x0010)  # NOMOVE/NOSIZE/NOACTIVATE
+                u.GetAncestor.argtypes=[wintypes.HWND,wintypes.UINT]
+                u.GetAncestor.restype=wintypes.HWND
+                u.SetWindowPos.argtypes=[
+                    wintypes.HWND,wintypes.HWND,ctypes.c_int,ctypes.c_int,
+                    ctypes.c_int,ctypes.c_int,wintypes.UINT]
+                u.SetWindowPos.restype=wintypes.BOOL
+                hwnd=u.GetAncestor(self.win.winfo_id(),2)
+                if hwnd:u.SetWindowPos(hwnd,ctypes.c_void_p(-1),
+                    0,0,0,0,0x0001|0x0002|0x0010)
             except (OSError,AttributeError):pass
 
     def hide(self):
