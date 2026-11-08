@@ -1,3 +1,24 @@
+# VOC Trader Vision PC 0.1.6 Beta — Reconstruído da fonte 0.1.3 (Hezilex Windows)
+
+Esta é uma atualização do MESMO VOC Trader Vision PC, construída a partir da fonte 0.1.3, a última relatada como aparentemente funcional. Não utiliza binários de versões que falharam e não altera código Android nem o VOC Lab.
+
+**Correções do problema "não funciona":**
+- A etiqueta colorida com o relógio da vela MOVE com o preço. Agora o OCR localiza automaticamente a etiqueta vermelha/verde em uma FAIXA VERTICAL, e só aceita um relógio quando leituras concordam. O campo "Expiração" 03:14 não substitui o relógio de preço 03:15.
+- **CALIBRAR TELA → MODELO 1366×768** mostra dez áreas sugeridas na imagem atual; só aplica após o usuário verificar as regiões manualmente. Se a cor dos botões ou a resolução não corresponder, exige calibração manual. Outros formatos continuam possíveis pela seleção manual.
+- Painel flutuante reconstruído, arrastável, com leitura de saldo, vela, ativo, risco, fase e WIN/LOSS conciliados. Mostra onde está bloqueado. "■ PARAR" desarma antes do toque; a captura do bot oculta momentaneamente o próprio painel para não confundi-lo com o gráfico; ele permanece visível em screenshots do Windows feitos pelo usuário.
+- O painel não pode roubar o foco do Chrome. Se o navegador não estiver em primeiro plano, mostra um aviso em vez de interpretar o aplicativo como gráfico.
+- Relatório em `%APPDATA%\VOCTraderVisionPC\monitoramento_pc.csv`, com estado real a cada minuto ou mudanças importantes. Um gesto não é uma ordem aceita; WIN/LOSS só vem da conciliação original do Journal.
+
+**Limites INALTERADOS:** o motor original exige pelo menos 60 velas fechadas para sinais completos, confirmação na vela e nota mínima; o controle de risco máximo 1%, somente Conta Demo, os valores confirmados da Hezilex, validação OCR, saldo, expiração, símbolo e URL continuam obrigatórios. MT5/CSV continuam SOMENTE análise. Se a tela mostrar saldo €33,08 e entrada $5,00, a operação deve ser BLOQUEADA, e não "consertada" aumentando o risco.
+
+**Guia de teste:** extraia o ZIP portátil inteiro e execute VOC-Trader-Vision-PC.exe (Python já está incluído); abra Hezilex no Chrome em Conta Demo; CALIBRAR TELA, verifique os retângulos, configure Ativo igual à aba selecionada (ex.: BNB); clique OBSERVAR e RETORNE AO CHROME; o PAINEL informa se a leitura acontece e se há bloqueio. Para cliques DEMO, o Tesseract OCR precisa estar instalado. Mantenha o PC acordado/desbloqueado. Não ative em conta real.
+
+**Estado:** CANDIDATE/BETA; compilação e testes automatizados NÃO equivalem a execução no PC do usuário ou teste de trades.
+
+Download: https://github.com/vcaitanoo/voc-apps/releases/download/voc-trader-vision-pc-v0.1.6-beta/VOC-Trader-Vision-PC-0.1.6-beta.zip
+
+---
+
 # VOC Trader Vision PC 0.1.3-beta — CALIBRAR TELA sempre visível
 
 Correção solicitada após teste no Windows 11 1366x768: o botão CALIBRAR TELA
