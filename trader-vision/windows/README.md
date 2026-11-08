@@ -1,3 +1,23 @@
+# VOC Trader Vision PC 0.1.3-beta — CALIBRAR TELA sempre visível
+
+Correção solicitada após teste no Windows 11 1366x768: o botão CALIBRAR TELA
+estava escondido abaixo de SALVAR CONFIGURAÇÃO, porque a coluna lateral tinha
+mais campos que a altura da janela e não possuía rolagem.
+
+Agora, CALIBRAR TELA e OBSERVAR/PARAR ficam fixos no alto da coluna CONTROLES;
+os restantes campos podem ser percorridos pela barra de rolagem vertical.
+Nenhuma alteração nas estratégias, motor de análise, gestão, permissões,
+ativação do modo DEMO ou sistema de cliques.
+
+ZIP portátil (Python embutido):
+https://github.com/vcaitanoo/voc-apps/releases/download/voc-trader-vision-pc-v0.1.3-beta/VOC-Trader-Vision-PC-0.1.3-beta.zip
+
+O usuário deve extrair tudo e executar VOC-Trader-Vision-PC.exe; não executar
+START_WINDOWS.bat da fonte. O Tesseract OCR continua sendo necessário para
+validar textos e habilitar toques na conta DEMO.
+
+---
+
 # VOC Trader Vision PC — Portable 0.1.2 beta (Windows x64)
 
 **Correção da execução silenciosa (VC0.1.2):** marcar ARMAR CLIQUES agora ativa o sinal real do executor e inicia a observação automaticamente após confirmação; mostra no painel se faltam velas, se o OCR/Tesseract está indisponível, se a Hezilex não é DEMO ou se o risco impede €1. Preserva limites de 1% e calibração obrigatória. Isso NÃO garante a aceitação de qualquer ordem ou a existência de oportunidades de mercado.
