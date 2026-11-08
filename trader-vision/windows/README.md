@@ -1,3 +1,21 @@
+# VOC Trader Vision PC 0.1.4 Beta — Painel flutuante para Hezilex
+
+Nova versão portátil Windows: mesmo app/fonte da 0.1.3; sem duplicar o programa.
+
+- Ao clicar **OBSERVAR**, aparece o **PAINEL** flutuante sempre no topo, movível pela barra superior. A janela principal tem **◉ PAINEL** para reabri-lo.
+- Mostra leitura DEMO/OCR, ativo, timeframe, velas detectadas, estratégia, direção, nota técnica, cronômetro, saldo/entrada/expiração lidos, motivo de espera ou bloqueio, último gesto e WIN/LOSS confirmados.
+- **■ PARAR BOT** desarma os cliques e interrompe a observação; **—** recolhe, **×** apenas esconde o painel, sem parar o bot.
+- O relatório de acompanhamento é salvo em `%APPDATA%\\VOCTraderVisionPC\\monitoramento_pc.csv`, com dados reais observados, ao menos uma linha por minuto. Clique em **RELATÓRIO** para abrir.
+- Para não confundir o painel com velas, o programa tenta a exclusão de captura do Windows; se indisponível, oculta temporariamente o painel durante cada screenshot. O reconhecimento continua impedindo cliques inseguros.
+- A execução começa **com os cliques DESARMADOS**; nenhuma estratégia, gestão, consentimento DEMO ou limite de 1% foi alterado. Um gesto não é prova de ordem aceita: só operações conciliadas contam como WIN/LOSS.
+- Para acompanhar durante a noite mantenha o PC ligado, sem bloquear a sessão; mantenha a Hezilex aberta no Chrome com a conta DEMO, sem cobrir gráfico/campos. Se a sessão bloquear ou a tela dormir, o bot não pode ler corretamente.
+- Python já está incluído no ZIP; Tesseract OCR é necessário para ler texto da Hezilex e liberar tentativas DEMO. O Windows pode alertar por falta de assinatura de código.
+- **Build automatizado não substitui teste real no seu computador.**
+
+Download do portátil atualizado: https://github.com/vcaitanoo/voc-apps/releases/download/voc-trader-vision-pc-v0.1.4-beta/VOC-Trader-Vision-PC-0.1.4-beta.zip
+
+---
+
 # VOC Trader Vision PC 0.1.3-beta — CALIBRAR TELA sempre visível
 
 Correção solicitada após teste no Windows 11 1366x768: o botão CALIBRAR TELA
