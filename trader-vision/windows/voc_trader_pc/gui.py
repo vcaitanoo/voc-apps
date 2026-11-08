@@ -16,8 +16,11 @@ BG='#0a1220'; PANEL='#111f34'; TEXT='#f0f6ff'; MUTED='#a3bad1'; ACCENT='#50e8bd'
 
 class TraderApp:
     def __init__(self,root):
-        self.root=root;self.root.title('VOC Trader Vision PC · Análise Adaptativa DEMO v0.1.2')
-        self.root.geometry('1180x765');self.root.minsize(910,650);self.root.configure(bg=BG)
+        self.root=root;self.root.title('VOC Trader Vision PC · Análise Adaptativa DEMO v0.1.3')
+        screen_width=max(940,self.root.winfo_screenwidth())
+        screen_height=max(610,self.root.winfo_screenheight())
+        self.root.geometry(f'{min(1180,screen_width-30)}x{min(765,screen_height-85)}')
+        self.root.minsize(910,540);self.root.configure(bg=BG)
         self.settings=load_settings();self.journal=Journal(JOURNAL_FILE);self.tracker=DemoTracker(self.journal)
         self.events=queue.Queue();self.stop_event=threading.Event();self.demo_event=threading.Event();self.thread=None;self.last_click_key=None
         self.csv_data={};self.log_lines=[]
@@ -36,15 +39,50 @@ class TraderApp:
         body=tk.Frame(self.root,bg=BG);body.pack(fill='both',expand=True,padx=12,pady=12)
         left=tk.Frame(body,bg=PANEL,width=330);left.pack(side='left',fill='y',padx=(0,10));left.pack_propagate(False)
         right=tk.Frame(body,bg=BG);right.pack(side='right',fill='both',expand=True)
-        self._label(left,'CONTROLES',13,ACCENT,True).pack(anchor='w',padx=14,pady=(12,6))
+        self._label(left,'CONTROLES',13,ACCENT,True).pack(anchor='w',padx=14,pady=(12,5))
+        # Always visible even on 1366x768 laptop screens with taskbar.
+        self.calibration_button=self._button(left,'1 · CALIBRAR TELA',
+                                             self.calibrate,'#157b79')
+        self.calibration_button.pack(fill='x',padx=12,pady=(0,6))
+        fixed_actions=tk.Frame(left,bg=PANEL)
+        fixed_actions.pack(fill='x',padx=12,pady=(0,6))
+        self._button(fixed_actions,'▶ OBSERVAR',self.start,'#116c62').pack(
+            side='left',expand=True,fill='x',padx=(0,4))
+        self._button(fixed_actions,'■ PARAR',self.stop,'#9a3943').pack(
+            side='left',expand=True,fill='x',padx=(4,0))
+        self._label(left,'CONFIGURAÇÕES · role para ver todos os campos',
+                    9,MUTED).pack(fill='x',padx=12,pady=(0,3))
+        scroll_holder=tk.Frame(left,bg=PANEL)
+        scroll_holder.pack(fill='both',expand=True,padx=(5,3),pady=(0,7))
+        self.controls_canvas=tk.Canvas(scroll_holder,bg=PANEL,
+                                       highlightthickness=0,borderwidth=0)
+        scroll_bar=ttk.Scrollbar(scroll_holder,orient='vertical',
+                                command=self.controls_canvas.yview)
+        self.controls_canvas.configure(yscrollcommand=scroll_bar.set)
+        scroll_bar.pack(side='right',fill='y')
+        self.controls_canvas.pack(side='left',fill='both',expand=True)
+        controls=tk.Frame(self.controls_canvas,bg=PANEL)
+        controls_window=self.controls_canvas.create_window((0,0),
+                                                             window=controls,anchor='nw')
+        controls.bind('<Configure>',lambda event:
+            self.controls_canvas.configure(scrollregion=self.controls_canvas.bbox('all')))
+        self.controls_canvas.bind('<Configure>',lambda event:
+            self.controls_canvas.itemconfigure(controls_window,width=event.width))
+        def wheel(event):
+            x=self.root.winfo_pointerx()-scroll_holder.winfo_rootx()
+            y=self.root.winfo_pointery()-scroll_holder.winfo_rooty()
+            if 0<=x<scroll_holder.winfo_width() and 0<=y<scroll_holder.winfo_height():
+                if event.delta:self.controls_canvas.yview_scroll(
+                    -1 if event.delta>0 else 1,'units')
+        self.root.bind_all('<MouseWheel>',wheel,add='+')
         def row(name,value,key,width=13):
-            f=tk.Frame(left,bg=PANEL);f.pack(fill='x',padx=12,pady=4)
+            f=tk.Frame(controls,bg=PANEL);f.pack(fill='x',padx=12,pady=4)
             self._label(f,name,10).pack(side='left',anchor='center')
             v=tk.StringVar(value=str(value));entry=tk.Entry(f,textvariable=v,width=width,bg='#253954',fg=TEXT,insertbackground=TEXT,relief='flat',justify='right')
             entry.pack(side='right',ipady=5);self.vars[key]=v
             return v
         self.vars={}
-        f=tk.Frame(left,bg=PANEL);f.pack(fill='x',padx=12,pady=5)
+        f=tk.Frame(controls,bg=PANEL);f.pack(fill='x',padx=12,pady=5)
         self._label(f,'Fonte de dados',10).pack(side='left')
         self.source=tk.StringVar(value=self.settings.source)
         ttk.Combobox(f,textvariable=self.source,values=['SCREEN','MT5','CSV'],state='readonly',width=13).pack(side='right')
@@ -56,18 +94,15 @@ class TraderApp:
         row('Perda diária (%)',self.settings.max_daily_loss_pct,'loss');row('Máx. entradas/dia',self.settings.max_daily_entries,'max_entries')
         self.allow_limited=tk.BooleanVar(value=self.settings.allow_single_tf_demo)
         self.demo=tk.BooleanVar(value=False) # REARM ALWAYS OFF on launch, regardless of config.
-        tk.Checkbutton(left,text='Aceito análise visual M5 sem todos os timeframes',variable=self.allow_limited,
+        tk.Checkbutton(controls,text='Aceito análise visual M5 sem todos os timeframes',variable=self.allow_limited,
                        fg=GOLD,bg=PANEL,selectcolor='#253954',activebackground=PANEL,wraplength=290,justify='left').pack(anchor='w',padx=10,pady=5)
-        tk.Checkbutton(left,text='ARMAR CLIQUES (APENAS CONTA DEMO)',variable=self.demo,
+        tk.Checkbutton(controls,text='ARMAR CLIQUES (APENAS CONTA DEMO)',variable=self.demo,
                        fg='#ffb1b1',bg=PANEL,selectcolor='#253954',activebackground=PANEL,
                        command=self._armed,wraplength=290).pack(anchor='w',padx=10,pady=5)
-        self._button(left,'SALVAR CONFIGURAÇÃO',self.save).pack(fill='x',padx=12,pady=4)
-        self._button(left,'CALIBRAR ELEMENTOS NA TELA',self.calibrate,'#30547a').pack(fill='x',padx=12,pady=4)
-        self._button(left,'IMPORTAR PASTA CSV (5 TIMEFRAMES)',self.pick_csv,'#30547a').pack(fill='x',padx=12,pady=4)
-        f=tk.Frame(left,bg=PANEL);f.pack(fill='x',padx=12,pady=(8,5))
-        self._button(f,'▶ OBSERVAR',self.start,'#116c62').pack(side='left',expand=True,fill='x',padx=(0,4))
-        self._button(f,'■ PARAR',self.stop,'#9a3943').pack(side='left',expand=True,fill='x',padx=(4,0))
-        self._label(left,'Ações MT5 são leitura: não há envio de ordens nem trailing alterado.',9,MUTED).pack(fill='x',padx=12,pady=(7,0))
+        self._button(controls,'SALVAR CONFIGURAÇÃO',self.save).pack(fill='x',padx=12,pady=4)
+        self._button(controls,'IMPORTAR PASTA CSV (5 TIMEFRAMES)',self.pick_csv,'#30547a').pack(fill='x',padx=12,pady=4)
+
+        self._label(controls,'MT5: somente leitura; não envia ordens.',9,MUTED).pack(fill='x',padx=12,pady=(7,8))
 
         summary=tk.Frame(right,bg=PANEL);summary.pack(fill='x',pady=(0,10))
         self.status=tk.StringVar(value='PRONTO · SEM CLIQUES');self.summary=tk.StringVar(value='Nenhuma análise executada.')
