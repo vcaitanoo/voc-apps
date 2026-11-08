@@ -13,7 +13,7 @@ def main():
         # The onedir distribution must launch with its OWN bundled Python.
         if not getattr(sys, "frozen", False):
             raise RuntimeError("Self-test requires the packaged Windows executable")
-        from voc_trader_pc import gui, engine, feeds, screen, risk, tracker
+        from voc_trader_pc import gui, engine, feeds, screen, risk, tracker, screen_clock, monitor_overlay, monitor_journal, pc_reference
         import cv2
         import numpy
         import PIL
@@ -21,7 +21,7 @@ def main():
         import pyautogui
         info = {
             "application": "VOC Trader Vision PC",
-            "version": "0.1.3-beta",
+            "version": "0.1.6-beta",
             "bundled_python": bool(getattr(sys, "frozen", False)),
             "imported": ["gui", "engine", "feeds", "screen", "risk", "tracker",
                          "cv2", "numpy", "PIL", "mss", "pyautogui"],
