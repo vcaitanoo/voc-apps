@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json,time,queue,threading,traceback
+import json,time,queue,threading,traceback,re,os
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -11,12 +11,14 @@ from .journal import Journal
 from . import engine,feeds
 from .risk import stake_verdict
 from .tracker import DemoTracker
+from .monitor_overlay import MonitorOverlay
+from .monitor_journal import MonitorJournal
 
 BG='#0a1220'; PANEL='#111f34'; TEXT='#f0f6ff'; MUTED='#a3bad1'; ACCENT='#50e8bd'; GOLD='#e5ad60'
 
 class TraderApp:
     def __init__(self,root):
-        self.root=root;self.root.title('VOC Trader Vision PC · Análise Adaptativa DEMO v0.1.3')
+        self.root=root;self.root.title('VOC Trader Vision PC · Análise Adaptativa DEMO v0.1.6')
         screen_width=max(940,self.root.winfo_screenwidth())
         screen_height=max(610,self.root.winfo_screenheight())
         self.root.geometry(f'{min(1180,screen_width-30)}x{min(765,screen_height-85)}')
@@ -24,7 +26,10 @@ class TraderApp:
         self.settings=load_settings();self.journal=Journal(JOURNAL_FILE);self.tracker=DemoTracker(self.journal)
         self.events=queue.Queue();self.stop_event=threading.Event();self.demo_event=threading.Event();self.thread=None;self.last_click_key=None
         self.csv_data={};self.log_lines=[]
+        self.last_monitor_action='Nenhuma'
         self._build()
+        self.monitor_log=MonitorJournal()
+        self.overlay=MonitorOverlay(self.root,self.stop,self.open_report)
         root.after(200,self.poll)
         root.protocol('WM_DELETE_WINDOW',self.close)
     def _label(self,parent,text,size=10,color=TEXT,bold=False):
@@ -49,7 +54,9 @@ class TraderApp:
         self._button(fixed_actions,'▶ OBSERVAR',self.start,'#116c62').pack(
             side='left',expand=True,fill='x',padx=(0,4))
         self._button(fixed_actions,'■ PARAR',self.stop,'#9a3943').pack(
-            side='left',expand=True,fill='x',padx=(4,0))
+            side='left',expand=True,fill='x',padx=(4,3))
+        self._button(fixed_actions,'◉ PAINEL',self.open_overlay,'#245a70').pack(
+            side='left',expand=True,fill='x')
         self._label(left,'CONFIGURAÇÕES · role para ver todos os campos',
                     9,MUTED).pack(fill='x',padx=12,pady=(0,3))
         scroll_holder=tk.Frame(left,bg=PANEL)
@@ -190,12 +197,18 @@ class TraderApp:
             self.start()
         self.status.set('MONITORANDO DEMO · aguardando confirmação dos dados')
     def calibrate(self):
-        if self.thread and self.thread.is_alive():messagebox.showwarning('Interrompa','Pare a observação antes de calibrar.',parent=self.root);return
+        if self.thread and self.thread.is_alive():
+            messagebox.showwarning('Interrompa','Pare a observação antes de calibrar.',parent=self.root)
+            return
+        if self.overlay.visible:self.overlay.hide_for_capture()
         try:
             from .calibration import CalibrationWindow
             CalibrationWindow(self.root,self.settings,lambda s:save_settings(s))
         except Exception as e:
-            self.root.deiconify();messagebox.showerror('Calibração',f'Não consegui capturar o monitor: {e}',parent=self.root)
+            self.root.deiconify()
+            messagebox.showerror('Calibração',f'Não consegui capturar o monitor: {e}',parent=self.root)
+        finally:
+            self.overlay.restore_after_capture()
     def pick_csv(self):
         p=filedialog.askdirectory(title='Selecione uma pasta com EURUSD_H4.csv, EURUSD_H1.csv, ...')
         if not p:return
@@ -203,19 +216,46 @@ class TraderApp:
             self.csv_data=feeds.load_csv_directory(Path(p),self.vars['symbol'].get().strip().upper())
             self._log('CSV: '+', '.join(f'{tf}={len(a)} velas' for tf,a in self.csv_data.items()))
         except Exception as e:messagebox.showerror('CSV inválido',str(e),parent=self.root)
+    def open_overlay(self):
+        self.overlay.show(force=True)
+    def open_report(self):
+        try:
+            if hasattr(os,'startfile'):
+                os.startfile(str(self.monitor_log.path))
+            else:
+                self._log('Relatório: '+str(self.monitor_log.path))
+        except OSError as exc:
+            self._log('Não foi possível abrir relatório: '+str(exc))
     def start(self):
-        if self.thread and self.thread.is_alive():return
+        if self.thread and self.thread.is_alive():
+            self.open_overlay()
+            return
         try:self.save();s=self.settings
         except Exception:return
         if s.source=='SCREEN' and not s.calibration:
             messagebox.showwarning('Calibração necessária','Capture as 10 regiões na tela do PC antes de iniciar.',parent=self.root);return
         self.stop_event.clear();self.status.set('CAPTURANDO DADOS · '+s.source)
-        self.summary.set('Monitoramento iniciado. Lendo tela e campos calibrados; confira a aba Log / diagnóstico.')
+        self.summary.set('Monitoramento iniciado. Volte para o Chrome e mantenha a Hezilex visível.')
+        self.overlay.update_state('AGUARDANDO CHROME',[
+            'Dados: aguardando primeira leitura',
+            'Ativo configurado: '+s.symbol,
+            'Mantenha o navegador Hezilex em primeiro plano',
+            'Limite de risco preservado: 1%'],self.demo_event.is_set())
+        self.overlay.show()
         self.thread=threading.Thread(target=self._loop,daemon=True);self.thread.start()
         self._log('Monitoramento iniciado. Cliques '+('armados' if self.demo_event.is_set() else 'desarmados')+'.')
     def stop(self):
         self.stop_event.set();self.demo_event.clear();self.demo.set(False)
-        self.status.set('PARADO · SEM CLIQUES');self._log('Observação interrompida; execução DEMO desarmada.')
+        self.status.set('PARADO · SEM CLIQUES')
+        self._log('Observação interrompida; execução DEMO desarmada.')
+        if hasattr(self,'overlay'):
+            self.overlay.update_state('PARADO',[
+                'Bot desarmado e captura interrompida',
+                'Relatório preservado em monitoramento_pc.csv'],False)
+        if hasattr(self,'monitor_log'):
+            self.monitor_log.append({
+                'estado':'PARADO','cliques_armados':False,'ultima_acao':'PARAR',
+                'bloqueio':'Operador interrompeu a observação'},force=True)
     def _risk_text(self, observed_balance=None):
         s=self.settings;summary=self.journal.summary()
         balance=observed_balance if observed_balance is not None else s.balance
@@ -232,8 +272,18 @@ class TraderApp:
                 f'Fator de lucro: {summary["profit_factor"] if summary["profit_factor"] is not None else "SEM DADOS"}\n\n'+
                 'HEZILEX: expiração fixa, sem trailing/SL por pip.\n'+
                 'MT5: apenas leitura; trailing original não implementado sem seu código confirmado.\n')
+    def _protected_capture(self,callback):
+        # The app overlay must be absent from bot OCR frames but remains visible
+        # to screenshots the USER takes. Tk widgets only on the main thread.
+        if not self.overlay.visible:return callback()
+        ack=threading.Event()
+        self.events.put(('capture_hide',ack))
+        if not ack.wait(5.0):
+            raise RuntimeError('Não foi possível ocultar o painel antes de ler o gráfico')
+        try:return callback()
+        finally:self.events.put(('capture_restore',))
     def _loop(self):
-        from .screen import ScreenObserver,safe_click
+        from .screen import ScreenObserver,safe_click,foreground_is_browser
         s=self.settings
         obs=ScreenObserver(s.calibration,s.tesseract_path,int(s.timeframe[1:])) if s.source=='SCREEN' else None
         first_capture=True
@@ -241,13 +291,30 @@ class TraderApp:
             try:
                 if s.source=='SCREEN':
                     if first_capture:
-                        self.events.put(('stage','Capturando monitor calibrado e lendo OCR...'))
+                        self.events.put(('stage','Iniciando: volte para a aba Hezilex no Chrome...'))
                         first_capture=False
-                    frame=obs.capture();screen=obs.read(frame)
+                    if not foreground_is_browser():
+                        self.events.put(('stage','BLOQUEADO: Chrome/Edge/Brave precisa estar em primeiro plano; retorne à Hezilex'))
+                        self.stop_event.wait(4)
+                        continue
+                    frame=self._protected_capture(obs.capture)
+                    screen=obs.read(frame)
                     data={s.timeframe:screen.candles}
                     decision=engine.evaluate(s.symbol,data,self.journal,source='SCREEN',minimum_score=s.min_score,allow_limited_context=s.allow_single_tf_demo)
                     events=[f'Hezilex OCR: DEMO={screen.account_demo}, REAL={screen.account_real}, saldo={screen.balance}, valor={screen.stake}, expiração={screen.expiry}, vela={screen.clock_remaining}s',
                             f'Ativo OCR: {screen.asset_text} | Candles visíveis: {len(screen.candles)}; Bloqueios visuais: '+(', '.join(screen.blockers) or 'nenhum')]
+                    errors=[]
+                    configured=re.sub(r'[^A-Z0-9]','',s.symbol.upper())
+                    detected=re.sub(r'[^A-Z0-9]','',screen.asset_text.upper())
+                    if not configured or not detected.startswith(configured):
+                        errors.append('ATIVO DIFERENTE: configurado '+s.symbol+
+                                      ' / aba Hezilex '+(screen.asset_text or 'ilegível'))
+                    closed=max(0,len(screen.candles)-1)
+                    if closed<60:
+                        errors.append(f'HISTÓRICO: {closed}/60 velas fechadas; afaste zoom para analisar')
+                    if screen.blockers:
+                        errors.append('LEITURA: '+screen.blockers[0])
+                    if errors:events.extend('AJUSTE: '+err for err in errors)
                     status=self.tracker.observe(screen.balance)
                     if status and status not in ('AGUARDANDO_EXPIRACAO','OCR_SALDO_INDISPONIVEL'):
                         events.append('Resultado: '+status)
@@ -260,6 +327,8 @@ class TraderApp:
                     # explanation unless an eligible signal had already appeared.
                     if not self.demo_event.is_set():
                         events.append('EXECUÇÃO DESARMADA: marcar ARMAR CLIQUES para permitir tentativas DEMO.')
+                    elif errors:
+                        events.append('BLOQUEADO POR LEITURA: '+errors[0])
                     elif not verdict.allowed:
                         events.append('BLOQUEADO POR RISCO: '+verdict.reason)
                     elif self.tracker.pending is not None:
@@ -280,8 +349,13 @@ class TraderApp:
                             key=(s.symbol,int(time.time()//(total or 300)))
                             if key!=self.last_click_key:
                                 try:
-                                    _,_,latest_balance=safe_click(obs,screen,s.calibration,decision.candidate.direction,verdict.stake,s.expiry_min,
-                                              s.symbol,int(s.calibration.get('monitor',1)))
+                                    _,_,latest_balance=self._protected_capture(
+                                        lambda:safe_click(obs,screen,s.calibration,
+                                            decision.candidate.direction,verdict.stake,s.expiry_min,
+                                            s.symbol,int(s.calibration.get('monitor',1)),
+                                            should_cancel=lambda:(
+                                                self.stop_event.is_set() or
+                                                not self.demo_event.is_set())))
                                 except Exception as exc:
                                     events.append(f'TOQUE RECUSADO: {type(exc).__name__}: {exc}')
                                 else:
@@ -289,7 +363,15 @@ class TraderApp:
                                     self.tracker.begin(s.symbol,decision.candidate.strategy,decision.candidate.regime,
                                                        decision.candidate.direction,latest_balance,verdict.stake,s.expiry_min)
                                     events.append('GESTO DEMO ENVIADO; aceitação da ordem NÃO VERIFICADA')
-                    self.events.put(('decision',decision,events,screen.balance))
+                    screenshot_data={
+                        'account_demo':screen.account_demo,'account_real':screen.account_real,
+                        'asset':screen.asset_text,
+                        'bars':len(screen.candles),'clock':screen.clock_remaining,
+                        'balance':screen.balance,'stake':screen.stake,'expiry':screen.expiry,
+                        'browser':True,'blockers':screen.blockers,'risk':verdict.reason,
+                        'risk_allowed':verdict.allowed,'issues':errors}
+                    self.events.put(('decision',decision,events,screen.balance,
+                                     screenshot_data))
                 elif s.source=='MT5':
                     data=feeds.load_mt5(s.mt5_symbol)
                     decision=engine.evaluate(s.mt5_symbol,data,self.journal,source='MT5',minimum_score=s.min_score)
@@ -304,21 +386,39 @@ class TraderApp:
         try:
             for _ in range(12):
                 e=self.events.get_nowait()
-                if e[0]=='error':
+                if e[0]=='capture_hide':
+                    self.overlay.hide_for_capture()
+                    e[1].set()
+                elif e[0]=='capture_restore':
+                    self.overlay.restore_after_capture()
+                elif e[0]=='error':
                     self._log('ERRO: '+e[1])
                     self.status.set('ERRO DE LEITURA · SEM CLIQUES')
-                    self.summary.set(e[1]+'\nConfira OCR, calibração e visibilidade do navegador.')
+                    self.summary.set(e[1]+'\\nConfira OCR, calibração e visibilidade do navegador.')
+                    self.overlay.update_state('ERRO DE LEITURA',[e[1]],False)
+                    self.monitor_log.append({'estado':'ERRO DE LEITURA',
+                        'bloqueio':e[1],'cliques_armados':self.demo_event.is_set()},force=True)
                 elif e[0]=='stage':
-                    self.status.set('LENDO TELA · SCREEN')
+                    self.status.set('VERIFICANDO NAVEGADOR · SCREEN')
                     self.summary.set(e[1])
+                    self.overlay.update_state('AGUARDANDO HEZILEX',[e[1],
+                        'Volte ao Chrome; esta janela não pode cobrir o gráfico'],
+                        self.demo_event.is_set())
+                    self.monitor_log.append({'estado':'AGUARDANDO HEZILEX',
+                        'bloqueio':e[1],'browser_ativo':False,
+                        'cliques_armados':self.demo_event.is_set()})
                 else:
                     self._update(*e[1:])
         except queue.Empty:pass
         self.root.after(200,self.poll)
-    def _update(self,d:Decision,extras:list[str],balance:float|None):
-        execution=next((e for e in extras if e.startswith(('BLOQUEADO POR RISCO:',
-                      'EXECUÇÃO DESARMADA:', 'AGUARDANDO SETUP:',
-                      'AGUARDANDO RESULTADO', 'Sem toque:', 'TOQUE RECUSADO:'))), '')
+    def _update(self,d:Decision,extras:list[str],balance:float|None,
+                diagnostic:dict|None=None):
+        execution=next((e for e in extras if e.startswith((
+                      'AJUSTE:', 'BLOQUEADO POR LEITURA:',
+                      'BLOQUEADO POR RISCO:',
+                      'Sem toque:', 'TOQUE RECUSADO:',
+                      'AGUARDANDO RESULTADO', 'AGUARDANDO SETUP:',
+                      'EXECUÇÃO DESARMADA:'))), '')
         if d.source=='SCREEN' and self.demo_event.is_set() and execution.startswith('BLOQUEADO'):
             self.status.set('DEMO ARMADA · BLOQUEIO DE RISCO')
         elif d.source=='SCREEN':
@@ -350,8 +450,48 @@ class TraderApp:
         summary+='\n'+'\n'.join(extras)
         self._render('Estratégia & execução',summary)
         self._render('Risco & resultados',self._risk_text(balance))
+        info=diagnostic or {}
+        lines=[
+            'Tela/Conta: '+('DEMO OK' if info.get('account_demo') and not info.get('account_real') else 'NÃO CONFIRMADA'),
+            'Ativo: '+str(info.get('asset','—'))+' | Config.: '+self.settings.symbol,
+            'M5: '+str(max(0,int(info.get('bars') or 0)-1))+'/60 fechadas',
+            'Vela: '+(str(info.get('clock'))+'s' if info.get('clock') is not None else 'OCR não confirmado'),
+            'Saldo OCR: '+str(info.get('balance') if info.get('balance') is not None else '?')+
+                 ' | Entrada OCR: '+str(info.get('stake') if info.get('stake') is not None else '?'),
+            'Expiração OCR: '+str(info.get('expiry') if info.get('expiry') is not None else '?')+'min',
+            'Sinal: '+(d.candidate.direction+' '+str(d.candidate.score)+'/100'
+                       if d.candidate else 'AGUARDAR'),
+            'Razão: '+(execution or d.explanation),
+            'WIN/LOSS confirmados: '+str(self.journal.summary()['wins'])+
+                '/'+str(self.journal.summary()['losses']),
+            'Última ação: '+self.last_monitor_action]
+        for item in extras:
+            if item.startswith(('GESTO DEMO ENVIADO','TOQUE RECUSADO:','Resultado:')):
+                self.last_monitor_action=item
+        phase=('BLOQUEADO RISCO' if not info.get('risk_allowed',True) else
+               'AJUSTAR TELA' if info.get('issues') else
+               'AGUARDANDO SINAL' if d.status!='ELEGÍVEL' else d.status)
+        self.overlay.update_state(phase,lines,self.demo_event.is_set())
+        stats=self.journal.summary()
+        self.monitor_log.append({
+            'estado':phase,'fonte':d.source,'cliques_armados':self.demo_event.is_set(),
+            'browser_ativo':info.get('browser',False),
+            'conta_demo':info.get('account_demo',False),
+            'ativo_configurado':self.settings.symbol,
+            'ativo_lido':info.get('asset'), 'velas_fechadas':max(0,int(info.get('bars') or 0)-1),
+            'segundos_relogio':info.get('clock'),
+            'nota_tecnica':d.candidate.score if d.candidate else None,
+            'sinal':d.candidate.direction if d.candidate else 'AGUARDAR',
+            'estrategia':d.candidate.strategy if d.candidate else 'Nenhuma',
+            'saldo_ocr':info.get('balance'), 'valor_ocr':info.get('stake'),
+            'expiracao_ocr':info.get('expiry'),
+            'bloqueio':execution or info.get('risk') or d.explanation,
+            'ultima_acao':self.last_monitor_action,
+            'wins_confirmados':stats['wins'],'losses_confirmados':stats['losses'],
+            'operacoes_conciliadas':stats['total']})
     def close(self):
         self.stop_event.set();self.demo_event.clear();self.demo.set(False)
+        if hasattr(self,'overlay'):self.overlay.close()
         self.root.destroy()
 
 
