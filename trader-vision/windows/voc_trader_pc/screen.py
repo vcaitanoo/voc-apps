@@ -218,7 +218,8 @@ def foreground_is_browser()->bool:
 
 
 def safe_click(observer:ScreenObserver,screen:ObservedScreen,calibration:dict,side:str,
-               amount:float,expiry_min:int,expected_symbol:str,screen_monitor_index:int=1):
+               amount:float,expiry_min:int,expected_symbol:str,screen_monitor_index:int=1,
+               *,should_cancel=None):
     """Re-capture and re-validate the broker screen immediately before any demo click.
 
     No real-money account. No click when the browser loses focus, when OCR fails,
@@ -245,6 +246,10 @@ def safe_click(observer:ScreenObserver,screen:ObservedScreen,calibration:dict,si
         mon=s.monitors[screen_monitor_index]
     x=(int(roi[0])+int(roi[2]))//2+int(mon['left'])
     y=(int(roi[1])+int(roi[3]))//2+int(mon['top'])
+    # Overlay STOP can disarm while OCR is running. Respect that command
+    # immediately before sending the actual mouse click.
+    if should_cancel is not None and should_cancel():
+        raise RuntimeError('Monitoramento parado ou cliques DEMO desarmados')
     pyautogui.FAILSAFE=True
     pyautogui.click(x=x,y=y,clicks=1,interval=.12)
     return x,y,latest.balance
