@@ -1,3 +1,27 @@
+# VOC Trader Vision PC 0.1.5 Beta — Layout real Hezilex desktop (1366×768)
+
+Correção feita sobre **0.1.4**, sem criar outro programa e sem mexer nas estratégias, gestão, modo DEMO, fontes MT5/CSV, trailing, contas ou lógica de fechamento de operação.
+
+**Sua tela de 1366×768 mostra BNB, 5 min, saldo €33,08, valor de entrada €5,00 e cerca de 35 velas visíveis.** Essa captura não autoriza operação automática: o símbolo configurado é EURUSD, o gráfico tem menos de 60 velas fechadas e €5 excedem 1% de €33,08 (€0,3308).
+
+1. Abra a Hezilex no Chrome, na conta DEMO, sem mudar zoom do navegador nem posição dos componentes.
+2. No VOC Trader PC abra **CALIBRAR TELA → MODELO PC 1366×768**. O modelo só é oferecido se a resolução for idêntica **e** os botões verde/vermelho estiverem nas posições esperadas.
+3. O programa desenha dez retângulos sobre a captura. **Verifique cada área antes de confirmar.** A correspondência de cores NÃO garante texto, saldo ou preço corretos. Se algo não coincidir, responda NÃO e calibre manualmente.
+4. Na configuração **Ativo**, escreva o ativo efetivamente aberto (ex.: BNB). O programa não muda automaticamente o ativo para evitar operar outro mercado.
+5. Recolha o zoom do gráfico para mostrar pelo menos **61 candles, incluindo a vela aberta** (o motor exige 60 fechados). Clique OBSERVAR.
+6. O painel flutuante mostrará **AJUSTE** com os motivos exatos enquanto faltar histórico, OCR, houver símbolo divergente ou valor acima de 1%.
+7. Para 1% de risco com €33,08, o orçamento máximo por entrada é cerca de €0,33. Se a corretora exigir ao menos €1, as entradas permanecem bloqueadas; não aumentar o risco sem uma decisão expressa.
+
+**Como calibrar o contador:** escolha os números pequenos **04:48** no rótulo VERDE de preço, à direita das velas. O relógio **04:47** no topo do bloco Expiração é outro elemento e não deve ser usado para detectar a abertura da vela.
+
+**Painel invisível em print do Windows:** a versão 0.1.4 tenta impedir que o painel apareça em screenshots para não contaminar a leitura do gráfico. Por isso, a captura enviada pelo usuário pode não mostrá-lo embora esteja visível na tela física. Use o botão PAINEL na janela do robô para reabrir se o tiver ocultado; mantenha OBSERVAR ativo.
+
+Esta versão **não ignora limitações de dados**, não usa informações futuras e não tenta enviar uma ordem em conta REAL. Se não houver condições de mercado e saldo adequados, a decisão correta é AGUARDAR/BLOQUEADO. Só operações conciliadas aparecem como WIN/LOSS. O Windows continua precisando de Tesseract OCR para analisar textos.
+
+Portátil Windows: https://github.com/vcaitanoo/voc-apps/releases/download/voc-trader-vision-pc-v0.1.5-beta/VOC-Trader-Vision-PC-0.1.5-beta.zip
+
+---
+
 # VOC Trader Vision PC 0.1.4 Beta — Painel flutuante para Hezilex
 
 Nova versão portátil Windows: mesmo app/fonte da 0.1.3; sem duplicar o programa.
