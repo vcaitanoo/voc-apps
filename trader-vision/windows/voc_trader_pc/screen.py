@@ -6,6 +6,7 @@ import re, time
 import numpy as np
 import cv2
 from .models import Candle
+from .screen_clock import moving_price_tag,read_price_tag_clock
 
 
 @dataclass
@@ -187,7 +188,23 @@ class ScreenObserver:
         observed_stake=parse_money(ocr('stake',7))
         observed_expiry=parse_expiry(ocr('expiry',7))
         current_balance=parse_money(ocr('balance',7))
-        seconds=parse_timer(ocr('countdown',7),self.timeframe*60)
+        # Hezilex price label moves with the quote; a static countdown Y is
+        # invalid after any price change. Never substitute the expiration
+        # countdown in the upper-right trade panel for the candle clock.
+        tag=moving_price_tag(frame,rois.get('chart'),rois.get('countdown'),
+                             rois.get('buy'))
+        seconds=None
+        if tag is not None and not self._ocr_error:
+            import pytesseract
+            def digits(image):
+                return pytesseract.image_to_string(
+                    image,config='--psm 7 -c tessedit_char_whitelist=0123456789:',
+                    timeout=4)
+            seconds=read_price_tag_clock(frame,tag,digits,self.timeframe*60)
+        if tag is None:
+            blockers.append('Etiqueta colorida do preço não localizada; não usar temporizador de Expiração')
+        elif seconds is None:
+            blockers.append('Relógio MÓVEL da vela não confirmado por OCR; sem toque')
         is_demo=bool(re.search(r'(conta\s*demo|demo\s*account)',account))
         is_real=bool(re.search(r'(conta\s*real|real\s*account)',account))
         url_ok='hezilex.com' in url and ('traderoom' in url or 'trade' in url)
@@ -196,7 +213,7 @@ class ScreenObserver:
         if observed_stake is None:blockers.append('Valor de entrada ilegível')
         if observed_expiry is None:blockers.append('Expiração ilegível')
         if current_balance is None:blockers.append('Saldo DEMO ilegível')
-        if seconds is None:blockers.append('Cronômetro da vela ilegível')
+        if seconds is None and tag is not None:blockers.append('Cronômetro da vela ilegível')
         btns=(button_color_check(frame,rois['buy'],'BUY') and button_color_check(frame,rois['sell'],'SELL')) if 'buy' in rois and 'sell' in rois else False
         if not btns:blockers.append('Botões Comprar/Vender parcialmente ocultos')
         bars=extract_candles(frame,rois['chart'],self.timeframe) if 'chart' in rois else []
