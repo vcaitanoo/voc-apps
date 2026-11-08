@@ -200,15 +200,18 @@ class TraderApp:
         if self.thread and self.thread.is_alive():
             messagebox.showwarning('Interrompa','Pare a observação antes de calibrar.',parent=self.root)
             return
-        if self.overlay.visible:self.overlay.hide_for_capture()
+        was_visible=self.overlay.visible
+        if was_visible:self.overlay.hide_for_capture()
+        def restore():
+            if was_visible:self.overlay.restore_after_capture()
         try:
             from .calibration import CalibrationWindow
-            CalibrationWindow(self.root,self.settings,lambda s:save_settings(s))
+            CalibrationWindow(self.root,self.settings,lambda s:save_settings(s),
+                              on_close=restore)
         except Exception as e:
             self.root.deiconify()
+            restore()
             messagebox.showerror('Calibração',f'Não consegui capturar o monitor: {e}',parent=self.root)
-        finally:
-            self.overlay.restore_after_capture()
     def pick_csv(self):
         p=filedialog.askdirectory(title='Selecione uma pasta com EURUSD_H4.csv, EURUSD_H1.csv, ...')
         if not p:return
