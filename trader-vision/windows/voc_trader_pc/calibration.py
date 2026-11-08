@@ -7,21 +7,21 @@ import numpy as np
 import cv2
 
 FIELDS=[
- ('chart','1/10: selecione SOMENTE a área das velas (sem botões, horários ou banner).'),
+ ('chart','1/10: selecione TODAS as velas até a faixa de preços (não cortar topos, sem botões).'),
  ('account','2/10: selecione o rótulo Conta Demo no canto superior.'),
  ('balance','3/10: selecione apenas o saldo € mostrado na conta Demo.'),
  ('address','4/10: selecione a barra de endereço com app.hezilex.com/traderoom.'),
- ('asset','5/10: selecione o nome do ATIVO aberto (ex.: EUR/USD).'),
+ ('asset','5/10: selecione o ATIVO da aba ativa (ex.: BNB); NÃO a lista de ativos da direita.'),
  ('stake','6/10: selecione o número do valor (ex.: 1,00).'),
  ('expiry','7/10: selecione a expiração (ex.: 5 min).'),
- ('countdown','8/10: selecione o cronômetro da vela ao lado do preço.'),
+ ('countdown','8/10: marque uma FAIXA VERTICAL ao lado do preço. A etiqueta 03:15 se move com a cotação; NÃO use o relógio da Expiração.'),
  ('buy','9/10: selecione toda a área VERDE do botão Comprar.'),
  ('sell','10/10: selecione toda a área VERMELHA do botão Vender.')
 ]
 
 class CalibrationWindow:
-    def __init__(self,parent,settings,on_save):
-        self.parent=parent;self.settings=settings;self.on_save=on_save
+    def __init__(self,parent,settings,on_save,on_close=None):
+        self.parent=parent;self.settings=settings;self.on_save=on_save;self.on_close=on_close
         self.selected={};self.step=0;self.start=None;self.rect=None
         parent.withdraw()
         parent.after(350,self._capture)
@@ -31,6 +31,7 @@ class CalibrationWindow:
             index=1
             monitor=s.monitors[index]
             raw=np.asarray(s.grab(monitor))
+        self.bgr=cv2.cvtColor(raw,cv2.COLOR_BGRA2BGR)
         arr=cv2.cvtColor(raw,cv2.COLOR_BGRA2RGB)
         self.full=Image.fromarray(arr)
         w,h=self.full.size
@@ -53,9 +54,46 @@ class CalibrationWindow:
         self.canvas.bind('<B1-Motion>',self.drag)
         self.canvas.bind('<ButtonRelease-1>',self.up)
         line=tk.Frame(self.win,bg='#0d1728');line.pack(fill='x',pady=5)
-        tk.Button(line,text='RECOMEÇAR',command=self.reset,bg='#40536d',fg='white').pack(side='left',padx=8)
+        tk.Button(line,text='RECOMEÇAR',command=self.reset,
+                  bg='#40536d',fg='white').pack(side='left',padx=8)
+        tk.Button(line,text='MODELO PC 1366×768',command=self.apply_reference,
+                  bg='#157b79',fg='white').pack(side='left',padx=8)
         tk.Button(line,text='CANCELAR',command=self._close,bg='#923f45',fg='white').pack(side='right',padx=8)
         self.win.lift();self.win.focus_force()
+    def apply_reference(self):
+        from .pc_reference import recommended
+        suggestion,reason=recommended(self.bgr)
+        if suggestion is None:
+            messagebox.showwarning('Modelo não compatível',
+                reason+'\\nCalibre as dez regiões manualmente.',parent=self.win)
+            return
+        self.canvas.delete('reference')
+        for index,(name,_) in enumerate(FIELDS,1):
+            x0,y0,x1,y1=suggestion['rois'][name]
+            x0,y0,x1,y1=[round(n*self.scale) for n in (x0,y0,x1,y1)]
+            self.canvas.create_rectangle(x0,y0,x1,y1,
+                outline='#37f9db',width=2,tags='reference')
+            self.canvas.create_text(x0+3,max(9,y0-9),text=f'{index}:{name}',
+                fill='#fff49a',anchor='w',tags='reference')
+        accepted=messagebox.askyesno('Confira os 10 retângulos',
+            'O MODELO é apenas uma proposta. Confira TODAS as áreas.\\n'
+            'A região 8 deve ser uma FAIXA VERTICAL para localizar a etiqueta móvel do preço.\\n'
+            'O ativo deve estar na ABA SELECIONADA, não na lista lateral.\\n'
+            'Se alguma posição estiver errada, clique NÃO e selecione manualmente.\\n'
+            'O modelo não autoriza cliques nem modifica os limites de risco.\\n\\n'
+            'Todas as posições estão corretas?',
+            parent=self.win)
+        if not accepted:
+            self.canvas.delete('reference')
+            return
+        self.settings.calibration=suggestion
+        self.on_save(self.settings)
+        self._close()
+        messagebox.showinfo('Calibração concluída',
+            'Regiões conferidas e salvas. Clique OBSERVAR, volte para o Chrome '
+            'e confira se o painel lê ativo, velas, saldo e relógio.',
+            parent=self.parent)
+
     def down(self,e):
         self.start=(e.x,e.y)
         if self.rect is not None:self.canvas.delete(self.rect)
@@ -85,3 +123,4 @@ class CalibrationWindow:
         if hasattr(self,'win'):
             self.win.destroy()
         self.parent.deiconify();self.parent.lift()
+        if self.on_close:self.on_close()
