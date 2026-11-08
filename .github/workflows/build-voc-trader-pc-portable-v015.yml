@@ -1,0 +1,151 @@
+name: VOC Trader Vision PC Portable 0.1.5 - No Python Required
+
+on:
+  push:
+    branches:
+      - fix/voc-trader-pc-v015-desktop-layout-diagnostics-20261108
+    paths:
+      - '.github/workflows/build-voc-trader-pc-portable-v015.yml'
+      - 'trader-vision/windows/run.py'
+      - 'trader-vision/windows/voc_trader_pc/gui.py'
+      - 'trader-vision/windows/voc_trader_pc/calibration.py'
+      - 'trader-vision/windows/voc_trader_pc/desktop_layout.py'
+      - 'trader-vision/windows/tests/test_desktop_reference.py'
+      - 'trader-vision/windows/voc_trader_pc/overlay.py'
+      - 'trader-vision/windows/voc_trader_pc/session_report.py'
+      - 'trader-vision/windows/tests/test_floating_overlay.py'
+      - 'trader-vision/windows/voc_trader_pc/screen.py'
+      - 'trader-vision/windows/tests/test_activation.py'
+      - 'trader-vision/windows/tests/test_calibration_layout.py'
+      - 'trader-vision/windows/README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: voc-trader-vision-pc-portable-v015
+  cancel-in-progress: false
+
+jobs:
+  standalone-windows:
+    runs-on: windows-latest
+    timeout-minutes: 50
+    defaults:
+      run:
+        working-directory: trader-vision/windows
+    steps:
+      - name: Checkout existing VOC Trader Vision PC source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Use Python only during build, not on end-user PC
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: x64
+      - name: Install original dependencies and packager
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest pyinstaller
+          python -m pip install MetaTrader5
+      - name: Verify existing application logic remains unchanged
+        shell: pwsh
+        run: python -m pytest -q
+      - name: Generate PyInstaller onedir with Python embedded
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --windowed --onedir --name VOC-Trader-Vision-PC --collect-all mss --collect-all MetaTrader5 run.py
+          $app='dist/VOC-Trader-Vision-PC'
+          if (!(Test-Path "$app/VOC-Trader-Vision-PC.exe")) { throw 'Main EXE is missing' }
+          if (!(Test-Path "$app/_internal/python311.dll")) { throw 'Python runtime was NOT bundled' }
+          Get-FileHash "$app/VOC-Trader-Vision-PC.exe" -Algorithm SHA256
+      - name: Smoke test FROZEN executable with system Python unavailable
+        shell: pwsh
+        run: |
+          $app=(Resolve-Path 'dist/VOC-Trader-Vision-PC').Path
+          $exe=Join-Path $app 'VOC-Trader-Vision-PC.exe'
+          $report=Join-Path $env:RUNNER_TEMP 'voc-trader-portable-selftest.json'
+          $savedPath=$env:PATH
+          $savedPythonHome=$env:PYTHONHOME
+          $savedPythonPath=$env:PYTHONPATH
+          try {
+            $env:PATH="$env:SystemRoot\System32;$env:SystemRoot"
+            Remove-Item Env:PYTHONHOME -ErrorAction SilentlyContinue
+            Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
+            $process=Start-Process -FilePath $exe -ArgumentList @('--self-test-report', $report) -WorkingDirectory $app -Wait -PassThru
+            if ($process.ExitCode -ne 0) { throw "Frozen application exit code $($process.ExitCode)" }
+            if (!(Test-Path $report)) { throw 'EXE did not produce self-test report' }
+            $result=Get-Content $report -Raw | ConvertFrom-Json
+            if (!$result.bundled_python -or $result.startup -ne 'imports_ok') { throw 'Bundled runtime smoke test failed' }
+            if ($result.trading_enabled) { throw 'Unsafe selftest state' }
+            Write-Host 'PASS: portable EXE opened and imported UI/analysis libraries WITHOUT Python on PATH'
+          } finally {
+            $env:PATH=$savedPath
+            if ($null -ne $savedPythonHome) {$env:PYTHONHOME=$savedPythonHome}
+            if ($null -ne $savedPythonPath) {$env:PYTHONPATH=$savedPythonPath}
+          }
+      - name: Package the EXE at ZIP ROOT (never the developer BAT)
+        shell: pwsh
+        run: |
+          $app='dist/VOC-Trader-Vision-PC'
+          Copy-Item README.md "$app/LEIA-ME.txt"
+          @'
+          VOC TRADER VISION PC 0.1.5 BETA - WINDOWS 64 BITS
+
+          ABRA: VOC-Trader-Vision-PC.exe
+          NAO ABRA: START_WINDOWS.bat (este arquivo NAO esta neste ZIP)
+
+          Python NAO precisa ser instalado. Ele esta na pasta _internal.
+          Extraia o ZIP completo; NAO mova so o .exe.
+
+          Para os cliques DEMO, o Tesseract OCR ainda exige
+          configuracao propria. O bot inicia DESARMADO.
+          '@ | Set-Content -Encoding utf8 "$app/COMECE-AQUI.txt"
+          $zip='VOC-Trader-Vision-PC-0.1.5-beta.zip'
+          Compress-Archive -Path "$app/*" -DestinationPath $zip -Force
+          if (!(Test-Path $zip)) {throw 'Portable ZIP is missing'}
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive=[System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip).Path)
+          try {
+            $names=@($archive.Entries | ForEach-Object {$_.FullName})
+            if ($names -notcontains 'VOC-Trader-Vision-PC.exe') {throw 'EXE not at ZIP root'}
+            if ($names -contains 'START_WINDOWS.bat') {throw 'Developer BAT accidentally distributed'}
+            if (-not ($names | Where-Object {$_ -like '_internal/*python311.dll'})) {throw 'Embedded Python is missing from ZIP'}
+            if ($names -notcontains 'COMECE-AQUI.txt') {throw 'Startup instructions missing'}
+            Write-Host "Portable ZIP layout PASS with $($names.Count) entries"
+          } finally { $archive.Dispose() }
+          Get-FileHash $zip -Algorithm SHA256
+      - name: Re-extract the distributed ZIP and smoke-test EXACT shipped EXE
+        shell: pwsh
+        run: |
+          $dest=Join-Path $env:RUNNER_TEMP 'voc-trader-shipped'
+          Expand-Archive 'VOC-Trader-Vision-PC-0.1.5-beta.zip' -DestinationPath $dest -Force
+          $exe=Join-Path $dest 'VOC-Trader-Vision-PC.exe'
+          $report=Join-Path $dest 'startup-ok.json'
+          $saved=$env:PATH
+          try {
+            $env:PATH="$env:SystemRoot\System32;$env:SystemRoot"
+            $p=Start-Process -FilePath $exe -ArgumentList @('--self-test-report', $report) -WorkingDirectory $dest -Wait -PassThru
+            if ($p.ExitCode -ne 0) { throw "ZIP EXE failed: $($p.ExitCode)" }
+            if (!(Test-Path $report)) { throw 'ZIP EXE did not launch' }
+            $result=Get-Content $report -Raw | ConvertFrom-Json
+            if (!$result.bundled_python) { throw 'ZIP EXE uses external Python' }
+            Write-Host 'PASS: exact ZIP runnable with no Python installed in PATH'
+          } finally { $env:PATH=$saved }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VOC-Trader-Vision-PC-0.1.5-beta-portable
+          path: trader-vision/windows/VOC-Trader-Vision-PC-0.1.5-beta.zip
+          if-no-files-found: error
+          retention-days: 45
+      - name: Publish corrected release, same VOC Trader Vision PC application
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag='voc-trader-vision-pc-v0.1.5-beta'
+          $repo='${{ github.repository }}'
+          $sha=(git rev-parse HEAD).Trim()
+          gh release create $tag VOC-Trader-Vision-PC-0.1.5-beta.zip --repo $repo --target $sha --title 'VOC Trader Vision PC 0.1.5 Beta - Windows Portable' --prerelease --notes 'Atualização do MESMO app para o layout real Hezilex desktop 1366x768: calibração guiada dos 10 retângulos com aprovação explícita, explicação do relógio verde da vela, diagnóstico visível de ativo BNB vs configuração EURUSD, zoom insuficiente (menos de 60 velas fechadas) e bloqueio por risco quando entrada €5 supera 1% do saldo €33,08. A automação nunca altera valores nem age sem validação fresca. Painel anterior mantido. Sem alterar estratégias nem risco de 1%. EXE portátil com Python embutido. Testado em Windows GitHub Actions sem Python no PATH, incluindo ZIP extraído. Não testado em computador físico nem na Hezilex real. Tesseract OCR ainda necessário para automação DEMO. Estratégias/gestão preservadas. Android VOC Lab não alterado.'
