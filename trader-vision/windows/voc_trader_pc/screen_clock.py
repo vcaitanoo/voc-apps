@@ -95,5 +95,9 @@ def read_price_tag_clock(frame:np.ndarray,tag:PriceTag,ocr_callable,
     if not results:return None
     counts={}
     for val in results:counts[val]=counts.get(val,0)+1
-    value,votes=max(counts.items(),key=lambda item:item[1])
+    ranking=sorted(counts.items(),key=lambda item:item[1],reverse=True)
+    value,votes=ranking[0]
+    # Two equally frequent readings are an ambiguous clock, not evidence
+    # that a new candle opened. Never choose arbitrarily by insertion order.
+    if len(ranking)>1 and ranking[1][1]==votes:return None
     return value if votes>=2 else None
