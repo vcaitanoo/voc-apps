@@ -1,0 +1,181 @@
+--- a/app/build.gradle
++++ b/app/build.gradle
+@@ -8,8 +8,8 @@
+         applicationId 'pt.vcaitano.telasempreativa'
+         minSdk 27
+         targetSdk 36
+-        versionCode 20260906
+-        versionName '1.0.32'
++        versionCode 20260909
++        versionName '1.0.35'
+         manifestPlaceholders = [admobAppId: 'ca-app-pub-4663833571268509~7119728069']
+         buildConfigField 'String', 'SETTINGS_NATIVE_AD_ID', '"ca-app-pub-4663833571268509/7487393728"'
+         buildConfigField 'String', 'AOD_BANNER_AD_ID', '"ca-app-pub-4663833571268509/6921131529"'
+--- a/app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java
++++ b/app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java
+@@ -87,6 +87,10 @@
+             if (MediaNotificationService.isListenerConnected()) {
+                 requestFreshState();
+                 showNotificationIcons(MediaNotificationService.getLastPackages());
++            } else {
++                // Access may remain enabled while Android disconnects the listener.
++                // A throttled rebind restores real icons without fake notifications.
++                MediaNotificationService.ensureListenerBound(AodActivity.this);
+             }
+             handler.postDelayed(this, 2_000L);
+         }
+@@ -229,7 +233,9 @@
+                 if (!preview) closeAfterUnlock();
+             } else if (MediaNotificationService.ACTION_NOTIFICATIONS.equals(action)) {
+                 ArrayList<String> packages = intent.getStringArrayListExtra("packages");
+-                showNotificationIcons(packages == null ? new ArrayList<>() : packages);
++                // A malformed/empty broadcast payload must not erase valid icons.
++                // An explicit empty list still removes icons when there are no notifications.
++                if (packages != null) showNotificationIcons(packages);
+             } else if (MediaNotificationService.ACTION_MEDIA.equals(action)) {
+                 refreshSessions();
+             } else if (Intent.ACTION_BATTERY_CHANGED.equals(action)) {
+@@ -276,6 +282,7 @@
+         handler.post(updateClock);
+         handler.removeCallbacks(antiBurn);
+         handler.postDelayed(antiBurn, ANTI_BURN_INTERVAL_MS);
++        MediaNotificationService.ensureListenerBound(this);
+         requestFreshState();
+         handler.removeCallbacks(notificationStatePoll);
+         handler.post(notificationStatePoll);
+--- a/app/src/main/java/pt/vcaitano/telasempreativa/MediaNotificationService.java
++++ b/app/src/main/java/pt/vcaitano/telasempreativa/MediaNotificationService.java
+@@ -17,6 +17,8 @@
+ import android.os.Bundle;
+ import android.os.Handler;
+ import android.os.Looper;
++import android.os.SystemClock;
++import android.provider.Settings;
+ import android.service.notification.NotificationListenerService;
+ import android.service.notification.StatusBarNotification;
+ import android.text.TextUtils;
+@@ -29,6 +31,7 @@
+ public class MediaNotificationService extends NotificationListenerService {
+     private static volatile MediaNotificationService instance;
+     private static volatile boolean listenerConnected;
++    private static volatile long lastRebindAttempt;
+     static final String ACTION_NOTIFICATIONS = "pt.vcaitano.telasempreativa.NOTIFICATIONS_CHANGED";
+     static final String ACTION_MEDIA = "pt.vcaitano.telasempreativa.MEDIA_CHANGED";
+     static final String ACTION_REQUEST = "pt.vcaitano.telasempreativa.REQUEST_STATE";
+@@ -97,6 +100,9 @@
+         listenerConnected = false;
+         clearController();
+         super.onListenerDisconnected();
++        // Android can disconnect notification access during an app update.
++        // Rebind only if the user has already authorized access.
++        handler.postDelayed(() -> ensureListenerBound(this), 1_500L);
+     }
+ 
+     @Override
+@@ -202,11 +208,19 @@
+     }
+ 
+     private void publishNotifications() {
++        if (!listenerConnected) return;
++        // Do not replace a valid snapshot with an empty one when the Android
++        // notification manager temporarily fails to return active notifications.
++        final StatusBarNotification[] active;
++        try {
++            active = getActiveNotifications();
++        } catch (RuntimeException error) {
++            return;
++        }
++        if (active == null) return;
+         Set<String> packages = new LinkedHashSet<>();
+         try {
+-            StatusBarNotification[] active = getActiveNotifications();
+-            if (active != null) {
+-                for (StatusBarNotification sbn : active) {
++            for (StatusBarNotification sbn : active) {
+                     String packageName = sbn.getPackageName();
+                     if (packageName == null || packageName.equals(getPackageName())
+                             || packageName.equals("android")
+@@ -217,9 +231,9 @@
+                     boolean media = Notification.CATEGORY_TRANSPORT.equals(notification.category)
+                             || (extras != null && extras.containsKey(Notification.EXTRA_MEDIA_SESSION));
+                     if (!media) packages.add(packageName);
+-                }
+             }
+-        } catch (Exception ignored) {
++        } catch (RuntimeException error) {
++            return;
+         }
+         ArrayList<String> payload = new ArrayList<>(packages);
+         synchronized (lastPackages) {
+@@ -365,6 +379,24 @@
+         return instance != null && listenerConnected;
+     }
+ 
++    /** Recover a disconnected listener, never grant or bypass notification access. */
++    static void ensureListenerBound(Context context) {
++        if (isListenerConnected()) return;
++        ComponentName service = new ComponentName(context, MediaNotificationService.class);
++        String enabled = Settings.Secure.getString(context.getContentResolver(),
++                "enabled_notification_listeners");
++        if (enabled == null) return;
++        boolean granted = false;
++        for (String item : enabled.split(":")) {
++            if (service.flattenToString().equals(item)) { granted = true; break; }
++        }
++        if (!granted) return;
++        long now = SystemClock.elapsedRealtime();
++        if (lastRebindAttempt != 0L && now - lastRebindAttempt < 30_000L) return;
++        lastRebindAttempt = now;
++        try { requestRebind(service); } catch (RuntimeException ignored) {}
++    }
++
+     static boolean isPlaying(PlaybackState state) {
+         if (state == null) return false;
+         int value = state.getState();
+--- a/app/src/main/java/pt/vcaitano/telasempreativa/MainActivity.java
++++ b/app/src/main/java/pt/vcaitano/telasempreativa/MainActivity.java
+@@ -297,6 +297,10 @@
+             updatePreview();
+             updatePreviewIcons();
+         }
++        if (startupPermissionsComplete && preview != null) {
++            // Re-check after Android / Play updates: access can be revoked later.
++            preview.postDelayed(this::offerNotificationAccessOnce, 550L);
++        }
+         if (overlaySettingsOpened) {
+             overlaySettingsOpened = false;
+             if (Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(this)) {
+@@ -1161,14 +1165,28 @@
+ 
+     private void offerNotificationAccessOnce() {
+         String enabled = Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
+-        if (enabled != null && enabled.contains(getPackageName())) return;
+-        if (prefs.getBoolean("aviso_acesso_notificacoes", false)) return;
+-        prefs.edit().putBoolean("aviso_acesso_notificacoes", true).apply();
+-        preview.postDelayed(() -> new AlertDialog.Builder(this)
++        String listener = new android.content.ComponentName(this,
++                MediaNotificationService.class).flattenToString();
++        if (enabled != null) {
++            for (String item : enabled.split(":")) {
++                if (listener.equals(item)) return;
++            }
++        }
++        // Previous one-time prompt prevented recovery after Play/Android revocation.
++        // Offer Settings again at most once per day, never over the locked AOD.
++        long now = System.currentTimeMillis();
++        long lastPrompt = prefs.getLong("aviso_acesso_notificacoes_ultimo_ms", 0L);
++        if (lastPrompt > 0L && now - lastPrompt < 86_400_000L) return;
++        prefs.edit().putBoolean("aviso_acesso_notificacoes", true)
++                .putLong("aviso_acesso_notificacoes_ultimo_ms", now).apply();
++        preview.postDelayed(() -> {
++            if (isFinishing() || isDestroyed()) return;
++            new AlertDialog.Builder(this)
+                 .setTitle("Acesso às notificações")
+                 .setMessage("Ative o acesso para mostrar notificações e controlar a música na Tela Sempre Ativa.")
+                 .setPositiveButton("Abrir definições", (d, w) -> startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)))
+-                .setNegativeButton("Agora não", null).show(), 700L);
++                .setNegativeButton("Agora não", null).show();
++        }, 700L);
+     }
+ 
+     private void hideSystemBars() {
