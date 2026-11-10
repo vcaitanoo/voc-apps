@@ -32,6 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           SRC="$RUNNER_TEMP/tsa-v40"
+          export SRC
           echo "SRC=$SRC" >> "$GITHUB_ENV"
           mkdir -p "$SRC" "$RUNNER_TEMP/out" "$RUNNER_TEMP/previous" "$RUNNER_TEMP/stable"
           gh run download 41721716089 --repo "$GITHUB_REPOSITORY" --name "TelaSempreAtiva_V37_PLAY_PLAY_vc20260906" --dir "$RUNNER_TEMP/previous"
