@@ -1,0 +1,496 @@
+diff -ruN stable/app/build.gradle work/app/build.gradle
+--- stable/app/build.gradle	2026-11-03 21:26:27.000000000 +0000
++++ work/app/build.gradle	2026-11-11 12:54:58.057732023 +0000
+@@ -8,8 +8,8 @@
+         applicationId 'pt.vcaitano.telasempreativa'
+         minSdk 27
+         targetSdk 36
+-        versionCode 20260906
+-        versionName '1.0.32'
++        versionCode 20261111
++        versionName '1.0.37'
+         manifestPlaceholders = [admobAppId: 'ca-app-pub-4663833571268509~7119728069']
+         buildConfigField 'String', 'SETTINGS_NATIVE_AD_ID', '"ca-app-pub-4663833571268509/7487393728"'
+         buildConfigField 'String', 'AOD_BANNER_AD_ID', '"ca-app-pub-4663833571268509/6921131529"'
+diff -ruN stable/app/src/main/AndroidManifest.xml work/app/src/main/AndroidManifest.xml
+--- stable/app/src/main/AndroidManifest.xml	2026-11-03 21:26:27.000000000 +0000
++++ work/app/src/main/AndroidManifest.xml	2026-11-11 12:54:58.058481330 +0000
+@@ -19,6 +19,7 @@
+     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false"/>
+     <application android:name=".TsaApplication" android:theme="@style/AppTheme" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:allowBackup="true" android:supportsRtl="true" android:hardwareAccelerated="true">
+         <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="${admobAppId}"/>
++        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="subject_segment"/>
+         <activity android:name=".AodActivity" android:theme="@style/AodTheme" android:excludeFromRecents="true" android:showWhenLocked="true" android:turnScreenOn="true" android:screenOrientation="portrait" android:launchMode="singleInstance" android:taskAffinity="" android:exported="false"/>
+         <activity android:name=".MainActivity" android:exported="true">
+             <intent-filter>
+diff -ruN stable/app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java work/app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java
+--- stable/app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java	2026-11-03 21:26:24.000000000 +0000
++++ work/app/src/main/java/pt/vcaitano/telasempreativa/AodActivity.java	2026-11-11 12:54:58.068701735 +0000
+@@ -43,6 +43,7 @@
+ import android.provider.Settings;
+ import android.text.Layout;
+ import android.text.TextUtils;
++import android.util.Log;
+ import android.text.format.DateFormat;
+ import android.view.Gravity;
+ import android.view.MotionEvent;
+@@ -87,6 +88,8 @@
+             if (MediaNotificationService.isListenerConnected()) {
+                 requestFreshState();
+                 showNotificationIcons(MediaNotificationService.getLastPackages());
++            } else {
++                MediaNotificationService.ensureListenerBound(AodActivity.this);
+             }
+             handler.postDelayed(this, 2_000L);
+         }
+@@ -107,6 +110,8 @@
+     private boolean hideScheduled;
+     private boolean lastPlaying;
+     private String currentCutoutUri;
++    private int aodCutoutRetryCount;
++    private Runnable pendingAodCutoutRetry;
+ 
+     private FrameLayout root;
+     private FrameLayout contentGroup;
+@@ -229,7 +234,7 @@
+                 if (!preview) closeAfterUnlock();
+             } else if (MediaNotificationService.ACTION_NOTIFICATIONS.equals(action)) {
+                 ArrayList<String> packages = intent.getStringArrayListExtra("packages");
+-                showNotificationIcons(packages == null ? new ArrayList<>() : packages);
++                if (packages != null) showNotificationIcons(packages);
+             } else if (MediaNotificationService.ACTION_MEDIA.equals(action)) {
+                 refreshSessions();
+             } else if (Intent.ACTION_BATTERY_CHANGED.equals(action)) {
+@@ -274,6 +279,7 @@
+         hideSystemBars();
+         handler.removeCallbacks(updateClock);
+         handler.post(updateClock);
++        MediaNotificationService.ensureListenerBound(this);
+         handler.removeCallbacks(antiBurn);
+         handler.postDelayed(antiBurn, ANTI_BURN_INTERVAL_MS);
+         requestFreshState();
+@@ -495,27 +501,52 @@
+         if (TextUtils.isEmpty(uriString) || uriString.equals(currentCutoutUri)) return;
+         Bitmap cached = CutoutStore.load(this, uriString);
+         if (cached != null) {
++            aodCutoutRetryCount = 0;
+             showCutout(cached, uriString);
+             return;
+         }
+-        SubjectSegmenter segmenter = SubjectSegmentation.getClient(
+-                new SubjectSegmenterOptions.Builder().enableForegroundBitmap().build());
++        SubjectSegmenter segmenter = null;
+         try {
+-            segmenter.process(InputImage.fromFilePath(this, Uri.parse(uriString)))
++            segmenter = SubjectSegmentation.getClient(
++                    new SubjectSegmenterOptions.Builder().enableForegroundBitmap().build());
++            final SubjectSegmenter currentSegmenter = segmenter;
++            currentSegmenter.process(InputImage.fromFilePath(this, Uri.parse(uriString)))
+                     .addOnSuccessListener(result -> {
+-                        if (result.getForegroundBitmap() == null) return;
++                        if (!uriString.equals(prefs.getString(Prefs.PHOTO_URI, null))) return;
+                         Bitmap foreground = result.getForegroundBitmap();
++                        if (foreground == null) {
++                            retryAodCutout(uriString);
++                            return;
++                        }
+                         CutoutStore.save(this, foreground, uriString);
++                        aodCutoutRetryCount = 0;
+                         showCutout(foreground, uriString);
+                     })
+-                    .addOnFailureListener(error -> cutout.setVisibility(View.GONE))
+-                    .addOnCompleteListener(task -> segmenter.close());
++                    .addOnFailureListener(error -> {
++                        Log.w("TsaCutout", "AOD aguarda modelo de segmentação", error);
++                        retryAodCutout(uriString);
++                    })
++                    .addOnCompleteListener(task -> currentSegmenter.close());
+         } catch (Exception error) {
+-            cutout.setVisibility(View.GONE);
+-            segmenter.close();
++            Log.w("TsaCutout", "AOD sem modelo de segmentação", error);
++            if (segmenter != null) segmenter.close();
++            retryAodCutout(uriString);
+         }
+     }
+ 
++    private void retryAodCutout(String uriString) {
++        if (pendingAodCutoutRetry != null) handler.removeCallbacks(pendingAodCutoutRetry);
++        final long[] retryMs = {8_000L, 20_000L, 45_000L};
++        if (aodCutoutRetryCount >= retryMs.length) return;
++        long wait = retryMs[aodCutoutRetryCount++];
++        pendingAodCutoutRetry = () -> {
++            pendingAodCutoutRetry = null;
++            if (!open || isFinishing() || isDestroyed()) return;
++            if (uriString.equals(prefs.getString(Prefs.PHOTO_URI, null))) processCutout(uriString);
++        };
++        handler.postDelayed(pendingAodCutoutRetry, wait);
++    }
++
+     private void showCutout(Bitmap bitmap, String uriString) {
+         cutout.setImageBitmap(bitmap);
+         cutout.setVisibility(View.VISIBLE);
+diff -ruN stable/app/src/main/java/pt/vcaitano/telasempreativa/AodAdController.java work/app/src/main/java/pt/vcaitano/telasempreativa/AodAdController.java
+--- stable/app/src/main/java/pt/vcaitano/telasempreativa/AodAdController.java	2026-11-03 21:26:27.000000000 +0000
++++ work/app/src/main/java/pt/vcaitano/telasempreativa/AodAdController.java	2026-11-11 12:54:58.070083424 +0000
+@@ -84,10 +84,12 @@
+         SharedPreferences prefs = activity.getSharedPreferences(DIAG_PREFS, Context.MODE_PRIVATE);
+         String state = prefs.getString("latest", "Ainda não houve pedidos no AOD.");
+         String failure = prefs.getString("last_failure", "Nenhuma falha registada.");
++        String settingsStatus = prefs.getString("settings_status", "Aguardando carregamento nas configurações.");
+         String report = "Tela Sempre Ativa — anúncios AOD\n" +
+                 "Versão: " + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")\n" +
+                 "Último estado: " + state + "\n" +
+                 "Última falha: " + failure + "\n" +
++                "Anúncio configurações: " + settingsStatus + "\n" +
+                 "Intervalo pretendido: 5 minutos após anúncio apresentado.\n" +
+                 "A exibição depende do consentimento e da disponibilidade do AdMob.";
+         new AlertDialog.Builder(activity)
+@@ -237,7 +239,17 @@
+                     if (!showLoadedAd(nativeHeight)) {
+                         status("Nativo carregado, mas não há espaço livre suficiente no AOD", true);
+                         removeAdView();
+-                        scheduleRetry();
++                        // Banner is smaller (50dp vs 96dp) and may fit the free gap.
++                        if (!fallbackAttempted) {
++                            fallbackAttempted = true;
++                            nextIsNative = false;
++                            handler.post(() -> {
++                                if (running && !activity.isFinishing() && !activity.isDestroyed())
++                                    requestBannerAd();
++                            });
++                        } else {
++                            scheduleRetry();
++                        }
+                         return;
+                     }
+                     status("Nativo visível durante 10 segundos; próximo pedido em 5 minutos", false);
+diff -ruN stable/app/src/main/java/pt/vcaitano/telasempreativa/MainActivity.java work/app/src/main/java/pt/vcaitano/telasempreativa/MainActivity.java
+--- stable/app/src/main/java/pt/vcaitano/telasempreativa/MainActivity.java	2026-11-03 21:26:27.000000000 +0000
++++ work/app/src/main/java/pt/vcaitano/telasempreativa/MainActivity.java	2026-11-11 12:54:58.063492469 +0000
+@@ -16,6 +16,9 @@
+ import android.net.Uri;
+ import android.os.Build;
+ import android.os.Bundle;
++import android.os.Handler;
++import android.os.Looper;
++import android.util.Log;
+ import android.provider.Settings;
+ import android.text.Layout;
+ import android.text.TextUtils;
+@@ -108,6 +111,9 @@
+     private boolean scalingPhoto;
+     private boolean processingCutout;
+     private String currentCutoutUri;
++    private int cutoutFailureCount;
++    private Runnable pendingCutoutRetry;
++    private final Handler cutoutRetryHandler = new Handler(Looper.getMainLooper());
+     private ScaleGestureDetector photoScaleDetector;
+     private String selectedPrefix;
+     private float resizeStartX;
+@@ -124,6 +130,7 @@
+     private boolean resizingFromWindow;
+     private NativeAd settingsNativeAd;
+     private FrameLayout settingsAdContainer;
++    private boolean settingsAdLoading;
+     private final Runnable retrySettingsAd = this::loadSettingsNativeAd;
+ 
+     @Override
+@@ -201,6 +208,7 @@
+ 
+     @Override
+     protected void onDestroy() {
++        if (pendingCutoutRetry != null) cutoutRetryHandler.removeCallbacks(pendingCutoutRetry);
+         if (settingsAdContainer != null) settingsAdContainer.removeCallbacks(retrySettingsAd);
+         if (settingsNativeAd != null) {
+             settingsNativeAd.destroy();
+@@ -210,36 +218,57 @@
+     }
+ 
+     private void loadSettingsNativeAd() {
++        if (isFinishing() || isDestroyed() || settingsAdLoading) return;
+         FrameLayout container = findViewById(R.id.container_anuncio_nativo);
++        if (container == null || !AdConsent.canRequestAds(this)) return;
+         settingsAdContainer = container;
+         container.removeCallbacks(retrySettingsAd);
++        settingsAdLoading = true;
++        // Never hide the dedicated ad area or discard a previously loaded ad on no-fill.
++        container.setVisibility(View.VISIBLE);
+         MobileAds.initialize(this, initializationStatus -> {
+-            if (isFinishing() || (Build.VERSION.SDK_INT >= 17 && isDestroyed())) return;
+-            new AdLoader.Builder(this, NATIVE_AD_ID)
+-                .forNativeAd(nativeAd -> {
+-                    if (isFinishing() || (Build.VERSION.SDK_INT >= 17 && isDestroyed())) {
+-                        nativeAd.destroy();
+-                        return;
+-                    }
+-                    if (settingsNativeAd != null) settingsNativeAd.destroy();
+-                    settingsNativeAd = nativeAd;
+-                    NativeAdView adView = (NativeAdView) getLayoutInflater()
+-                            .inflate(R.layout.native_ad_settings, container, false);
+-                    populateSettingsNativeAd(nativeAd, adView);
+-                    container.removeCallbacks(retrySettingsAd);
+-                    container.removeAllViews();
+-                    container.addView(adView);
+-                    container.setVisibility(View.VISIBLE);
+-                })
+-                .withAdListener(new com.google.android.gms.ads.AdListener() {
+-                    @Override public void onAdFailedToLoad(LoadAdError error) {
+-                        container.setVisibility(View.GONE);
++            if (isFinishing() || isDestroyed()) {
++                settingsAdLoading = false;
++                return;
++            }
++            try {
++                new AdLoader.Builder(this, NATIVE_AD_ID)
++                    .forNativeAd(nativeAd -> {
++                        settingsAdLoading = false;
++                        if (isFinishing() || isDestroyed()) {
++                            nativeAd.destroy();
++                            return;
++                        }
++                        NativeAdView adView = (NativeAdView) getLayoutInflater()
++                                .inflate(R.layout.native_ad_settings, container, false);
++                        populateSettingsNativeAd(nativeAd, adView);
++                        if (settingsNativeAd != null) settingsNativeAd.destroy();
++                        settingsNativeAd = nativeAd;
+                         container.removeCallbacks(retrySettingsAd);
+-                        container.postDelayed(retrySettingsAd, 30_000L);
+-                    }
+-                })
+-                .build()
+-                .loadAd(new AdRequest.Builder().build());
++                        container.removeAllViews();
++                        container.addView(adView);
++                        container.setVisibility(View.VISIBLE);
++                        getSharedPreferences("tsa_aod_ads_diagnostic", MODE_PRIVATE).edit()
++                                .putString("settings_status", "Anúncio das configurações carregado").apply();
++                    })
++                    .withAdListener(new com.google.android.gms.ads.AdListener() {
++                        @Override public void onAdFailedToLoad(LoadAdError error) {
++                            settingsAdLoading = false;
++                            String detail = "Configurações: " + error.getCode() + " — " + error.getMessage();
++                            Log.w("TsaSettingsAds", detail);
++                            getSharedPreferences("tsa_aod_ads_diagnostic", MODE_PRIVATE).edit()
++                                    .putString("settings_status", detail).apply();
++                            container.removeCallbacks(retrySettingsAd);
++                            if (!isFinishing() && !isDestroyed())
++                                container.postDelayed(retrySettingsAd, 30_000L);
++                        }
++                    })
++                    .build().loadAd(new AdRequest.Builder().build());
++            } catch (RuntimeException error) {
++                settingsAdLoading = false;
++                Log.w("TsaSettingsAds", "Erro ao pedir nativo", error);
++                container.postDelayed(retrySettingsAd, 30_000L);
++            }
+         });
+     }
+ 
+@@ -296,6 +325,11 @@
+         if (preview != null) {
+             updatePreview();
+             updatePreviewIcons();
++            if (startupPermissionsComplete) offerNotificationAccessOnce();
++        }
++        MediaNotificationService.ensureListenerBound(this);
++        if (settingsNativeAd == null && !settingsAdLoading && AdConsent.canRequestAds(this)) {
++            if (settingsAdContainer != null) settingsAdContainer.postDelayed(retrySettingsAd, 1_000L);
+         }
+         if (overlaySettingsOpened) {
+             overlaySettingsOpened = false;
+@@ -700,42 +734,73 @@
+             previewCutout.setImageBitmap(cached);
+             previewCutout.setVisibility(prefs.getBoolean(Prefs.USE_PHOTO, true) ? View.VISIBLE : View.GONE);
+             currentCutoutUri = uriString;
++            cutoutFailureCount = 0;
++            if (pendingCutoutRetry != null) cutoutRetryHandler.removeCallbacks(pendingCutoutRetry);
++            pendingCutoutRetry = null;
+             applyPhotoTransform();
+             return;
+         }
+         if (processingCutout) return;
+         processingCutout = true;
+-        SubjectSegmenter segmenter = SubjectSegmentation.getClient(
+-                new SubjectSegmenterOptions.Builder().enableForegroundBitmap().build());
++        SubjectSegmenter segmenter = null;
+         try {
+-            segmenter.process(InputImage.fromFilePath(this, uri))
++            segmenter = SubjectSegmentation.getClient(
++                    new SubjectSegmenterOptions.Builder().enableForegroundBitmap().build());
++            final SubjectSegmenter currentSegmenter = segmenter;
++            currentSegmenter.process(InputImage.fromFilePath(this, uri))
+                     .addOnSuccessListener(result -> {
+-                        if (result.getForegroundBitmap() != null) {
+-                            Bitmap foreground = result.getForegroundBitmap();
+-                            CutoutStore.save(this, foreground, uriString);
+-                            previewCutout.setImageBitmap(foreground);
+-                            previewCutout.setVisibility(prefs.getBoolean(Prefs.USE_PHOTO, true) ? View.VISIBLE : View.GONE);
+-                            currentCutoutUri = uriString;
+-                            applyPhotoTransform();
++                        if (!uriString.equals(prefs.getString(Prefs.PHOTO_URI, null))) return;
++                        Bitmap foreground = result.getForegroundBitmap();
++                        if (foreground == null) {
++                            retryCutoutAfterModelDownload(uriString, new IllegalStateException("Modelo sem imagem recortada"));
++                            return;
+                         }
++                        CutoutStore.save(this, foreground, uriString);
++                        previewCutout.setImageBitmap(foreground);
++                        previewCutout.setVisibility(prefs.getBoolean(Prefs.USE_PHOTO, true) ? View.VISIBLE : View.GONE);
++                        currentCutoutUri = uriString;
++                        cutoutFailureCount = 0;
++                        if (pendingCutoutRetry != null) cutoutRetryHandler.removeCallbacks(pendingCutoutRetry);
++                        pendingCutoutRetry = null;
++                        applyPhotoTransform();
+                     })
+-                    .addOnFailureListener(error -> {
+-                        previewCutout.setVisibility(View.GONE);
+-                        currentCutoutUri = null;
+-                        Toast.makeText(this, "Não foi possível criar o recorte. Verifique a internet e escolha a foto novamente.", Toast.LENGTH_LONG).show();
+-                    })
++                    .addOnFailureListener(error -> retryCutoutAfterModelDownload(uriString, error))
+                     .addOnCompleteListener(task -> {
+                         processingCutout = false;
+-                        segmenter.close();
++                        currentSegmenter.close();
++                        String latest = prefs.getString(Prefs.PHOTO_URI, null);
++                        if (latest != null && !latest.equals(uriString))
++                            cutoutRetryHandler.post(() -> updateCutout(Uri.parse(latest), latest));
+                     });
+         } catch (Exception error) {
+             processingCutout = false;
+-            previewCutout.setVisibility(View.GONE);
+-            currentCutoutUri = null;
+-            segmenter.close();
++            if (segmenter != null) segmenter.close();
++            retryCutoutAfterModelDownload(uriString, error);
+         }
+     }
+ 
++    /** The unbundled ML Kit model may still be downloading immediately after Play install. */
++    private void retryCutoutAfterModelDownload(String uriString, Exception error) {
++        if (!uriString.equals(prefs.getString(Prefs.PHOTO_URI, null))) return;
++        Log.w("TsaCutout", "Recorte aguardando modelo ML Kit", error);
++        if (pendingCutoutRetry != null) cutoutRetryHandler.removeCallbacks(pendingCutoutRetry);
++        final long[] delays = {8_000L, 20_000L, 45_000L};
++        if (cutoutFailureCount >= delays.length) {
++            Toast.makeText(this, "O modelo de recorte ainda não está disponível. Confira os Serviços Google Play e tente novamente mais tarde.", Toast.LENGTH_LONG).show();
++            return;
++        }
++        long delay = delays[cutoutFailureCount++];
++        if (cutoutFailureCount == 1)
++            Toast.makeText(this, "A preparar o recorte. O modelo será tentado novamente automaticamente.", Toast.LENGTH_LONG).show();
++        pendingCutoutRetry = () -> {
++            pendingCutoutRetry = null;
++            if (isFinishing() || isDestroyed()) return;
++            if (uriString.equals(prefs.getString(Prefs.PHOTO_URI, null)))
++                updateCutout(Uri.parse(uriString), uriString);
++        };
++        cutoutRetryHandler.postDelayed(pendingCutoutRetry, delay);
++    }
++
+     private void applyPhotoTransform() {
+         boolean use = prefs.getBoolean(Prefs.USE_PHOTO, true);
+         previewImage.setVisibility(use ? View.VISIBLE : View.GONE);
+@@ -766,6 +831,9 @@
+         catch (Exception ignored) {}
+         CutoutStore.clear(this);
+         currentCutoutUri = null;
++        cutoutFailureCount = 0;
++        if (pendingCutoutRetry != null) cutoutRetryHandler.removeCallbacks(pendingCutoutRetry);
++        pendingCutoutRetry = null;
+         previewCutout.setVisibility(View.GONE);
+         prefs.edit().putString(Prefs.PHOTO_URI, uri.toString()).putBoolean(Prefs.USE_PHOTO, true).apply();
+         ((Switch) findViewById(R.id.switch_usar_foto)).setChecked(true);
+@@ -1161,9 +1229,15 @@
+ 
+     private void offerNotificationAccessOnce() {
+         String enabled = Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
+-        if (enabled != null && enabled.contains(getPackageName())) return;
+-        if (prefs.getBoolean("aviso_acesso_notificacoes", false)) return;
+-        prefs.edit().putBoolean("aviso_acesso_notificacoes", true).apply();
++        if (enabled != null && enabled.contains(getPackageName())) {
++            prefs.edit().putBoolean("aviso_acesso_notificacoes", false)
++                    .putBoolean("acesso_notificacoes_reaviso_1037", false).apply();
++            return;
++        }
++        if (prefs.getBoolean("aviso_acesso_notificacoes", false)
++                && prefs.getBoolean("acesso_notificacoes_reaviso_1037", false)) return;
++        prefs.edit().putBoolean("aviso_acesso_notificacoes", true)
++                .putBoolean("acesso_notificacoes_reaviso_1037", true).apply();
+         preview.postDelayed(() -> new AlertDialog.Builder(this)
+                 .setTitle("Acesso às notificações")
+                 .setMessage("Ative o acesso para mostrar notificações e controlar a música na Tela Sempre Ativa.")
+diff -ruN stable/app/src/main/java/pt/vcaitano/telasempreativa/MediaNotificationService.java work/app/src/main/java/pt/vcaitano/telasempreativa/MediaNotificationService.java
+--- stable/app/src/main/java/pt/vcaitano/telasempreativa/MediaNotificationService.java	2026-11-03 21:26:24.000000000 +0000
++++ work/app/src/main/java/pt/vcaitano/telasempreativa/MediaNotificationService.java	2026-11-11 12:54:58.065309492 +0000
+@@ -17,6 +17,9 @@
+ import android.os.Bundle;
+ import android.os.Handler;
+ import android.os.Looper;
++import android.os.SystemClock;
++import android.provider.Settings;
++import android.util.Log;
+ import android.service.notification.NotificationListenerService;
+ import android.service.notification.StatusBarNotification;
+ import android.text.TextUtils;
+@@ -29,6 +32,7 @@
+ public class MediaNotificationService extends NotificationListenerService {
+     private static volatile MediaNotificationService instance;
+     private static volatile boolean listenerConnected;
++    private static volatile long lastRebindRequestAt;
+     static final String ACTION_NOTIFICATIONS = "pt.vcaitano.telasempreativa.NOTIFICATIONS_CHANGED";
+     static final String ACTION_MEDIA = "pt.vcaitano.telasempreativa.MEDIA_CHANGED";
+     static final String ACTION_REQUEST = "pt.vcaitano.telasempreativa.REQUEST_STATE";
+@@ -84,6 +88,7 @@
+     public void onListenerConnected() {
+         super.onListenerConnected();
+         listenerConnected = true;
++        lastRebindRequestAt = 0L;
+         try {
+             sessionManager.addOnActiveSessionsChangedListener(
+                     sessionsListener, new ComponentName(this, MediaNotificationService.class));
+@@ -205,7 +210,9 @@
+         Set<String> packages = new LinkedHashSet<>();
+         try {
+             StatusBarNotification[] active = getActiveNotifications();
+-            if (active != null) {
++            // null means unavailable, not "zero notifications". Preserve last valid icons.
++            if (active == null) return;
++            {
+                 for (StatusBarNotification sbn : active) {
+                     String packageName = sbn.getPackageName();
+                     if (packageName == null || packageName.equals(getPackageName())
+@@ -219,7 +226,9 @@
+                     if (!media) packages.add(packageName);
+                 }
+             }
+-        } catch (Exception ignored) {
++        } catch (Exception error) {
++            Log.w("TsaNotifications", "Leitura temporariamente indisponível", error);
++            return;
+         }
+         ArrayList<String> payload = new ArrayList<>(packages);
+         synchronized (lastPackages) {
+@@ -357,6 +366,21 @@
+         }
+     }
+ 
++    /** System may silently disconnect NotificationListenerService after an app update. */
++    static void ensureListenerBound(Context context) {
++        if (listenerConnected) return;
++        String enabled = Settings.Secure.getString(context.getContentResolver(), "enabled_notification_listeners");
++        if (enabled == null || !enabled.contains(context.getPackageName())) return;
++        long now = SystemClock.elapsedRealtime();
++        if (now - lastRebindRequestAt < 45_000L) return;
++        lastRebindRequestAt = now;
++        try {
++            requestRebind(new ComponentName(context, MediaNotificationService.class));
++        } catch (RuntimeException error) {
++            Log.w("TsaNotifications", "Não foi possível solicitar religação", error);
++        }
++    }
++
+     static ArrayList<String> getLastPackages() {
+         synchronized (lastPackages) { return new ArrayList<>(lastPackages); }
+     }
