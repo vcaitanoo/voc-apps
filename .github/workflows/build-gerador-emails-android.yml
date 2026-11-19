@@ -1,0 +1,41 @@
+name: Gerador de E-mails Android APK
+on:
+  push:
+    branches: [feature/gerador-emails-android-20261119]
+    paths:
+      - 'gerador-emails-android/**'
+      - '.github/workflows/build-gerador-emails-android.yml'
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Compilar APK debug
+        working-directory: gerador-emails-android
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Verificar estrutura, manifesto e assinatura
+        run: |
+          APK=gerador-emails-android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -t "$APK" | tail -1
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -E 'package:|sdkVersion:|targetSdkVersion:'
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
+          sha256sum "$APK"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Gerador_Emails_Android_v1_APK
+          path: gerador-emails-android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
