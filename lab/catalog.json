@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-11-05T18:11:04Z",
+  "updatedAt": "2026-11-20T22:55:33Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -165,6 +165,29 @@
         "signatureSha256": "e52d1c13baa3a4e7f73b71cb7e15bc1fdd8709650aa64fe8a9b86bb26a5491f9",
         "notes": "VC7 DEMO: corrige sinal oscilante que impedia 3 confirmações, agora valida a direção por 3 das últimas 5 capturas e rejeita direções contraditórias. Limita OCR do cronômetro a cada 3s e não mantém contagem antiga no painel por 30s; redesenho limitado para reduzir piscadas. Mantém entradas somente no início da vela confirmada, conta DEMO, gestão, scanner de velas, painel móvel e resultados anteriores. MESMO package e assinatura permanente VC3. Sem novo app. Build, SHA, assinatura e URL verificados; execução real no Android ainda pendente."
       }
+    },
+    {
+      "id": "divulgador",
+      "name": "Divulgador Mobile",
+      "packageName": "pt.vcaitano.divulgador",
+      "enabled": true,
+      "stable": {
+        "versionCode": 0,
+        "versionName": "Ainda não homologado",
+        "apkUrl": "",
+        "sha256": "",
+        "signatureSha256": "",
+        "notes": "Nenhuma versão estável aprovada pelo utilizador."
+      },
+      "candidate": {
+        "versionCode": 3,
+        "versionName": "0.1.2",
+        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador/candidate/Divulgador-Mobile-0.1.2-vc3.apk",
+        "sha256": "3c8a59fcb5492eeb7a51a068baef267e0ac73b98ebb32ecee81fa7c44e29b467",
+        "signatureSha256": "b09e3eb8db179789eb937ee8ed3ecb5a0b6f216c6e274ca800dd357b2f3c414b",
+        "notes": "NOVA APP CANDIDATA VC3 (versao de teste): Divulgador mobile com campanhas e gerador CSV com variacoes PT. Substitui o divulgador antigo por autorizacao do usuario. APK assinado com chave DEBUG temporaria: desinstale a versao antiga antes da instalacao; futuras atualizacoes exigem assinatura permanente. Envios manuais via app de email, backend automatico DRY_RUN."
+      },
+      "notes": "Candidato experimental substitui Divulgador VC2, por autorizacao do usuario; nao homologado no Android."
     }
   ]
 }
