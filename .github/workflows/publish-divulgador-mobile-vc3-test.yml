@@ -76,10 +76,23 @@ jobs:
           p=Path('lab/catalog.json')
           d=json.loads(p.read_text(encoding='utf-8'))
           matches=[a for a in d['apps'] if a['id']=='divulgador']
-          assert len(matches)==1
-          a=matches[0]
-          assert a['packageName']=='pt.vcaitano.divulgador'
-          assert a['candidate']['versionCode']==2
+          assert len(matches)<=1
+          if matches:
+            a=matches[0]
+            assert a['packageName']=='pt.vcaitano.divulgador'
+            assert int((a.get('candidate') or {}).get('versionCode') or 0)<3
+          else:
+            a={
+              'id':'divulgador','name':'Divulgador Mobile',
+              'packageName':'pt.vcaitano.divulgador','enabled':True,
+              'stable':{
+                'versionCode':0,'versionName':'Ainda não homologado',
+                'apkUrl':'','sha256':'','signatureSha256':'',
+                'notes':'Nenhuma versão estável aprovada pelo utilizador.'
+              },
+              'candidate':None
+            }
+            d['apps'].append(a)
           assert a['stable']['versionCode']==0
           a['name']='Divulgador Mobile'
           a['enabled']=True
