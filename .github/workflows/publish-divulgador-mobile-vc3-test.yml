@@ -1,0 +1,117 @@
+name: Publicar Divulgador Mobile VC3 no VOC Lab (candidato)
+on:
+  push:
+    branches: [feature/divulgador-mobile-csv-20261120]
+    paths:
+      - '.github/workflows/publish-divulgador-mobile-vc3-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      - name: Recuperar exatamente o APK VC3 compilado, sem recompilar ou re-assinar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/vcaitanoo/voc-apps/actions/artifacts/14670894927/zip" \
+            --output "$RUNNER_TEMP/apk-archive.zip"
+          unzip -p "$RUNNER_TEMP/apk-archive.zip" "debug/app-debug.apk" > "$RUNNER_TEMP/divulgador-mobile-vc3.apk"
+          test -s "$RUNNER_TEMP/divulgador-mobile-vc3.apk"
+          printf '%s  %s\n' 3c8a59fcb5492eeb7a51a068baef267e0ac73b98ebb32ecee81fa7c44e29b467 "$RUNNER_TEMP/divulgador-mobile-vc3.apk" | sha256sum --check
+      - name: Validar pacote, manifesto, DEX, recursos e assinatura
+        run: |
+          set -euo pipefail
+          APK="$RUNNER_TEMP/divulgador-mobile-vc3.apk"
+          unzip -t "$APK" | tail -1
+          unzip -Z1 "$APK" | grep -qx classes.dex
+          unzip -Z1 "$APK" | grep -qx AndroidManifest.xml
+          unzip -Z1 "$APK" | grep -q '^resources.arsc$'
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | tee "$RUNNER_TEMP/badging.txt"
+          grep -q "package: name='pt.vcaitano.divulgador' versionCode='3' versionName='0.1.2'" "$RUNNER_TEMP/badging.txt"
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/signing.txt"
+          grep -qx 'Verifies' "$RUNNER_TEMP/signing.txt"
+          CERT_SHA="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/signing.txt" | head -1 | tr '[:upper:]' '[:lower:]')"
+          [[ "$CERT_SHA" =~ ^[a-f0-9]{64}$ ]]
+          printf '%s\n' "$CERT_SHA" > "$RUNNER_TEMP/cert-sha.txt"
+          sha256sum "$APK"
+      - name: Publicar novo candidato no catalogo GitHub sem afetar outros apps
+        run: |
+          set -euo pipefail
+          cp -a lab/sources/divulgador/android "$RUNNER_TEMP/divulgador-android-source"
+          cp docs/DIVULGADOR_MOBILE_VC3_CONTINUIDADE_20261120.md "$RUNNER_TEMP/divulgador-continuity.md"
+          git fetch origin main
+          git checkout -B main origin/main
+          mkdir -p lab/sources/divulgador docs
+          cp -a "$RUNNER_TEMP/divulgador-android-source" lab/sources/divulgador/android
+          cp "$RUNNER_TEMP/divulgador-continuity.md" docs/DIVULGADOR_MOBILE_VC3_CONTINUIDADE_20261120.md
+          APK="apks/divulgador/candidate/Divulgador-Mobile-0.1.2-vc3.apk"
+          mkdir -p "$(dirname "$APK")"
+          cp "$RUNNER_TEMP/divulgador-mobile-vc3.apk" "$APK"
+          export APK_SHA="$(sha256sum "$APK" | cut -d' ' -f1)"
+          export CERT_SHA="$(cat "$RUNNER_TEMP/cert-sha.txt")"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          from datetime import datetime, timezone
+          p=Path('lab/catalog.json')
+          d=json.loads(p.read_text(encoding='utf-8'))
+          matches=[a for a in d['apps'] if a['id']=='divulgador']
+          assert len(matches)==1
+          a=matches[0]
+          assert a['packageName']=='pt.vcaitano.divulgador'
+          assert a['candidate']['versionCode']==2
+          assert a['stable']['versionCode']==0
+          a['name']='Divulgador Mobile'
+          a['enabled']=True
+          a['candidate']={
+            'versionCode':3,'versionName':'0.1.2',
+            'apkUrl':'https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador/candidate/Divulgador-Mobile-0.1.2-vc3.apk',
+            'sha256':os.environ['APK_SHA'],
+            'signatureSha256':os.environ['CERT_SHA'],
+            'notes':'NOVA APP CANDIDATA VC3 (versao de teste): Divulgador mobile com campanhas e gerador CSV com variacoes PT. Substitui o divulgador antigo por autorizacao do usuario. APK assinado com chave DEBUG temporaria: desinstale a versao antiga antes da instalacao; futuras atualizacoes exigem assinatura permanente. Envios manuais via app de email, backend automatico DRY_RUN.'
+          }
+          a['notes']='Candidato experimental substitui Divulgador VC2, por autorizacao do usuario; nao homologado no Android.'
+          d['updatedAt']=datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+          p.write_text(json.dumps(d, ensure_ascii=False, indent=2)+'\n',encoding='utf-8')
+          assert len(d['apps'])>=8
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lab/catalog.json "$APK" lab/sources/divulgador/android docs/DIVULGADOR_MOBILE_VC3_CONTINUIDADE_20261120.md
+          git commit -m "candidate(divulgador): substituir antigo por Divulgador Mobile VC3 teste + CSV PT"
+          git push origin HEAD:main
+      - name: Conferir artefato publico apos publicar
+        run: |
+          set -euo pipefail
+          URL="https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador/candidate/Divulgador-Mobile-0.1.2-vc3.apk"
+          for i in 1 2 3 4 5; do
+            if curl --fail --location --silent --show-error --retry 2 "$URL" --output "$RUNNER_TEMP/public.apk"; then
+              if cmp -s "$RUNNER_TEMP/public.apk" "$RUNNER_TEMP/divulgador-mobile-vc3.apk"; then
+                echo "APK URL HTTPS verificada e binario identico ao APK validado"
+                exit 0
+              fi
+            fi
+            sleep 3
+          done
+          echo "::error::APK publicado nao corresponde ao verificado"
+          exit 1
