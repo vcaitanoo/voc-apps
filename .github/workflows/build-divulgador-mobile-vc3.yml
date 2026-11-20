@@ -1,0 +1,115 @@
+name: Divulgador Android VC3
+on:
+  push:
+    branches: [feature/divulgador-mobile-csv-20261120]
+    paths:
+      - 'lab/sources/divulgador/android/**'
+      - '.github/workflows/build-divulgador-mobile-vc3.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+env:
+  ROOT: lab/sources/divulgador/android
+  EXPECTED_SIGNER: 918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Compilar debug para diagnóstico
+        run: gradle -p "$ROOT" --no-daemon :app:assembleDebug
+      - name: Validar debug
+        run: |
+          set -euo pipefail
+          APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
+          unzip -t "$APK" | tail -1
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | grep "package: name='pt.vcaitano.divulgador' versionCode='3' versionName='0.1.2'"
+      - name: Recuperar assinatura release ORIGINAL
+        env:
+          KEYSTORE_B64: ${{ secrets.VOC_MANAGER_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.VOC_MANAGER_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_B64" || { echo "::error::VOC_MANAGER_KEYSTORE_B64 não disponível"; exit 1; }
+          test -n "$STORE_PASSWORD" || { echo "::error::VOC_MANAGER_KEYSTORE_PASSWORD não disponível"; exit 1; }
+          KEYSTORE_PATH="$RUNNER_TEMP/divulgador-original.jks"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+          echo "DIVULGADOR_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+      - name: Compilar release com assinatura original
+        env:
+          DIVULGADOR_KEYSTORE_PASSWORD: ${{ secrets.VOC_MANAGER_KEYSTORE_PASSWORD }}
+          DIVULGADOR_KEY_ALIAS: voc-manager-release
+          DIVULGADOR_KEY_PASSWORD: ${{ secrets.VOC_MANAGER_KEYSTORE_PASSWORD }}
+        run: gradle -p "$ROOT" --no-daemon :app:assembleRelease
+      - name: Verificar release, manifesto e assinatura
+        run: |
+          set -euo pipefail
+          APK="$ROOT/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          unzip -t "$APK" | tail -1
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | tee /tmp/divulgador-badging
+          grep -q "package: name='pt.vcaitano.divulgador' versionCode='3' versionName='0.1.2'" /tmp/divulgador-badging
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/divulgador-sig
+          SIGNER="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/divulgador-sig | head -1 | tr '[:upper:]' '[:lower:]')"
+          test "$SIGNER" = "$EXPECTED_SIGNER"
+          sha256sum "$APK"
+      - name: Publicar candidato VC3 e atualizar catalogo GitHub
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="$ROOT/app/build/outputs/apk/release/app-release.apk"
+          cp "$SOURCE" "$RUNNER_TEMP/divulgador-vc3.apk"
+          git fetch origin main
+          git checkout -B main origin/main
+          APK="apks/divulgador/candidate/Divulgador-0.1.2-vc3.apk"
+          mkdir -p "$(dirname "$APK")"
+          cp "$RUNNER_TEMP/divulgador-vc3.apk" "$APK"
+          export APK_SHA="$(sha256sum "$APK" | cut -d' ' -f1)"
+          python3 - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          path=Path("lab/catalog.json")
+          catalog=json.loads(path.read_text(encoding="utf-8"))
+          release={"versionCode":3,"versionName":"0.1.2",
+            "apkUrl":"https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador/candidate/Divulgador-0.1.2-vc3.apk",
+            "sha256":os.environ["APK_SHA"],
+            "signatureSha256":"918b566590b49f691ec9880c95dd174a6c032b21f81dc66efcfac74d0de11aa8",
+            "notes":"CANDIDATO VC3: controle de campanhas preservado; gerador CSV com 22 formatos PT; envio por app de email de contatos autorizados. Backend ainda em DRY_RUN, teste real pendente."}
+          item=next((a for a in catalog["apps"] if a.get("id")=="divulgador"), None)
+          if item is None:
+              item={"id":"divulgador","name":"Divulgador","packageName":"pt.vcaitano.divulgador","enabled":True,
+                "stable":{"versionCode":0,"versionName":"Ainda nao homologada","apkUrl":"","sha256":"","signatureSha256":"",
+                  "notes":"Nenhuma stable aprovada em Android real."},"candidate":None}
+              catalog["apps"].append(item)
+          assert item["packageName"]=="pt.vcaitano.divulgador"
+          assert item["stable"]["versionCode"]<3
+          item["candidate"]=release
+          catalog["updatedAt"]=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+          path.write_text(json.dumps(catalog,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$APK" lab/catalog.json
+          git commit -m "candidate(divulgador): VC3 mobile com CSV PT e campanhas"
+          git push origin HEAD:main
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Divulgador-Mobile-VC3-APK
+          path: |
+            lab/sources/divulgador/android/app/build/outputs/apk/debug/app-debug.apk
+            lab/sources/divulgador/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: warn
