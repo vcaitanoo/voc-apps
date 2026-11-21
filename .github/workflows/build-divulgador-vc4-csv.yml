@@ -1,0 +1,127 @@
+name: Corrigir CSV Email Divulgador Mobile VC4
+on:
+  push:
+    branches: [fix/divulgador-vc4-coluna-email-20261121]
+    paths:
+      - 'lab/sources/divulgador/android/**'
+      - '.github/workflows/build-divulgador-vc4-csv.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build_and_publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ROOT: lab/sources/divulgador/android
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Confirmar alteracao restrita no export CSV
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          g=Path("lab/sources/divulgador/android/app/src/main/java/pt/vcaitano/divulgador/GeneratorActivity.java").read_text()
+          b=Path("lab/sources/divulgador/android/app/build.gradle.kts").read_text()
+          assert 'writer.write("Email;Nome;Cidade;Idade\\r\\n");' in g
+          assert 'int[] order = {1, 0, 2, 3};' in g
+          assert "if (i > 0) writer.write(';');" in g
+          assert '?: "4").toInt()' in b and '?: "0.1.3"' in b
+          print("Formato CSV confirmado: Email;Nome;Cidade;Idade, sem alterar o gerador de dados.")
+          PY
+      - name: Compilar APK do código-fonte corrigido com Gradle
+        run: gradle -p "$ROOT" --no-daemon :app:assembleDebug
+      - name: Validar estrutura, versao e assinatura
+        run: |
+          set -euo pipefail
+          APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          unzip -t "$APK" | tail -1
+          unzip -Z1 "$APK" | grep -qx 'AndroidManifest.xml'
+          unzip -Z1 "$APK" | grep -qx 'resources.arsc'
+          unzip -Z1 "$APK" | grep -qx 'classes.dex'
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | tee /tmp/divulgador-badging.txt
+          grep -q "package: name='pt.vcaitano.divulgador' versionCode='4' versionName='0.1.3'" /tmp/divulgador-badging.txt
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/divulgador-signature.txt
+          grep -qx 'Verifies' /tmp/divulgador-signature.txt
+          sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/divulgador-signature.txt | head -1 > /tmp/divulgador-cert.txt
+          test "$(wc -c < /tmp/divulgador-cert.txt)" -eq 65
+          sha256sum "$APK" | tee /tmp/divulgador-sha256.txt
+      - name: Publicar candidato 0.1.3 VC4 no VOC Lab GitHub
+        run: |
+          set -euo pipefail
+          cp "$ROOT/app/build/outputs/apk/debug/app-debug.apk" "$RUNNER_TEMP/Divulgador-Mobile-0.1.3-vc4.apk"
+          cp "$ROOT/app/src/main/java/pt/vcaitano/divulgador/GeneratorActivity.java" "$RUNNER_TEMP/GeneratorActivity.java"
+          cp "$ROOT/app/build.gradle.kts" "$RUNNER_TEMP/build.gradle.kts"
+          git fetch origin main
+          git checkout -B main origin/main
+          mkdir -p "$ROOT/app/src/main/java/pt/vcaitano/divulgador"
+          cp "$RUNNER_TEMP/GeneratorActivity.java" "$ROOT/app/src/main/java/pt/vcaitano/divulgador/GeneratorActivity.java"
+          cp "$RUNNER_TEMP/build.gradle.kts" "$ROOT/app/build.gradle.kts"
+          APK="apks/divulgador/candidate/Divulgador-Mobile-0.1.3-vc4.apk"
+          mkdir -p "$(dirname "$APK")"
+          cp "$RUNNER_TEMP/Divulgador-Mobile-0.1.3-vc4.apk" "$APK"
+          export APK_SHA="$(sha256sum "$APK" | cut -d' ' -f1)"
+          export CERT_SHA="$(cat /tmp/divulgador-cert.txt)"
+          python3 - <<'PY'
+          import json, os
+          from datetime import datetime,timezone
+          from pathlib import Path
+          p=Path('lab/catalog.json')
+          cat=json.loads(p.read_text(encoding='utf-8'))
+          item=next(x for x in cat['apps'] if x['id']=='divulgador')
+          assert item['packageName']=='pt.vcaitano.divulgador'
+          assert item['candidate']['versionCode']==3
+          assert item['stable']['versionCode']==0
+          item['candidate']={
+            'versionCode':4,
+            'versionName':'0.1.3',
+            'apkUrl':'https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador/candidate/Divulgador-Mobile-0.1.3-vc4.apk',
+            'sha256':os.environ['APK_SHA'],
+            'signatureSha256':os.environ['CERT_SHA'],
+            'notes':'CANDIDATO VC4: corrigido APENAS o CSV. Email agora e primeira coluna; separador ponto e virgula compativel com Excel PT. Restante comportamento preservado. APK assinado com chave de depuracao temporaria diferente da VC3: para instalar, DESINSTALAR a VC3; proxima atualizacao precisa assinatura permanente. Teste Android real pendente.'
+          }
+          cat['updatedAt']=datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+          p.write_text(json.dumps(cat,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$APK" "$ROOT/app/src/main/java/pt/vcaitano/divulgador/GeneratorActivity.java" "$ROOT/app/build.gradle.kts" lab/catalog.json
+          git commit -m "fix(divulgador): CSV Email na primeira coluna e delimitador PT (VC4)"
+          git push origin HEAD:main
+      - name: Comparar APK publicado com build validado
+        run: |
+          set -euo pipefail
+          URL="https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador/candidate/Divulgador-Mobile-0.1.3-vc4.apk"
+          for i in 1 2 3 4 5; do
+            if curl --fail --location --silent --show-error "$URL" --output "$RUNNER_TEMP/public.apk" && cmp -s "$RUNNER_TEMP/public.apk" "$RUNNER_TEMP/Divulgador-Mobile-0.1.3-vc4.apk"; then
+              echo "URL HTTPS, tamanho e bytes: OK"
+              exit 0
+            fi
+            sleep 3
+          done
+          exit 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Divulgador-Mobile-VC4-CSV-Email-APK
+          path: |
+            lab/sources/divulgador/android/app/build/outputs/apk/debug/app-debug.apk
+            /tmp/divulgador-badging.txt
+            /tmp/divulgador-signature.txt
+            /tmp/divulgador-sha256.txt
+          if-no-files-found: warn
