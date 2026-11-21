@@ -11,8 +11,8 @@ android {
         applicationId = "pt.vcaitano.divulgadormobile"
         minSdk = 24
         targetSdk = 34
-        versionCode = (System.getenv("DIVULGADOR_VERSION_CODE") ?: "8").toInt()
-        versionName = System.getenv("DIVULGADOR_VERSION_NAME") ?: "0.1.7"
+        versionCode = (System.getenv("DIVULGADOR_VERSION_CODE") ?: "9").toInt()
+        versionName = System.getenv("DIVULGADOR_VERSION_NAME") ?: "0.1.8"
     }
 
     packaging {
