@@ -1,0 +1,32 @@
+name: Divulgador VC6 - verificar assinatura permanente
+on:
+  push:
+    branches: [feature/divulgador-vc6-fotos-20261121]
+    paths:
+      - '.github/workflows/divulgador-vc6-signing-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar somente disponibilidade de segredos (nunca imprimir valores)
+        shell: bash
+        env:
+          VOC_LAB_KEYSTORE_B64: ${{ secrets.VOC_LAB_KEYSTORE_B64 }}
+          VOC_LAB_KEYSTORE_PASSWORD: ${{ secrets.VOC_LAB_KEYSTORE_PASSWORD }}
+          VOC_MANAGER_KEYSTORE_B64: ${{ secrets.VOC_MANAGER_KEYSTORE_B64 }}
+          VOC_MANAGER_KEYSTORE_PASSWORD: ${{ secrets.VOC_MANAGER_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$VOC_LAB_KEYSTORE_B64" && -n "$VOC_LAB_KEYSTORE_PASSWORD" ]]; then
+            echo "ASSINATURA_VOC_LAB_DISPONIVEL=true"
+          else
+            echo "ASSINATURA_VOC_LAB_DISPONIVEL=false"
+          fi
+          if [[ -n "$VOC_MANAGER_KEYSTORE_B64" && -n "$VOC_MANAGER_KEYSTORE_PASSWORD" ]]; then
+            echo "ASSINATURA_VOC_MANAGER_DISPONIVEL=true"
+          else
+            echo "ASSINATURA_VOC_MANAGER_DISPONIVEL=false"
+          fi
