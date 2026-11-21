@@ -25,6 +25,7 @@ public class SendActivity extends Activity {
     private static final int INK=0xff18243B;
     private static final Pattern EMAIL=Pattern.compile("^[A-Za-z0-9_+.%'-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
     private EditText subject, body, product, link;
+    private PhotoAttachments photoAttachments;
     private TextView recipient, stats;
     private final ArrayList<JSONObject> contacts=new ArrayList<>();
     private final HashSet<String> confirmed=new HashSet<>(), blocked=new HashSet<>();
@@ -63,6 +64,8 @@ public class SendActivity extends Activity {
         body=field(p,"Mensagem (use {nome}, {produto}, {link})",
             "Olá {nome},\n\n"+(desc==null?"Quero apresentar {produto}.":desc)+
             "\n\nSaiba mais em {link}\n\nCaso não deseje receber outras mensagens, responda REMOVER.",true);
+        // As fotos pertencem à campanha configurada, e não à lista de contatos.
+        photoAttachments=new PhotoAttachments(this,p);
         TextView contactsTitle=text("Destinatários autorizados",20);
         contactsTitle.setTypeface(null,1);p.addView(contactsTitle);
         button(p,"IMPORTAR CSV",v->pickCsv());
@@ -129,6 +132,10 @@ public class SendActivity extends Activity {
     }
     @Override protected void onActivityResult(int code,int status,Intent data){
         super.onActivityResult(code,status,data);
+        if(code==PhotoAttachments.PICK_IMAGE_REQUEST){
+            if(status==RESULT_OK && photoAttachments!=null)photoAttachments.handleResult(data);
+            return;
+        }
         if(code!=PICK_CSV||status!=RESULT_OK||data==null||data.getData()==null)return;
         Uri uri=data.getData();
         stats.setText("Lendo lista CSV...");
@@ -248,20 +255,48 @@ public class SendActivity extends Activity {
         if(sample==null){Toast.makeText(this,"Importe ou gere uma lista primeiro.",Toast.LENGTH_LONG).show();return;}
         new AlertDialog.Builder(this)
             .setTitle(fill(subject.getText().toString(),sample))
-            .setMessage("Para: "+sample.optString("email")+"\n\n"+fill(body.getText().toString(),sample))
+            .setMessage("Para: "+sample.optString("email")+"\n\n"+
+                fill(body.getText().toString(),sample)+
+                "\n\nFotos anexadas: "+(photoAttachments==null?0:photoAttachments.size()))
             .setPositiveButton("Fechar",null).show();
     }
     private void compose(){
         JSONObject obj=active();
         if(obj==null){Toast.makeText(this,"Lista pronta para configurar, mas nenhum destinatário possui consentimento de envio. Importe uma lista autorizada.",Toast.LENGTH_LONG).show();return;}
         String email=obj.optString("email");
-        Intent out=new Intent(Intent.ACTION_SENDTO);
-        out.setData(Uri.fromParts("mailto",email,null));
+        String title=fill(subject.getText().toString(),obj);
+        String message=fill(body.getText().toString(),obj);
+        ArrayList<Uri> images=new ArrayList<>();
+        try {
+            if(photoAttachments!=null)images=photoAttachments.uris();
+        } catch(Exception error) {
+            Toast.makeText(this,"Erro ao preparar fotos: "+error.getMessage(),Toast.LENGTH_LONG).show();
+            return;
+        }
+        Intent out;
+        if(images.isEmpty()){
+            // Sem fotos: mantém exatamente o caminho existente de envio por e-mail.
+            out=new Intent(Intent.ACTION_SENDTO);
+            out.setData(Uri.fromParts("mailto",email,null));
+        } else if(images.size()==1) {
+            out=new Intent(Intent.ACTION_SEND);
+            out.setType("image/*");
+            out.putExtra(Intent.EXTRA_STREAM,images.get(0));
+            PhotoAttachments.grant(out,images,this);
+        } else {
+            out=new Intent(Intent.ACTION_SEND_MULTIPLE);
+            out.setType("image/*");
+            out.putParcelableArrayListExtra(Intent.EXTRA_STREAM,images);
+            PhotoAttachments.grant(out,images,this);
+        }
         out.putExtra(Intent.EXTRA_EMAIL,new String[]{email});
-        out.putExtra(Intent.EXTRA_SUBJECT,fill(subject.getText().toString(),obj));
-        out.putExtra(Intent.EXTRA_TEXT,fill(body.getText().toString(),obj));
-        try{startActivity(Intent.createChooser(out,"Escolha o aplicativo de e-mail"));}
-        catch(Exception ex){Toast.makeText(this,"Nenhum aplicativo de e-mail encontrado.",Toast.LENGTH_LONG).show();}
+        out.putExtra(Intent.EXTRA_SUBJECT,title);
+        out.putExtra(Intent.EXTRA_TEXT,message);
+        try {
+            startActivity(Intent.createChooser(out,"Escolha o aplicativo de e-mail para enviar"));
+        }catch(Exception error){
+            Toast.makeText(this,"Nenhum aplicativo compatível para enviar e-mail com os anexos.",Toast.LENGTH_LONG).show();
+        }
     }
     private void confirm(){
         JSONObject obj=active();if(obj==null)return;
