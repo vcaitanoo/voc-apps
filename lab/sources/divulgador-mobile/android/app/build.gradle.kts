@@ -15,6 +15,12 @@ android {
         versionName = System.getenv("DIVULGADOR_VERSION_NAME") ?: "0.1.6"
     }
 
+    packaging {
+        resources {
+            excludes += setOf("META-INF/NOTICE.md", "META-INF/LICENSE.md")
+        }
+    }
+
     signingConfigs {
         create("release") {
             val ksPath = System.getenv("DIVULGADOR_KEYSTORE_PATH")
