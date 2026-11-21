@@ -37,7 +37,10 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            // Sem keystore: o build gera release UNSIGNED para validação.
+            // Com keystore: release assinado obrigatoriamente com a chave VC6.
+            signingConfig = if (System.getenv("DIVULGADOR_KEYSTORE_PATH") != null)
+                signingConfigs.getByName("release") else null
         }
     }
 
