@@ -332,7 +332,7 @@ public class GeneratorActivity extends Activity {
     }
 
     private static String csvCell(String text) {
-        if (text.contains(",") || text.contains("\"") ||
+        if (text.contains(";") || text.contains("\"") ||
             text.contains("\r") || text.contains("\n"))
             return "\"" + text.replace("\"", "\"\"") + "\"";
         return text;
@@ -355,11 +355,14 @@ public class GeneratorActivity extends Activity {
                 if (out == null) throw new java.io.IOException("Não foi possível abrir o arquivo.");
                 try (Writer writer = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
                     writer.write('\uFEFF');
-                    writer.write("Nome,Email,Cidade,Idade\r\n");
+                    // Separador de campos para Excel em Portugal: ponto e vírgula.
+                    // Email vem primeiro, em coluna própria e com nome explícito.
+                    writer.write("Email;Nome;Cidade;Idade\r\n");
                     for (String[] row : snapshot) {
-                        for (int i = 0; i < row.length; i++) {
-                            if (i > 0) writer.write(',');
-                            writer.write(csvCell(row[i]));
+                        int[] order = {1, 0, 2, 3};
+                        for (int i = 0; i < order.length; i++) {
+                            if (i > 0) writer.write(';');
+                            writer.write(csvCell(row[order[i]]));
                         }
                         writer.write("\r\n");
                     }
