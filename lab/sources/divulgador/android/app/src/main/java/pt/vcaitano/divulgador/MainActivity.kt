@@ -96,6 +96,16 @@ fun Root(ctx: Context) {
                 Button(onClick = { ctx.startActivity(Intent(ctx, SendActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }, modifier = Modifier.weight(1f)) { Text("Enviar e-mails", fontSize = 12.sp) }
                 OutlinedButton(onClick = { ctx.startActivity(Intent(ctx, GeneratorActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }, modifier = Modifier.weight(1f)) { Text("Gerador CSV", fontSize = 12.sp) }
             }
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    ctx.startActivity(
+                        Intent(ctx, SendActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            .putExtra("pick_csv_on_start", true)
+                    )
+                }
+            ) { Text("IMPORTAR CSV E CONFIGURAR") }
             Text("Envio automático depende de servidor autenticado. Envio manual usa seu app de e-mail.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (serverOnline) {
                 Text(
