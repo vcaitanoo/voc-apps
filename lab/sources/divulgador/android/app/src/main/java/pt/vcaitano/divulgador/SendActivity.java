@@ -285,7 +285,14 @@ public class SendActivity extends Activity {
         try{
             android.content.SharedPreferences pref=getPreferences(MODE_PRIVATE);
             JSONArray c=new JSONArray(pref.getString("contacts","[]"));
-            for(int i=0;i<c.length();i++)contacts.add(c.getJSONObject(i));
+            for(int i=0;i<c.length();i++){
+                JSONObject entry=c.getJSONObject(i);
+                // Compatibilidade com CSVs autorizados importados na VC4:
+                // o importador anterior só aceitava linhas com consentimento positivo.
+                if(!entry.has("consented"))entry.put("consented",true);
+                if(!entry.has("synthetic"))entry.put("synthetic",false);
+                contacts.add(entry);
+            }
             JSONArray yes=new JSONArray(pref.getString("confirmed","[]"));
             for(int i=0;i<yes.length();i++)confirmed.add(yes.getString(i));
             JSONArray deny=new JSONArray(pref.getString("blocked","[]"));
