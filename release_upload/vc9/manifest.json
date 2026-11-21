@@ -1,0 +1,11 @@
+{
+  "packageName": "pt.vcaitano.divulgadormobile",
+  "versionCode": 9,
+  "versionName": "0.1.8",
+  "sha256": "08d3075b352887087765eba088b2352051cc1dd39dadbc93f2484dafe560fa6a",
+  "signerSha256": "b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006",
+  "size": 11140677,
+  "parts": 8,
+  "sourceBranch": "feature/divulgador-mobile-vc9-simulacao-segura-20261121",
+  "mode": "simulacao-offline-nenhum-email-enviado"
+}
