@@ -86,6 +86,9 @@ public class SendActivity extends Activity {
                 stats.setText("Carregando CSV criado no Gerador...");
                 readGeneratedFile(source);
             }
+        }else if(getIntent().getBooleanExtra("pick_csv_on_start",false)){
+            // Atalho da tela inicial: escolher lista e voltar ao editor já preenchido.
+            pickCsv();
         }
     }
     private void pickCsv(){
