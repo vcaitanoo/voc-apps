@@ -72,7 +72,11 @@ public final class SmtpMailSender {
         // Also allow the recipient to send an unsubscribe request using their mail client.
         mail.setHeader("List-Unsubscribe","<mailto:"+sender.email+"?subject=REMOVER>");
 
-        File folder=new File(context.getFilesDir(),"mail_photos");
+        // Use the immutable photo snapshot captured when this campaign was queued.
+        File folder=new File(context.getFilesDir(),"auto_mail_attachments");
+        if(job.photosDirectory!=null && job.photosDirectory.matches("batch_[a-f0-9]{32}"))
+            folder=new File(folder,job.photosDirectory);
+        else folder=new File(context.getFilesDir(),"no_attachments_for_this_message");
         File[] stored=folder.listFiles();
         ArrayList<File> files=new ArrayList<>();
         long total=0;
