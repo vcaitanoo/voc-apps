@@ -1,0 +1,13 @@
+{
+  "artifact": "Divulgador-Mobile-0.1.6-vc7-release.apk",
+  "packageName": "pt.vcaitano.divulgadormobile",
+  "versionCode": 7,
+  "versionName": "0.1.6",
+  "sha256": "9460dc644e9680a4a17414a37923f4ff427090b271b234893bfc3567436d5fac",
+  "signerSha256": "b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006",
+  "bytes": 11136581,
+  "base64Chars": 14848776,
+  "parts": 8,
+  "builtFromCommit": "266481adb6054192181fc4cca2cbc464e41678be",
+  "note": "Blocos tecnicos temporarios de transporte de APK JA assinado. Nao contem keystore nem password."
+}
