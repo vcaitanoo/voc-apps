@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-11-21T02:34:58Z",
+  "updatedAt": "2026-11-21T03:09:12Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -180,12 +180,12 @@
         "notes": "Teste no Android real pendente."
       },
       "candidate": {
-        "versionCode": 6,
-        "versionName": "0.1.5",
-        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.5-vc6-release.apk",
-        "sha256": "c7e426939fd6526b634db315c87b4a63d6636fab0f0692afbc1f2af5f23e1ca3",
+        "versionCode": 7,
+        "versionName": "0.1.6",
+        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.6-vc7-release.apk",
+        "sha256": "9460dc644e9680a4a17414a37923f4ff427090b271b234893bfc3567436d5fac",
         "signatureSha256": "b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006",
-        "notes": "NOVA BASE VC6 com assinatura permanente e backup cifrado restaurado. Instala ao lado da VC4, sem desinstalar. CSV com Email e Consentimento, importar direto, campanhas, até 6 fotos anexadas via Gmail. Endereços fictícios não liberados para envio. Teste físico pendente, dados da VC4 não migrados."
+        "notes": "VC7: envio automático com fila local em segundo plano, várias contas Gmail (senha de app criptografada AndroidKeyStore), início/pausa, limites diários, CSV com consentimento, fotos. Envio real apenas para destinatários autorizados. Mesmo certificado da VC6: atualização sem desinstalar. Teste em Android real e com Gmail pendente."
       },
       "notes": "App novo e separado da VC4 devido assinatura perdida; futuras atualizações devem reutilizar a mesma chave e elevar versionCode."
     }
