@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-11-21T00:37:37Z",
+  "updatedAt": "2026-11-21T02:26:00Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -188,6 +188,29 @@
         "notes": "CANDIDATO VC4: corrigido APENAS o CSV. Email agora e primeira coluna; separador ponto e virgula compativel com Excel PT. Restante comportamento preservado. APK assinado com chave de depuracao temporaria diferente da VC3: para instalar, DESINSTALAR a VC3; proxima atualizacao precisa assinatura permanente. Teste Android real pendente."
       },
       "notes": "Candidato experimental substitui Divulgador VC2, por autorizacao do usuario; nao homologado no Android."
+    },
+    {
+      "id": "divulgador-mobile",
+      "name": "Divulgador Mobile (nova base)",
+      "packageName": "pt.vcaitano.divulgadormobile",
+      "enabled": true,
+      "stable": {
+        "versionCode": 0,
+        "versionName": "Ainda não confirmada",
+        "apkUrl": "",
+        "sha256": "",
+        "signatureSha256": "",
+        "notes": "Teste no Android real pendente."
+      },
+      "candidate": {
+        "versionCode": 6,
+        "versionName": "0.1.5",
+        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.5-vc6-release.apk",
+        "sha256": "c7e426939fd6526b634db315c87b4a63d6636fab0f0692afbc1f2af5f23e1ca3",
+        "signatureSha256": "b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006",
+        "notes": "NOVA BASE VC6 com assinatura permanente e backup cifrado restaurado. Instala ao lado da VC4, sem desinstalar. CSV com Email e Consentimento, importar direto, campanhas, até 6 fotos anexadas via Gmail. Endereços fictícios não liberados para envio. Teste físico pendente, dados da VC4 não migrados."
+      },
+      "notes": "App novo e separado da VC4 devido assinatura perdida; futuras atualizações devem reutilizar a mesma chave e elevar versionCode."
     }
   ]
 }
