@@ -84,10 +84,12 @@ public class SendActivity extends Activity {
             "\n\nSaiba mais em {link}\n\nCaso não deseje receber outras mensagens, responda REMOVER.",true);
         // As fotos pertencem à campanha configurada, e não à lista de contatos.
         photoAttachments=new PhotoAttachments(this,p);
-        TextView contactsTitle=text("Destinatários autorizados",20);
+        TextView contactsTitle=text("Listas de contatos",20);
         contactsTitle.setTypeface(null,1);p.addView(contactsTitle);
         button(p,"IMPORTAR CSV",v->pickCsv());
-        TextView help=text("Aceita CSV com vírgula ou ponto e vírgula. A coluna Email é obrigatória; Consentimento é opcional na importação. Listas sem consentimento são carregadas para configurar e visualizar, mas não podem ser enviadas sem autorização. Endereços gerados são fictícios.",13);
+        button(p,"TESTAR LISTA GERADA (SIMULAÇÃO SEM ENVIO)",v->
+            CampaignSimulation.show(this,new ArrayList<>(contacts)));
+        TextView help=text("CSV com Email obrigatório e Consentimento opcional. Listas geradas podem ser simuladas integralmente, com contadores e progresso, sem enviar mensagens. O envio real exige contatos autorizados; endereços inventados podem pertencer a terceiros.",13);
         help.setTextColor(0xff655D52);p.addView(help);
         recipient=text("",16);p.addView(recipient);
         stats=text("",14);p.addView(stats);
