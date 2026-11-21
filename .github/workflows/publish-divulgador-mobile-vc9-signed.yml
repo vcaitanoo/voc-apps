@@ -1,0 +1,133 @@
+name: Publicar Divulgador VC9 assinado no VOC Lab
+on:
+  push:
+    branches: [feature/divulgador-mobile-vc9-simulacao-segura-20261121]
+    paths:
+      - release_upload/vc9/manifest.json
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: divulgador-mobile-vc9-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      - name: Reconstituir arquivo assinado e confirmar SHA-256 original
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,glob,hashlib,json,re
+          from pathlib import Path
+          m=json.loads(Path('release_upload/vc9/manifest.json').read_text())
+          assert m['packageName']=='pt.vcaitano.divulgadormobile'
+          assert m['versionCode']==9 and m['versionName']=='0.1.8'
+          assert m['signerSha256']=='b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006'
+          assert re.fullmatch('[a-f0-9]{64}',m['sha256'])
+          parts=sorted(glob.glob('release_upload/vc9/part*.b64'))
+          assert len(parts)==m['parts']
+          raw=''.join(Path(p).read_text('ascii').strip() for p in parts)
+          assert all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=' for c in raw)
+          binary=base64.b64decode(raw,validate=True)
+          assert len(binary)==m['size']
+          assert hashlib.sha256(binary).hexdigest()==m['sha256']
+          Path('/tmp/divulgador-mobile-vc9-release.apk').write_bytes(binary)
+          print('APK restaurado: integridade verificada.')
+          PY
+      - name: Certificado original, estrutura, manifesto, DEX, resources e versionCode
+        run: |
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/34.0.0"
+          APK=/tmp/divulgador-mobile-vc9-release.apk
+          unzip -t "$APK" | tail -1
+          unzip -Z1 "$APK" | grep -qx AndroidManifest.xml
+          unzip -Z1 "$APK" | grep -qx classes.dex
+          unzip -Z1 "$APK" | grep -qx resources.arsc
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/vc9-signature.txt
+          grep -qx Verifies /tmp/vc9-signature.txt
+          CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/vc9-signature.txt | head -1)"
+          test "$CERT" = "b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006"
+          "$BT/aapt" dump badging "$APK" | tee /tmp/vc9-badging.txt
+          grep -q "package: name='pt.vcaitano.divulgadormobile' versionCode='9' versionName='0.1.8'" /tmp/vc9-badging.txt
+      - name: Publicar apenas fonte VC9, APK e entrada do novo Divulgador no GitHub
+        run: |
+          set -euo pipefail
+          SOURCE_BRANCH=feature/divulgador-mobile-vc9-simulacao-segura-20261121
+          git fetch origin main
+          git checkout -B main origin/main
+          ROOT=lab/sources/divulgador-mobile/android/app
+          for p in \
+            "$ROOT/build.gradle.kts" \
+            "$ROOT/src/main/java/pt/vcaitano/divulgador/SendActivity.java" \
+            "$ROOT/src/main/java/pt/vcaitano/divulgador/CampaignSimulation.java" \
+            docs/DIVULGADOR_MOBILE_VC9_CONTINUIDADE_20261121.md; do
+              mkdir -p "$(dirname "$p")"
+              git show "origin/$SOURCE_BRANCH:$p" > "$p"
+          done
+          grep -q '?: "9").toInt()' "$ROOT/build.gradle.kts"
+          grep -q 'NENHUM E-MAIL SERÁ ENVIADO' "$ROOT/src/main/java/pt/vcaitano/divulgador/CampaignSimulation.java"
+          APK=apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.8-vc9-release.apk
+          mkdir -p "$(dirname "$APK")"
+          cp /tmp/divulgador-mobile-vc9-release.apk "$APK"
+          export APK_SHA="$(sha256sum "$APK" | awk '{print $1}')"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          from datetime import datetime,timezone
+          path=Path('lab/catalog.json')
+          data=json.loads(path.read_text(encoding='utf-8'))
+          assert sum(a['id']=='divulgador-mobile' for a in data['apps'])==1
+          item=next(a for a in data['apps'] if a['id']=='divulgador-mobile')
+          assert item['packageName']=='pt.vcaitano.divulgadormobile'
+          assert item['candidate']['versionCode']==8
+          assert item['candidate']['signatureSha256']=='b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006'
+          item['candidate']={
+            'versionCode':9,'versionName':'0.1.8',
+            'apkUrl':'https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.8-vc9-release.apk',
+            'sha256':os.environ['APK_SHA'],
+            'signatureSha256':'b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006',
+            'notes':'CANDIDATA VC9: simulacao offline de listas ficticias com porcentagem, processados, pendentes, pause/continue e zero emails enviados. Fila real continua exclusiva de contatos autorizados. Mesmo package/certificado da VC8; teste fisico Android pendente.'
+          }
+          data['updatedAt']=datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+          path.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$APK" lab/catalog.json \
+            "$ROOT/build.gradle.kts" \
+            "$ROOT/src/main/java/pt/vcaitano/divulgador/SendActivity.java" \
+            "$ROOT/src/main/java/pt/vcaitano/divulgador/CampaignSimulation.java" \
+            docs/DIVULGADOR_MOBILE_VC9_CONTINUIDADE_20261121.md
+          git commit -m "release(divulgador-mobile): simulacao offline VC9, assinatura VC8 preservada"
+          git push origin HEAD:main
+      - name: Confirmar bytes da URL pública
+        run: |
+          set -euo pipefail
+          URL="https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.8-vc9-release.apk"
+          for n in 1 2 3 4 5; do
+            if curl -fsSL "$URL" -o /tmp/vc9-public.apk && cmp -s /tmp/vc9-public.apk /tmp/divulgador-mobile-vc9-release.apk; then
+              echo "APK GitHub público corresponde ao certificado e hash verificados."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::APK publico diferente"
+          exit 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Divulgador-Mobile-VC9-Release-Oficial
+          path: |
+            /tmp/divulgador-mobile-vc9-release.apk
+            /tmp/vc9-badging.txt
+            /tmp/vc9-signature.txt
+          if-no-files-found: warn
