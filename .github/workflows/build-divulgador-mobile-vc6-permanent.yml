@@ -1,0 +1,155 @@
+name: Divulgador Mobile VC6 - build release assinado e backup criptografado
+on:
+  push:
+    branches: [feature/divulgador-vc6-fotos-20261121]
+    paths:
+      - '.github/workflows/build-divulgador-mobile-vc6-permanent.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ROOT: lab/sources/divulgador/android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Testes CSV e regras de fotos
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/csv-tests"
+          javac -d "$RUNNER_TEMP/csv-tests" "$ROOT/app/src/main/java/pt/vcaitano/divulgador/CsvFormat.java" "$ROOT/csv-tests/CsvFormatTest.java"
+          java -cp "$RUNNER_TEMP/csv-tests" pt.vcaitano.divulgador.CsvFormatTest
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path("lab/sources/divulgador/android/app/src/main")
+          java=base/"java/pt/vcaitano/divulgador"
+          send=(java/"SendActivity.java").read_text()
+          photo=(java/"PhotoAttachments.java").read_text()
+          gen=(java/"GeneratorActivity.java").read_text()
+          manifest=(base/"AndroidManifest.xml").read_text()
+          gradle=Path("lab/sources/divulgador/android/app/build.gradle.kts").read_text()
+          assert "USAR NO DIVULGADOR" in gen
+          assert "IMPORTAR CSV E CONFIGURAR" in (java/"MainActivity.kt").read_text()
+          assert "CsvFormat.parse(csv)" in send
+          assert "ACTION_SEND_MULTIPLE" in send
+          assert "ACTION_SENDTO" in send
+          assert "ACTION_OPEN_DOCUMENT" in photo and "EXTRA_ALLOW_MULTIPLE" in photo
+          assert "FileProvider.getUriForFile" in photo
+          assert "FLAG_GRANT_READ_URI_PERMISSION" in photo
+          assert 'android:resource="@xml/email_photo_paths"' in manifest
+          assert 'applicationId = "pt.vcaitano.divulgadormobile"' in gradle
+          assert '?: "6").toInt()' in gradle and '?: "0.1.5"' in gradle
+          print("PASSOU: integracao CSV, galeria/fotos, anexo e manifest/versao")
+          PY
+      - name: Preparar certificado PUBLICO de backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/recovery-public.crt" <<'CERTIFICATE'
+-----BEGIN CERTIFICATE-----
+MIIEazCCAtOgAwIBAgIUdToK/s0MDHRNGekt+xiWiBY9Iw8wDQYJKoZIhvcNAQEL
+BQAwRDELMAkGA1UEBhMCUFQxDDAKBgNVBAoMA1ZPQzEnMCUGA1UEAwweVk9DIERp
+dnVsZ2Fkb3IgTW9iaWxlIFJlY292ZXJ5MCAXDTI2MTEyMTAyMjAzMloYDzIxMjYx
+MDI4MDIyMDMyWjBEMQswCQYDVQQGEwJQVDEMMAoGA1UECgwDVk9DMScwJQYDVQQD
+DB5WT0MgRGl2dWxnYWRvciBNb2JpbGUgUmVjb3ZlcnkwggGiMA0GCSqGSIb3DQEB
+AQUAA4IBjwAwggGKAoIBgQCq6upNOUlFkWeE9pPw1NPmU8ostvl/+tCNjevqiydq
+U0qVT5LXxCEWXmC+zh4n6mjWXpSHJ9Qi7wP9PbucNMak3+9uw+VedyB66e0yib5h
+RA+e7caG8DpMhK28h+4Yp2P8qHw3EuvYFSl3ildllAu0TGydhXLBUu6Ik7gxKH2q
+Em6eEwV+iG0G/T4aWL6hdj0HzIUexvaJVcFMHps8fWiFolWrztb0Uk12RsarZaKJ
+LNoXGIJThYapAPvjAgu/xGxuEG5zatWPrp0juWJWV2PP5oEnPOwDeYuLN3gllngn
+ra3/+Pz+fwMXjn33OQUioW9FKt8EsdN6ngbC7YKwnO75898fusDrxY9bAOsjYZqr
+YVq3z2wMojbcabDxYtUh/mIA59UWhxdD9P2DPEfD5FoNwZtcU/UGiQVq89TGBOvD
+ZhqYUiWDvjSNmc0BlHKVnoMLWR8wd6B9ghj5iKOAUW5oDsmmI6kQuSSNkJYCSRDS
+Gk/HlEmLNbNJkmTxH8mNXWECAwEAAaNTMFEwHQYDVR0OBBYEFMNYL/7JkyfF1yrI
+SHgYmO3BpitnMB8GA1UdIwQYMBaAFMNYL/7JkyfF1yrISHgYmO3BpitnMA8GA1Ud
+EwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggGBAKeisep4LGKqICspiXxvSMH7
+68IpYn8R4yuNJMggPYZ8cz/jbdY+f6OfDcFayGRQypin2VhS18/0OUVKUU2wJ2Fq
+QwGacZo+WUaqkJ6gOH1gNznZVlvlwAI9ngmZmIJIq3haoN9LitDB4UBzKFmC7iqn
+EjfANp2CTt866BVCKxTXbK9yuTsKHVwRzOUtPspovwShuxa2jXYE1/4m2R1DwXNM
+JL8hye+A2JWKQ2OsObUXQvpOuS0jYGS8IfAlcFt7U3j1Iz7AVdkw18B52HivRn74
+AjDPkOsJH+i5glgvhuDRRFH6jAM7Yc1dfyDXEcRDBdjdEnCea6mdXsCTvkID73Vf
++yrex32wrO9632CtMgESuSFpy7gxCIKHfQb2/fcdSIa0ARq2o/0bSHjmLSk3VJM7
+dcYEaNjDf763wTWaZmwj2667Lz0y8NCLv/cZZ1qzPFM/v6El7FJ/26pDbW9qEBvO
+7nuNgXEyLybMieitbB/pciuQbsDqGU/28kdd+ConoA==
+-----END CERTIFICATE-----
+CERTIFICATE
+          openssl x509 -in "$RUNNER_TEMP/recovery-public.crt" -noout >/dev/null
+      - name: Gerar assinatura PERMANENTE unica e backup sem expor segredos
+        shell: bash
+        run: |
+          set -euo pipefail
+          PASS="$(openssl rand -hex 32)"
+          echo "::add-mask::$PASS"
+          KEYSTORE="$RUNNER_TEMP/divulgador-mobile-signing.p12"
+          ALIAS="divulgador-mobile-release"
+          keytool -genkeypair -storetype PKCS12 -keystore "$KEYSTORE" \
+            -alias "$ALIAS" -keyalg RSA -keysize 3072 -sigalg SHA256withRSA \
+            -validity 36500 -dname "CN=Divulgador Mobile, OU=VOC, O=VOC, C=PT" \
+            -storepass "$PASS" -keypass "$PASS" -noprompt >/dev/null
+          chmod 600 "$KEYSTORE"
+          printf '%s' "$PASS" > "$RUNNER_TEMP/signing-password.txt"
+          chmod 600 "$RUNNER_TEMP/signing-password.txt"
+          # O pacote de recuperação só pode ser aberto com a chave privada
+          # de recuperação externa; esse segredo NUNCA entra no GitHub.
+          tar -cf "$RUNNER_TEMP/signing-private.tar" \
+            -C "$RUNNER_TEMP" divulgador-mobile-signing.p12 signing-password.txt
+          openssl cms -encrypt -binary -aes-256-cbc \
+            -in "$RUNNER_TEMP/signing-private.tar" \
+            -out "$RUNNER_TEMP/Divulgador-Mobile-Assinatura-CIFRADA.cms" \
+            -outform DER "$RUNNER_TEMP/recovery-public.crt"
+          test -s "$RUNNER_TEMP/Divulgador-Mobile-Assinatura-CIFRADA.cms"
+          echo "DIVULGADOR_KEYSTORE_PATH=$KEYSTORE" >> "$GITHUB_ENV"
+          echo "DIVULGADOR_KEYSTORE_PASSWORD=$PASS" >> "$GITHUB_ENV"
+          echo "DIVULGADOR_KEY_ALIAS=$ALIAS" >> "$GITHUB_ENV"
+          echo "DIVULGADOR_KEY_PASSWORD=$PASS" >> "$GITHUB_ENV"
+          # Informação pública do certificado para continuidade.
+          keytool -exportcert -rfc -keystore "$KEYSTORE" -alias "$ALIAS" \
+            -storepass "$PASS" > "$RUNNER_TEMP/Divulgador-Mobile-Certificado-ASSINATURA.crt"
+      - name: Compilar release a partir do mesmo codigo fonte Gradle
+        run: gradle -p "$ROOT" --no-daemon :app:assembleRelease
+      - name: Validar APK e gravar hash publico da assinatura
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$ROOT/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          unzip -t "$APK" | tail -1
+          unzip -Z1 "$APK" | grep -qx classes.dex
+          unzip -Z1 "$APK" | grep -qx AndroidManifest.xml
+          unzip -Z1 "$APK" | grep -qx resources.arsc
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | tee "$RUNNER_TEMP/badging.txt"
+          grep -q "package: name='pt.vcaitano.divulgadormobile' versionCode='6' versionName='0.1.5'" "$RUNNER_TEMP/badging.txt"
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/assinatura.txt"
+          grep -qx Verifies "$RUNNER_TEMP/assinatura.txt"
+          CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/assinatura.txt" | head -1 | tr '[:upper:]' '[:lower:]')"
+          [[ "$CERT" =~ ^[a-f0-9]{64}$ ]]
+          sha256sum "$APK" > "$RUNNER_TEMP/apk-sha256.txt"
+          cp "$APK" "$RUNNER_TEMP/Divulgador-Mobile-0.1.5-vc6-release.apk"
+          cat "$RUNNER_TEMP/apk-sha256.txt"
+          printf 'CERTIFICATE_SHA256=%s\n' "$CERT"
+          echo "ASSINATURA DEFINITIVA: somente reutilizar este keystore para futuros APKs."
+      - name: Disponibilizar APK e backup criptografado, sem expor chaves
+        uses: actions/upload-artifact@v4
+        with:
+          name: Divulgador-Mobile-VC6-RELEASE-e-Backup-Cifrado
+          path: |
+            ${{ runner.temp }}/Divulgador-Mobile-0.1.5-vc6-release.apk
+            ${{ runner.temp }}/Divulgador-Mobile-Assinatura-CIFRADA.cms
+            ${{ runner.temp }}/Divulgador-Mobile-Certificado-ASSINATURA.crt
+            ${{ runner.temp }}/apk-sha256.txt
+            ${{ runner.temp }}/badging.txt
+            ${{ runner.temp }}/assinatura.txt
+          retention-days: 90
