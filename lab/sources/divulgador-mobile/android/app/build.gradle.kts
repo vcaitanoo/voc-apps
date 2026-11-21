@@ -11,8 +11,8 @@ android {
         applicationId = "pt.vcaitano.divulgadormobile"
         minSdk = 24
         targetSdk = 34
-        versionCode = (System.getenv("DIVULGADOR_VERSION_CODE") ?: "6").toInt()
-        versionName = System.getenv("DIVULGADOR_VERSION_NAME") ?: "0.1.5"
+        versionCode = (System.getenv("DIVULGADOR_VERSION_CODE") ?: "7").toInt()
+        versionName = System.getenv("DIVULGADOR_VERSION_NAME") ?: "0.1.6"
     }
 
     signingConfigs {
@@ -53,5 +53,9 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // SMTP TLS com várias contas e fila agendada; sem abrir o Gmail por destinatário.
+    implementation("androidx.work:work-runtime:2.9.1")
+    implementation("com.sun.mail:android-mail:1.6.7")
+    implementation("com.sun.mail:android-activation:1.6.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }
