@@ -7,12 +7,12 @@
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="Divulgador"
+        android:label="Divulgador Mobile"
         android:usesCleartextTraffic="false"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity
-            android:name=".MainActivity"
+            android:name="pt.vcaitano.divulgador.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -28,7 +28,7 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/email_photo_paths" />
         </provider>
-        <activity android:name=".GeneratorActivity" android:exported="false" />
-        <activity android:name=".SendActivity" android:exported="false" />
+        <activity android:name="pt.vcaitano.divulgador.GeneratorActivity" android:exported="false" />
+        <activity android:name="pt.vcaitano.divulgador.SendActivity" android:exported="false" />
     </application>
 </manifest>
