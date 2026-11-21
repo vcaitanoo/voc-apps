@@ -9,6 +9,11 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.UUID;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -29,10 +34,10 @@ public final class AutoMailQueue extends SQLiteOpenHelper {
 
     public static final class Job {
         public final long id;
-        public final String email,name,subject,body,product,link;
-        Job(long id,String email,String name,String subject,String body,String product,String link) {
+        public final String email,name,subject,body,product,link,photosDirectory;
+        Job(long id,String email,String name,String subject,String body,String product,String link,String photosDirectory) {
             this.id=id;this.email=email;this.name=name;this.subject=subject;
-            this.body=body;this.product=product;this.link=link;
+            this.body=body;this.product=product;this.link=link;this.photosDirectory=photosDirectory;
         }
     }
     public static final class Status {
@@ -54,7 +59,7 @@ public final class AutoMailQueue extends SQLiteOpenHelper {
             "id INTEGER PRIMARY KEY AUTOINCREMENT,"+
             "email TEXT NOT NULL UNIQUE COLLATE NOCASE,name TEXT NOT NULL,"+
             "subject TEXT NOT NULL, body TEXT NOT NULL,product TEXT NOT NULL,"+
-            "link TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'queued',"+
+            "link TEXT NOT NULL,photo_dir TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'queued',"+
             "sender TEXT, sent_at INTEGER, error TEXT, created_at INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE sender_days(email TEXT NOT NULL, day TEXT NOT NULL,"+
                    "used INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(email,day))");
@@ -91,11 +96,39 @@ public final class AutoMailQueue extends SQLiteOpenHelper {
         return s.length()<=max?s:s.substring(0,max);
     }
 
+    private String snapshotPhotos() throws IOException {
+        File source=new File(context.getFilesDir(),"mail_photos");
+        File[] items=source.listFiles();
+        if(items==null||items.length==0)return "";
+        File base=new File(context.getFilesDir(),"auto_mail_attachments");
+        if(!base.isDirectory()&&!base.mkdirs())throw new IOException("Falha ao criar pasta de anexos");
+        String name="batch_"+UUID.randomUUID().toString().replace("-","");
+        File folder=new File(base,name);
+        if(!folder.mkdirs())throw new IOException("Falha ao preparar anexos da campanha");
+        long total=0;
+        int count=0;
+        for(File file:items) {
+            if(!file.isFile() || !file.getName().matches("foto_[a-f0-9]{32}\\.(jpg|png|webp|heic|gif)"))continue;
+            if(count>=6)break;
+            total+=file.length();
+            if(total>20L*1024*1024)throw new IOException("Anexos excedem 20 MB");
+            try(FileInputStream input=new FileInputStream(file);
+                FileOutputStream output=new FileOutputStream(new File(folder,file.getName()))){
+                byte[] buffer=new byte[16384];int n;
+                while((n=input.read(buffer))!=-1)output.write(buffer,0,n);
+            }
+            count++;
+        }
+        if(count==0){folder.delete();return "";}
+        return name;
+    }
+
     public synchronized int enqueueAuthorized(List<JSONObject> contacts,
-                String subject,String body,String product,String link) {
+                String subject,String body,String product,String link) throws IOException {
         String s=safe(subject,200),m=safe(body,10000);
         if(s.isEmpty()||m.isEmpty())throw new IllegalArgumentException("Preencha assunto e mensagem.");
         SQLiteDatabase db=getWritableDatabase();
+        String photos=snapshotPhotos();  // Photos frozen for this batch.
         int added=0;
         db.beginTransaction();
         try{
@@ -115,6 +148,7 @@ public final class AutoMailQueue extends SQLiteOpenHelper {
                 row.put("body",m);
                 row.put("product",safe(product,150));
                 row.put("link",safe(link,2000));
+                row.put("photo_dir",photos);
                 row.put("status","queued");
                 row.put("created_at",System.currentTimeMillis());
                 if(db.insertWithOnConflict("delivery",null,row,SQLiteDatabase.CONFLICT_IGNORE)!=-1)added++;
@@ -126,7 +160,7 @@ public final class AutoMailQueue extends SQLiteOpenHelper {
 
     private static Job fromCursor(Cursor c){
         return new Job(c.getLong(0),c.getString(1),c.getString(2),
-            c.getString(3),c.getString(4),c.getString(5),c.getString(6));
+            c.getString(3),c.getString(4),c.getString(5),c.getString(6),c.getString(7));
     }
     public synchronized Job claim(){
         SQLiteDatabase db=getWritableDatabase();
@@ -134,7 +168,7 @@ public final class AutoMailQueue extends SQLiteOpenHelper {
         try{
             Job job=null;
             try(Cursor c=db.rawQuery(
-                 "SELECT id,email,name,subject,body,product,link FROM delivery "+
+                 "SELECT id,email,name,subject,body,product,link,photo_dir FROM delivery "+
                  "WHERE status='queued' AND email NOT IN (SELECT email FROM blacklist) "+
                  "ORDER BY id LIMIT 1",null)){
                 if(c.moveToFirst())job=fromCursor(c);
