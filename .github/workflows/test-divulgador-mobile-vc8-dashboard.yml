@@ -1,0 +1,88 @@
+name: Divulgador Mobile VC8 - painel de envios
+on:
+  push:
+    branches: [fix/divulgador-mobile-vc8-dashboard-20261121]
+    paths:
+      - 'lab/sources/divulgador-mobile/android/**'
+      - '.github/workflows/test-divulgador-mobile-vc8-dashboard.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile_verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      ROOT: lab/sources/divulgador-mobile/android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Confirmar VC8, painel e bloqueio por consentimento
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('lab/sources/divulgador-mobile/android')
+          b=(root/'app/build.gradle.kts').read_text()
+          s=(root/'app/src/main/java/pt/vcaitano/divulgador/SendActivity.java').read_text()
+          q=(root/'app/src/main/java/pt/vcaitano/divulgador/AutoMailQueue.java').read_text()
+          assert 'applicationId = "pt.vcaitano.divulgadormobile"' in b
+          assert '?: "8").toInt()' in b and '?: "0.1.7"' in b
+          for marker in ['createDashboard(p);','PAINEL DE ENVIOS','dashboardProgress.setProgress(percent);',
+                         '"Importados","Autorizados","Sem consent.","Na fila","Enviados","Falhas"',
+                         'dashboardHandler.postDelayed(this,5000)',
+                         'Nenhum destinatário autorizado.']:
+              assert marker in s,marker
+          assert 'AutoMailWorker.start(this)' in s and 'AutoMailWorker.pause(this)' in s
+          assert 'obj.optBoolean("consented",false)' in s
+          assert 'obj.optBoolean("synthetic",false)' in s
+          assert 'optBoolean("consented",false)' in q and 'optBoolean("synthetic",false)' in q
+          print('OK: painel e segurança dos destinatários')
+          PY
+      - name: Teste CSV mantido
+        run: |
+          mkdir -p "$RUNNER_TEMP/test-classes"
+          javac -d "$RUNNER_TEMP/test-classes" \
+            "$ROOT/app/src/main/java/pt/vcaitano/divulgador/CsvFormat.java" \
+            "$ROOT/csv-tests/CsvFormatTest.java"
+          java -cp "$RUNNER_TEMP/test-classes" pt.vcaitano.divulgador.CsvFormatTest
+      - name: Compilar APK debug e release nao assinado
+        run: gradle -p "$ROOT" --no-daemon :app:assembleDebug :app:assembleRelease
+      - name: Verificar package manifesto DEX assinatura e recursos
+        run: |
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/34.0.0"
+          APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
+          RELEASE="$ROOT/app/build/outputs/apk/release/app-release-unsigned.apk"
+          test -s "$APK"
+          test -s "$RELEASE"
+          unzip -t "$APK" | tail -1
+          unzip -t "$RELEASE" | tail -1
+          unzip -Z1 "$APK" | grep -qx classes.dex
+          unzip -Z1 "$APK" | grep -qx AndroidManifest.xml
+          unzip -Z1 "$APK" | grep -qx resources.arsc
+          "$BT/aapt" dump badging "$APK" | tee "$RUNNER_TEMP/vc8-badging.txt"
+          grep -q "package: name='pt.vcaitano.divulgadormobile' versionCode='8' versionName='0.1.7'" "$RUNNER_TEMP/vc8-badging.txt"
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/vc8-debug-cert.txt"
+          grep -qx Verifies "$RUNNER_TEMP/vc8-debug-cert.txt"
+          sha256sum "$APK" "$RELEASE"
+          echo "APK RELEASE AINDA NÃO ASSINADO: somente publicar depois de assinar com a chave VC6."
+      - name: Entregar artefatos para assinatura original (sem publicar debug)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Divulgador-Mobile-VC8-APKs-para-verificacao
+          path: |
+            lab/sources/divulgador-mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            lab/sources/divulgador-mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: warn
