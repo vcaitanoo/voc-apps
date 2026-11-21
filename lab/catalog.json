@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-11-21T02:26:00Z",
+  "updatedAt": "2026-11-21T02:34:58Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -165,29 +165,6 @@
         "signatureSha256": "e52d1c13baa3a4e7f73b71cb7e15bc1fdd8709650aa64fe8a9b86bb26a5491f9",
         "notes": "VC7 DEMO: corrige sinal oscilante que impedia 3 confirmações, agora valida a direção por 3 das últimas 5 capturas e rejeita direções contraditórias. Limita OCR do cronômetro a cada 3s e não mantém contagem antiga no painel por 30s; redesenho limitado para reduzir piscadas. Mantém entradas somente no início da vela confirmada, conta DEMO, gestão, scanner de velas, painel móvel e resultados anteriores. MESMO package e assinatura permanente VC3. Sem novo app. Build, SHA, assinatura e URL verificados; execução real no Android ainda pendente."
       }
-    },
-    {
-      "id": "divulgador",
-      "name": "Divulgador Mobile",
-      "packageName": "pt.vcaitano.divulgador",
-      "enabled": true,
-      "stable": {
-        "versionCode": 0,
-        "versionName": "Ainda não homologado",
-        "apkUrl": "",
-        "sha256": "",
-        "signatureSha256": "",
-        "notes": "Nenhuma versão estável aprovada pelo utilizador."
-      },
-      "candidate": {
-        "versionCode": 4,
-        "versionName": "0.1.3",
-        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador/candidate/Divulgador-Mobile-0.1.3-vc4.apk",
-        "sha256": "9663a9528463e7c8785b95070b47226ed26221662b34b1308ea430602a932cfe",
-        "signatureSha256": "8229c3521273f75b900dec051b79ef5b678960b22735e13e12d0ff221959cd0a",
-        "notes": "CANDIDATO VC4: corrigido APENAS o CSV. Email agora e primeira coluna; separador ponto e virgula compativel com Excel PT. Restante comportamento preservado. APK assinado com chave de depuracao temporaria diferente da VC3: para instalar, DESINSTALAR a VC3; proxima atualizacao precisa assinatura permanente. Teste Android real pendente."
-      },
-      "notes": "Candidato experimental substitui Divulgador VC2, por autorizacao do usuario; nao homologado no Android."
     },
     {
       "id": "divulgador-mobile",
