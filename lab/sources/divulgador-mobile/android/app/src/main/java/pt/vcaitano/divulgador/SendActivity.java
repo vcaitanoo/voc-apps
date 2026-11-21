@@ -5,6 +5,11 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.content.res.ColorStateList;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
 import android.widget.*;
 import android.graphics.Color;
 import org.json.JSONArray;
@@ -27,6 +32,18 @@ public class SendActivity extends Activity {
     private EditText subject, body, product, link;
     private PhotoAttachments photoAttachments;
     private TextView recipient, stats, automaticStatus;
+    private TextView dashboardPercent, dashboardWarning, dashboardState;
+    private ProgressBar dashboardProgress;
+    private final TextView[] dashboardValues=new TextView[6];
+    private final Handler dashboardHandler=new Handler(Looper.getMainLooper());
+    private boolean dashboardVisible=false;
+    private final Runnable dashboardTick=new Runnable(){
+        @Override public void run(){
+            if(!dashboardVisible)return;
+            updateAutomaticStatus();
+            dashboardHandler.postDelayed(this,5000);
+        }
+    };
     private final ArrayList<JSONObject> contacts=new ArrayList<>();
     private final HashSet<String> confirmed=new HashSet<>(), blocked=new HashSet<>();
     private int current=0;
@@ -53,6 +70,7 @@ public class SendActivity extends Activity {
         LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);
         p.setPadding(dp(19),dp(16),dp(19),dp(40));p.setBackgroundColor(0xffF5F7FB);
         scroll.addView(p);setContentView(scroll);
+        createDashboard(p);
         TextView title=text("Divulgação por e-mail",25);title.setTypeface(null,1);p.addView(title);
         p.addView(text("Importe contatos autorizados, edite a mensagem e confirme o envio no Gmail ou outro app de e-mail.",14));
         String name=getIntent().getStringExtra("campaign_name");
@@ -109,9 +127,138 @@ public class SendActivity extends Activity {
             pickCsv();
         }
     }
+    private GradientDrawable dashboardBackground(int fillColor){
+        GradientDrawable background=new GradientDrawable();
+        background.setColor(fillColor);
+        background.setCornerRadius(dp(16));
+        background.setStroke(dp(1),0xffDEE5F2);
+        return background;
+    }
+
+    private TextView metricValue(LinearLayout parent,String caption){
+        LinearLayout metric=new LinearLayout(this);
+        metric.setOrientation(LinearLayout.VERTICAL);
+        metric.setGravity(Gravity.CENTER);
+        metric.setPadding(dp(2),dp(8),dp(2),dp(8));
+        LinearLayout.LayoutParams slot=new LinearLayout.LayoutParams(0,-2,1f);
+        slot.setMargins(dp(2),0,dp(2),0);
+        parent.addView(metric,slot);
+
+        TextView value=new TextView(this);
+        value.setText("0");
+        value.setTextColor(0xff19347A);
+        value.setTextSize(23);
+        value.setTypeface(null,1);
+        value.setGravity(Gravity.CENTER);
+        metric.addView(value,new LinearLayout.LayoutParams(-1,-2));
+
+        TextView label=new TextView(this);
+        label.setText(caption);
+        label.setTextColor(0xff596478);
+        label.setTextSize(12);
+        label.setGravity(Gravity.CENTER);
+        metric.addView(label,new LinearLayout.LayoutParams(-1,-2));
+        return value;
+    }
+
+    private void createDashboard(LinearLayout root){
+        LinearLayout panel=new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(13),dp(12),dp(13),dp(12));
+        panel.setBackground(dashboardBackground(0xffFFFFFF));
+        LinearLayout.LayoutParams outside=new LinearLayout.LayoutParams(-1,-2);
+        outside.bottomMargin=dp(16);
+        root.addView(panel,outside);
+
+        LinearLayout head=new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        panel.addView(head,new LinearLayout.LayoutParams(-1,-2));
+        TextView title=text("PAINEL DE ENVIOS",16);
+        title.setTypeface(null,1);title.setTextColor(0xff19347A);
+        head.addView(title,new LinearLayout.LayoutParams(0,-2,1f));
+        dashboardPercent=text("0%",22);
+        dashboardPercent.setTypeface(null,1);
+        dashboardPercent.setTextColor(0xff087F8C);
+        head.addView(dashboardPercent);
+
+        dashboardProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
+        dashboardProgress.setMax(100);dashboardProgress.setProgress(0);
+        dashboardProgress.setProgressTintList(ColorStateList.valueOf(0xff087F8C));
+        LinearLayout.LayoutParams progressSize=new LinearLayout.LayoutParams(-1,dp(9));
+        progressSize.topMargin=dp(6);progressSize.bottomMargin=dp(5);
+        panel.addView(dashboardProgress,progressSize);
+
+        dashboardState=text("Aguardando dados de envio.",12);
+        dashboardState.setTextColor(0xff526078);
+        panel.addView(dashboardState);
+        String[] labels={"Importados","Autorizados","Sem consent.","Na fila","Enviados","Falhas"};
+        for(int rowIndex=0;rowIndex<2;rowIndex++){
+            LinearLayout row=new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER);
+            panel.addView(row,new LinearLayout.LayoutParams(-1,-2));
+            for(int col=0;col<3;col++){
+                int i=rowIndex*3+col;
+                dashboardValues[i]=metricValue(row,labels[i]);
+            }
+        }
+        dashboardWarning=text("",13);
+        dashboardWarning.setTextColor(0xff88531A);
+        dashboardWarning.setPadding(dp(8),dp(7),dp(8),dp(7));
+        dashboardWarning.setBackground(dashboardBackground(0xffFFF5E5));
+        panel.addView(dashboardWarning,new LinearLayout.LayoutParams(-1,-2));
+    }
+
+    private void renderDashboard(AutoMailQueue.Status status){
+        if(dashboardPercent==null)return;
+        int authorized=0,withoutConsent=0;
+        for(JSONObject row:contacts){
+            String email=row.optString("email");
+            if(!row.optBoolean("consented",false) || row.optBoolean("synthetic",false)){
+                withoutConsent++;
+            }else if(!blocked.contains(email)&&!confirmed.contains(email)){
+                authorized++;
+            }
+        }
+        // Percentual de mensagens realmente enfileiradas; exclui sem consentimento.
+        int total=status.total;
+        int percent=total==0?0:(int)Math.round(100.0*status.sent/total);
+        dashboardPercent.setText(percent+"% enviado");
+        dashboardProgress.setProgress(percent);
+        dashboardValues[0].setText(String.format(Locale.getDefault(),"%,d",contacts.size()));
+        dashboardValues[1].setText(String.format(Locale.getDefault(),"%,d",authorized));
+        dashboardValues[2].setText(String.format(Locale.getDefault(),"%,d",withoutConsent));
+        dashboardValues[3].setText(String.format(Locale.getDefault(),"%,d",status.waiting));
+        dashboardValues[4].setText(String.format(Locale.getDefault(),"%,d",status.sent));
+        dashboardValues[5].setText(String.format(Locale.getDefault(),"%,d",status.failed));
+        dashboardState.setText((status.running?"● Automático ativo":"○ Automático pausado")+
+            " · Total na fila: "+total+" · Incertos: "+status.uncertain+
+            " · Bloqueados: "+status.blocked);
+        if(!status.error.isEmpty()){
+            dashboardWarning.setText("Atenção: "+status.error);
+        }else if(status.waiting==0 && authorized==0 && !contacts.isEmpty()){
+            dashboardWarning.setText("Nenhum destinatário autorizado. Contatos sem consentimento"+
+                " ou gerados ficticiamente não entram na fila. Importe uma lista real autorizada.");
+        }else if(status.waiting==0 && authorized>0){
+            dashboardWarning.setText("Há contatos autorizados. Toque PREPARAR FILA e depois INICIAR ENVIO AUTOMÁTICO.");
+        }else if(status.total==0){
+            dashboardWarning.setText("Importe contatos autorizados para preparar a primeira campanha.");
+        }else{
+            dashboardWarning.setText("Atualização a cada 5 segundos enquanto esta tela estiver aberta.");
+        }
+    }
+
     @Override protected void onResume(){
         super.onResume();
-        if(automaticStatus!=null)updateAutomaticStatus();
+        dashboardVisible=true;
+        dashboardHandler.removeCallbacks(dashboardTick);
+        dashboardHandler.post(dashboardTick);
+    }
+    @Override protected void onPause(){
+        dashboardVisible=false;
+        dashboardHandler.removeCallbacks(dashboardTick);
+        super.onPause();
     }
 
     private void updateAutomaticStatus(){
@@ -119,6 +266,7 @@ public class SendActivity extends Activity {
         AutoMailQueue q=new AutoMailQueue(this);
         try{
             AutoMailQueue.Status status=q.status();
+            renderDashboard(status);
             automaticStatus.setText(
                 (status.running?"● ENVIO AUTOMÁTICO ATIVO":"○ ENVIO PAUSADO")+
                 "\nNa fila: "+status.waiting+" · Enviados: "+status.sent+
@@ -354,6 +502,7 @@ public class SendActivity extends Activity {
         stats.setText("Importados: "+contacts.size()+" · Autorizados a enviar: "+authorized+
             " · Sem consentimento: "+pending+" · Envio confirmado: "+confirmed.size()+
             " · Bloqueados: "+blocked.size());
+        updateAutomaticStatus();
     }
     private String fill(String template,JSONObject obj){
         String name=obj.optString("name");

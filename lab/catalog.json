@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogId": "voc-lab",
   "catalogName": "VOC Lab",
-  "updatedAt": "2026-11-21T03:09:12Z",
+  "updatedAt": "2026-11-21T03:27:56Z",
   "apps": [
     {
       "id": "tela-sempre-ativa",
@@ -180,12 +180,12 @@
         "notes": "Teste no Android real pendente."
       },
       "candidate": {
-        "versionCode": 7,
-        "versionName": "0.1.6",
-        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.6-vc7-release.apk",
-        "sha256": "9460dc644e9680a4a17414a37923f4ff427090b271b234893bfc3567436d5fac",
+        "versionCode": 8,
+        "versionName": "0.1.7",
+        "apkUrl": "https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.7-vc8-release.apk",
+        "sha256": "18dc17baedf0df88d9d259fcdb4e8aa37c8f79d95bc3e2685a057283645c1969",
         "signatureSha256": "b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006",
-        "notes": "VC7: envio automático com fila local em segundo plano, várias contas Gmail (senha de app criptografada AndroidKeyStore), início/pausa, limites diários, CSV com consentimento, fotos. Envio real apenas para destinatários autorizados. Mesmo certificado da VC6: atualização sem desinstalar. Teste em Android real e com Gmail pendente."
+        "notes": "VC8 candidata: painel no topo com percentual de envios, importados, autorizados, sem consentimento, pendentes na fila, enviados, falhas, incertos e bloqueados. Avisos claros sobre ausencia de consentimento; atualiza a cada 5 segundos. Mantem toda a logica Gmail/CSV/fotos VC7, mesma assinatura. Teste Android real pendente."
       },
       "notes": "App novo e separado da VC4 devido assinatura perdida; futuras atualizações devem reutilizar a mesma chave e elevar versionCode."
     }
