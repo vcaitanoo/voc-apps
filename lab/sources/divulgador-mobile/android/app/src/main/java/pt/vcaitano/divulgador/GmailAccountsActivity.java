@@ -131,6 +131,28 @@ public final class GmailAccountsActivity extends Activity {
                             Toast.LENGTH_LONG).show());
                     }
                 }).start());
+                button(panel,"ENVIAR TESTE PARA ESTA PRÓPRIA CONTA",v->{
+                    new AlertDialog.Builder(this)
+                        .setTitle("Enviar e-mail de teste?")
+                        .setMessage("Será enviada uma mensagem real de "+account.email+
+                            " para esta mesma conta, apenas para validar o SMTP.")
+                        .setNegativeButton("Cancelar",null)
+                        .setPositiveButton("Enviar teste",(d,w)->new Thread(()->{
+                            try{
+                                AutoMailQueue.Job example=new AutoMailQueue.Job(-1L,
+                                    account.email,"Teste","Teste do Divulgador Mobile",
+                                    "Esta mensagem confirma que sua conta Gmail está preparada para envios autorizados.",
+                                    "Divulgador Mobile","","");
+                                SmtpMailSender.send(this,account,example);
+                                runOnUiThread(()->Toast.makeText(this,
+                                    "Teste enviado para "+account.email,Toast.LENGTH_LONG).show());
+                            }catch(Exception e){
+                                runOnUiThread(()->Toast.makeText(this,
+                                    "Falha no envio de teste. Confira o Gmail e a senha de app.",
+                                    Toast.LENGTH_LONG).show());
+                            }
+                        }).start()).show();
+                });
                 button(panel,"REMOVER CONTA",v->
                     new AlertDialog.Builder(this)
                         .setTitle("Remover "+account.email+"?")
