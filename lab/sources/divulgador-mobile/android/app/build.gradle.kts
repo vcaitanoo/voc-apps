@@ -11,8 +11,14 @@ android {
         applicationId = "pt.vcaitano.divulgadormobile"
         minSdk = 24
         targetSdk = 34
-        versionCode = (System.getenv("DIVULGADOR_VERSION_CODE") ?: "6").toInt()
-        versionName = System.getenv("DIVULGADOR_VERSION_NAME") ?: "0.1.5"
+        versionCode = (System.getenv("DIVULGADOR_VERSION_CODE") ?: "7").toInt()
+        versionName = System.getenv("DIVULGADOR_VERSION_NAME") ?: "0.1.6"
+    }
+
+    packaging {
+        resources {
+            excludes += setOf("META-INF/NOTICE.md", "META-INF/LICENSE.md")
+        }
     }
 
     signingConfigs {
@@ -31,7 +37,10 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            // Sem keystore: o build gera release UNSIGNED para validação.
+            // Com keystore: release assinado obrigatoriamente com a chave VC6.
+            signingConfig = if (System.getenv("DIVULGADOR_KEYSTORE_PATH") != null)
+                signingConfigs.getByName("release") else null
         }
     }
 
@@ -53,5 +62,9 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // SMTP TLS com várias contas e fila agendada; sem abrir o Gmail por destinatário.
+    implementation("androidx.work:work-runtime:2.9.1")
+    implementation("com.sun.mail:android-mail:1.6.7")
+    implementation("com.sun.mail:android-activation:1.6.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }

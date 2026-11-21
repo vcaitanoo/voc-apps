@@ -106,7 +106,11 @@ fun Root(ctx: Context) {
                     )
                 }
             ) { Text("IMPORTAR CSV E CONFIGURAR") }
-            Text("Envio automático depende de servidor autenticado. Envio manual usa seu app de e-mail.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(
+                onClick = { ctx.startActivity(Intent(ctx, GmailAccountsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Gerenciar contas Gmail • envio automático") }
+            Text("Prepare a fila em Enviar e-mails e toque em INICIAR uma vez. O Android processa envios autorizados em segundo plano, com limite por conta. Pode pausar a campanha.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (serverOnline) {
                 Text(
                     if (dryRun) {
