@@ -1,0 +1,10 @@
+{
+  "packageName": "pt.vcaitano.divulgadormobile",
+  "versionCode": 8,
+  "versionName": "0.1.7",
+  "sha256": "18dc17baedf0df88d9d259fcdb4e8aa37c8f79d95bc3e2685a057283645c1969",
+  "signerSha256": "b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006",
+  "size": 11136581,
+  "parts": 8,
+  "notes": "Fonte derivada da VC7; dashboard no topo. APK release assinado pela chave VC6/VC7. Não confundir contatos sem consentimento com emails pendentes na fila."
+}
