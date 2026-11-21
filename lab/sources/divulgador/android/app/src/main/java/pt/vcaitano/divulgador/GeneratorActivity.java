@@ -16,6 +16,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.OutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
@@ -79,7 +81,7 @@ public class GeneratorActivity extends Activity {
     private Spinner mode;
     private EditText quantity, minAge, maxAge, seed, domain;
     private TextView preview, result;
-    private Button generate, save;
+    private Button generate, save, useInCampaign;
     private boolean busy = false;
 
     private int dp(int value) {
@@ -184,6 +186,16 @@ public class GeneratorActivity extends Activity {
         all.addView(save, second);
         save.setOnClickListener(v -> chooseFile());
 
+        useInCampaign = new Button(this);
+        useInCampaign.setText("USAR NO DIVULGADOR");
+        useInCampaign.setAllCaps(false);
+        useInCampaign.setTextSize(17);
+        useInCampaign.setEnabled(false);
+        LinearLayout.LayoutParams third = new LinearLayout.LayoutParams(-1, dp(54));
+        third.topMargin = dp(8);
+        all.addView(useInCampaign, third);
+        useInCampaign.setOnClickListener(v -> openCampaignWithGenerated());
+
         result = label("Nenhum registro gerado ainda.", 15);
         result.setPadding(0, dp(20), 0, dp(6));
         all.addView(result);
@@ -260,6 +272,7 @@ public class GeneratorActivity extends Activity {
         busy = true;
         generate.setEnabled(false);
         save.setEnabled(false);
+        useInCampaign.setEnabled(false);
         result.setText("Gerando " + count + " registros...");
         new Thread(() -> {
             try {
@@ -309,6 +322,7 @@ public class GeneratorActivity extends Activity {
                     busy = false;
                     generate.setEnabled(true);
                     save.setEnabled(true);
+                    useInCampaign.setEnabled(true);
                 });
             } catch (Exception ex) {
                 runOnUiThread(() -> {
@@ -316,6 +330,43 @@ public class GeneratorActivity extends Activity {
                     busy = false;
                     generate.setEnabled(true);
                     save.setEnabled(!records.isEmpty());
+                    useInCampaign.setEnabled(!records.isEmpty());
+                });
+            }
+        }).start();
+    }
+
+    private void openCampaignWithGenerated() {
+        if (busy || records.isEmpty()) return;
+        busy = true;
+        generate.setEnabled(false);
+        save.setEnabled(false);
+        useInCampaign.setEnabled(false);
+        result.setText("Transferindo " + records.size() + " registros para o Divulgador...");
+        final List<String[]> snapshot = new ArrayList<>(records);
+        new Thread(() -> {
+            File file = new File(getCacheDir(), "divulgador-gerado-" +
+                System.currentTimeMillis() + ".csv");
+            try (Writer writer = new OutputStreamWriter(new FileOutputStream(file),
+                     StandardCharsets.UTF_8)) {
+                CsvFormat.writeGenerated(writer, snapshot);
+                runOnUiThread(() -> {
+                    busy = false;
+                    generate.setEnabled(true);
+                    save.setEnabled(true);
+                    useInCampaign.setEnabled(true);
+                    Intent next = new Intent(this, SendActivity.class);
+                    next.putExtra("import_generated_file", file.getName());
+                    startActivity(next);
+                });
+            } catch (Exception e) {
+                file.delete();
+                runOnUiThread(() -> {
+                    busy = false;
+                    generate.setEnabled(true);
+                    save.setEnabled(true);
+                    useInCampaign.setEnabled(true);
+                    result.setText("Erro na transferência: " + e.getMessage());
                 });
             }
         }).start();
@@ -329,13 +380,6 @@ public class GeneratorActivity extends Activity {
         intent.putExtra(Intent.EXTRA_TITLE, "usuarios_fake_" +
             new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).format(new java.util.Date()) + ".csv");
         startActivityForResult(intent, REQUEST_CSV);
-    }
-
-    private static String csvCell(String text) {
-        if (text.contains(";") || text.contains("\"") ||
-            text.contains("\r") || text.contains("\n"))
-            return "\"" + text.replace("\"", "\"\"") + "\"";
-        return text;
     }
 
     @Override
@@ -354,19 +398,7 @@ public class GeneratorActivity extends Activity {
             try (OutputStream out = getContentResolver().openOutputStream(uri)) {
                 if (out == null) throw new java.io.IOException("Não foi possível abrir o arquivo.");
                 try (Writer writer = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
-                    writer.write('\uFEFF');
-                    // Separador de campos para Excel em Portugal: ponto e vírgula.
-                    // Email vem primeiro, em coluna própria e com nome explícito.
-                    writer.write("Email;Nome;Cidade;Idade\r\n");
-                    for (String[] row : snapshot) {
-                        int[] order = {1, 0, 2, 3};
-                        for (int i = 0; i < order.length; i++) {
-                            if (i > 0) writer.write(';');
-                            writer.write(csvCell(row[order[i]]));
-                        }
-                        writer.write("\r\n");
-                    }
-                    writer.flush();
+                    CsvFormat.writeGenerated(writer, snapshot);
                 }
                 runOnUiThread(() -> {
                     busy = false;

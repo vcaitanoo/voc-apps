@@ -1,0 +1,88 @@
+name: Testar Divulgador VC5 - importacao integrada CSV
+on:
+  push:
+    branches: [fix/divulgador-vc5-importar-direto-e-consentimento-20261121]
+    paths:
+      - 'lab/sources/divulgador/android/**'
+      - '.github/workflows/test-divulgador-vc5-csv-integrado.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ROOT: lab/sources/divulgador/android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Testar CSV real, delimitadores, BOM, colunas e consentimento
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/csv-classes"
+          javac -d "$RUNNER_TEMP/csv-classes" \
+            "$ROOT/app/src/main/java/pt/vcaitano/divulgador/CsvFormat.java" \
+            "$ROOT/csv-tests/CsvFormatTest.java"
+          java -cp "$RUNNER_TEMP/csv-classes" pt.vcaitano.divulgador.CsvFormatTest
+      - name: Validar navegacao do gerador para o composer sem envio automatico
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('lab/sources/divulgador/android/app/src/main/java/pt/vcaitano/divulgador')
+          g=(root/'GeneratorActivity.java').read_text()
+          s=(root/'SendActivity.java').read_text()
+          main=(root/'MainActivity.kt').read_text()
+          b=Path('lab/sources/divulgador/android/app/build.gradle.kts').read_text()
+          assert 'USAR NO DIVULGADOR' in g
+          assert 'next.putExtra("import_generated_file", file.getName());' in g
+          assert 'CsvFormat.writeGenerated(writer, snapshot);' in g
+          assert 'getIntent().getStringExtra("import_generated_file")' in s
+          assert 'importCsvText(csv,true);' in s
+          assert 'CsvFormat.parse(csv)' in s
+          assert 'if(e<0)' in s and 'if(e<0||c<0)' not in s
+          assert 'obj.optBoolean("consented",false)' in s
+          assert 'VER PRÉVIA DO E-MAIL' in s
+          assert 'IMPORTAR CSV E CONFIGURAR' in main
+          assert 'getBooleanExtra("pick_csv_on_start",false)' in s
+          assert '?: "5").toInt()' in b and '?: "0.1.4"' in b
+          print("Fluxo de transferencia, importador e versão: OK")
+          PY
+      - name: Compilar APK do mesmo codigo final
+        run: gradle -p "$ROOT" --no-daemon :app:assembleDebug
+      - name: Validar estrutura e assinatura do APK - teste apenas
+        run: |
+          set -euo pipefail
+          APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          unzip -t "$APK" | tail -1
+          unzip -Z1 "$APK" | grep -qx classes.dex
+          unzip -Z1 "$APK" | grep -qx AndroidManifest.xml
+          unzip -Z1 "$APK" | grep -qx resources.arsc
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | tee "$RUNNER_TEMP/badging.txt"
+          grep -q "package: name='pt.vcaitano.divulgador' versionCode='5' versionName='0.1.4'" "$RUNNER_TEMP/badging.txt"
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/signature.txt"
+          grep -qx Verifies "$RUNNER_TEMP/signature.txt"
+          ACTUAL="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/signature.txt" | head -1 | tr '[:upper:]' '[:lower:]')"
+          printf 'APK_SIGNER=%s\n' "$ACTUAL"
+          sha256sum "$APK"
+          # SEM publicar no Lab: a VC4 instalada tem outra assinatura.
+          echo "PUBLICACAO BLOQUEADA ATE RECUPERAR CHAVE VC4 OU MIGRAR PARA CHAVE PERMANENTE."
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Divulgador-Mobile-VC5-TESTE-CSV-Integrado
+          path: lab/sources/divulgador/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn

@@ -11,8 +11,8 @@ android {
         applicationId = "pt.vcaitano.divulgador"
         minSdk = 24
         targetSdk = 34
-        versionCode = (System.getenv("DIVULGADOR_VERSION_CODE") ?: "4").toInt()
-        versionName = System.getenv("DIVULGADOR_VERSION_NAME") ?: "0.1.3"
+        versionCode = (System.getenv("DIVULGADOR_VERSION_CODE") ?: "5").toInt()
+        versionName = System.getenv("DIVULGADOR_VERSION_NAME") ?: "0.1.4"
     }
 
     signingConfigs {
