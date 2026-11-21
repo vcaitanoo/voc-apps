@@ -1,0 +1,120 @@
+name: Publicar Divulgador Mobile VC7 APK release assinado no VOC Lab
+on:
+  push:
+    branches: [feature/divulgador-mobile-vc7-automacao-gmail-20261121]
+    paths:
+      - 'release_upload/vc7/manifest.json'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: divulgador-mobile-vc7-signed-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      - name: Reconstituir exatamente APK assinado a partir dos 8 blocos verificados
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,hashlib,base64,glob
+          from pathlib import Path
+          m=json.loads(Path('release_upload/vc7/manifest.json').read_text())
+          assert m['packageName']=='pt.vcaitano.divulgadormobile'
+          assert m['versionCode']==7 and m['versionName']=='0.1.6'
+          assert m['sha256']=='9460dc644e9680a4a17414a37923f4ff427090b271b234893bfc3567436d5fac'
+          assert m['signerSha256']=='b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006'
+          parts=sorted(glob.glob('release_upload/vc7/part*.b64'))
+          assert len(parts)==8
+          raw=''.join(Path(p).read_text('ascii') for p in parts)
+          assert len(raw)==14848776 and all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=' for c in raw)
+          binary=base64.b64decode(raw,validate=True)
+          assert len(binary)==11136581
+          digest=hashlib.sha256(binary).hexdigest()
+          assert digest==m['sha256'],f"SHA mismatch {digest}"
+          Path('/tmp/divulgador-vc7-signed.apk').write_bytes(binary)
+          print('APK SHA-256:',digest,'size:',len(binary))
+          PY
+      - name: Verificar assinatura IDENTICA VC6, package/versao e integridade
+        run: |
+          set -euo pipefail
+          APK=/tmp/divulgador-vc7-signed.apk
+          BT="$ANDROID_HOME/build-tools/34.0.0"
+          unzip -t "$APK" | tail -1
+          unzip -Z1 "$APK" | grep -qx classes.dex
+          unzip -Z1 "$APK" | grep -qx resources.arsc
+          unzip -Z1 "$APK" | grep -qx AndroidManifest.xml
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/divulgador-vc7-signer.txt
+          grep -qx Verifies /tmp/divulgador-vc7-signer.txt
+          ACTUAL="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/divulgador-vc7-signer.txt | head -1)"
+          test "$ACTUAL" = "b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006"
+          "$BT/aapt" dump badging "$APK" | tee /tmp/divulgador-vc7-badging.txt
+          grep -q "package: name='pt.vcaitano.divulgadormobile' versionCode='7' versionName='0.1.6'" /tmp/divulgador-vc7-badging.txt
+          echo "APK valido: mesmo certificado da VC6"
+      - name: Publicar APK assinado e atualizar apenas a entrada do Divulgador Mobile
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout -B main origin/main
+          git diff --exit-code origin/feature/divulgador-mobile-vc7-automacao-gmail-20261121 -- lab/sources/divulgador-mobile/android
+          grep -q '?: "7").toInt()' lab/sources/divulgador-mobile/android/app/build.gradle.kts
+          OUT=apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.6-vc7-release.apk
+          mkdir -p "$(dirname "$OUT")"
+          cp /tmp/divulgador-vc7-signed.apk "$OUT"
+          export APK_SHA="$(sha256sum "$OUT" | awk '{print $1}')"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          from datetime import datetime, timezone
+          f=Path('lab/catalog.json')
+          catalog=json.loads(f.read_text(encoding='utf-8'))
+          assert sum(x['id']=='divulgador-mobile' for x in catalog['apps'])==1
+          app=next(x for x in catalog['apps'] if x['id']=='divulgador-mobile')
+          assert app['packageName']=='pt.vcaitano.divulgadormobile'
+          assert app['candidate']['versionCode']==6, 'Recusar substituir versao desconhecida'
+          assert app['candidate']['signatureSha256']=='b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006'
+          assert os.environ['APK_SHA']=='9460dc644e9680a4a17414a37923f4ff427090b271b234893bfc3567436d5fac'
+          app['candidate']={
+            'versionCode':7,'versionName':'0.1.6',
+            'apkUrl':'https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.6-vc7-release.apk',
+            'sha256':os.environ['APK_SHA'],
+            'signatureSha256':'b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006',
+            'notes':'VC7: envio automático com fila local em segundo plano, várias contas Gmail (senha de app criptografada AndroidKeyStore), início/pausa, limites diários, CSV com consentimento, fotos. Envio real apenas para destinatários autorizados. Mesmo certificado da VC6: atualização sem desinstalar. Teste em Android real e com Gmail pendente.'
+          }
+          catalog['updatedAt']=datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+          f.write_text(json.dumps(catalog,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$OUT" lab/catalog.json
+          git commit -m "release(divulgador-mobile): VC7 0.1.6 Gmail automatico, assinatura VC6"
+          git push origin HEAD:main
+      - name: Verificar integridade da URL publica no GitHub
+        run: |
+          set -euo pipefail
+          URL=https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.6-vc7-release.apk
+          for i in 1 2 3 4 5; do
+            if curl -fsSL "$URL" -o /tmp/public-vc7.apk && cmp -s /tmp/public-vc7.apk /tmp/divulgador-vc7-signed.apk; then
+              echo "GitHub APK publico igual aos bytes assinados e verificados"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::Arquivo publico nao coincide"
+          exit 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Divulgador-Mobile-VC7-Release-Oficial
+          path: |
+            /tmp/divulgador-vc7-signed.apk
+            /tmp/divulgador-vc7-badging.txt
+            /tmp/divulgador-vc7-signer.txt
+          if-no-files-found: warn
