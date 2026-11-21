@@ -1,0 +1,129 @@
+name: Publicar Divulgador Mobile VC8 painel assinado no VOC Lab
+on:
+  push:
+    branches: [fix/divulgador-mobile-vc8-dashboard-20261121]
+    paths:
+      - release_upload/vc8/manifest.json
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: divulgador-mobile-vc8-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      - name: Restaurar APK ja assinado a partir de blocos com hash verificado
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,glob,base64,hashlib,re
+          m=json.loads(Path("release_upload/vc8/manifest.json").read_text())
+          assert m['packageName']=='pt.vcaitano.divulgadormobile'
+          assert m['versionCode']==8 and m['versionName']=='0.1.7'
+          assert m['signerSha256']=='b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006'
+          assert re.fullmatch('[a-f0-9]{64}',m['sha256'])
+          parts=sorted(glob.glob('release_upload/vc8/part*.b64'))
+          assert len(parts)==m['parts']
+          raw=''.join(Path(p).read_text('ascii').strip() for p in parts)
+          assert all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=' for c in raw)
+          binary=base64.b64decode(raw,validate=True)
+          assert len(binary)==m['size']
+          digest=hashlib.sha256(binary).hexdigest()
+          assert digest==m['sha256'],f'SHA-256 diferente: {digest}'
+          Path('/tmp/divulgador-mobile-vc8-release.apk').write_bytes(binary)
+          print('APK verificado SHA256',digest)
+          PY
+      - name: Confirmar mesma assinatura VC6/VC7, package, versao, manifesto, resources e DEX
+        run: |
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/34.0.0"
+          APK=/tmp/divulgador-mobile-vc8-release.apk
+          unzip -t "$APK" | tail -1
+          unzip -Z1 "$APK" | grep -qx AndroidManifest.xml
+          unzip -Z1 "$APK" | grep -qx classes.dex
+          unzip -Z1 "$APK" | grep -qx resources.arsc
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/vc8-signature.txt
+          grep -qx Verifies /tmp/vc8-signature.txt
+          CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/vc8-signature.txt | head -1)"
+          test "$CERT" = "b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006"
+          "$BT/aapt" dump badging "$APK" | tee /tmp/vc8-badging.txt
+          grep -q "package: name='pt.vcaitano.divulgadormobile' versionCode='8' versionName='0.1.7'" /tmp/vc8-badging.txt
+      - name: Atualizar somente fonte VC8, APK e entrada Divulgador Mobile no main
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout -B main origin/main
+          SOURCE_BRANCH=fix/divulgador-mobile-vc8-dashboard-20261121
+          for p in \
+            lab/sources/divulgador-mobile/android/app/build.gradle.kts \
+            lab/sources/divulgador-mobile/android/app/src/main/java/pt/vcaitano/divulgador/SendActivity.java \
+            docs/DIVULGADOR_MOBILE_VC8_CONTINUIDADE_20261121.md; do
+            git show "origin/$SOURCE_BRANCH:$p" > "$p"
+          done
+          grep -q '?: "8").toInt()' lab/sources/divulgador-mobile/android/app/build.gradle.kts
+          APK=apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.7-vc8-release.apk
+          mkdir -p "$(dirname "$APK")"
+          cp /tmp/divulgador-mobile-vc8-release.apk "$APK"
+          export APK_SHA="$(sha256sum "$APK" | awk '{print $1}')"
+          python3 - <<'PY'
+          import os,json
+          from datetime import datetime,timezone
+          from pathlib import Path
+          f=Path('lab/catalog.json')
+          data=json.loads(f.read_text(encoding='utf-8'))
+          assert sum(x['id']=='divulgador-mobile' for x in data['apps'])==1
+          item=next(x for x in data['apps'] if x['id']=='divulgador-mobile')
+          assert item['packageName']=='pt.vcaitano.divulgadormobile'
+          assert item['candidate']['versionCode']==7
+          assert item['candidate']['signatureSha256']=='b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006'
+          item['candidate']={
+            'versionCode':8,
+            'versionName':'0.1.7',
+            'apkUrl':'https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.7-vc8-release.apk',
+            'sha256':os.environ['APK_SHA'],
+            'signatureSha256':'b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006',
+            'notes':'VC8 candidata: painel no topo com percentual de envios, importados, autorizados, sem consentimento, pendentes na fila, enviados, falhas, incertos e bloqueados. Avisos claros sobre ausencia de consentimento; atualiza a cada 5 segundos. Mantem toda a logica Gmail/CSV/fotos VC7, mesma assinatura. Teste Android real pendente.'
+          }
+          data['updatedAt']=datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+          f.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$APK" lab/catalog.json \
+            lab/sources/divulgador-mobile/android/app/build.gradle.kts \
+            lab/sources/divulgador-mobile/android/app/src/main/java/pt/vcaitano/divulgador/SendActivity.java \
+            docs/DIVULGADOR_MOBILE_VC8_CONTINUIDADE_20261121.md
+          git commit -m "release(divulgador-mobile): painel e diagnostico envio VC8 assinado"
+          git push origin HEAD:main
+      - name: Comprovar APK publico igual ao APK assinado
+        run: |
+          set -euo pipefail
+          URL="https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.7-vc8-release.apk"
+          for n in 1 2 3 4 5; do
+            if curl -fsSL "$URL" -o /tmp/vc8-public.apk && cmp -s /tmp/vc8-public.apk /tmp/divulgador-mobile-vc8-release.apk; then
+              echo "Arquivo publico corresponde ao APK assinado e verificado"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::APK publico diferente";exit 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Divulgador-Mobile-VC8-Release-Assinado-Verificado
+          path: |
+            /tmp/divulgador-mobile-vc8-release.apk
+            /tmp/vc8-badging.txt
+            /tmp/vc8-signature.txt
+          if-no-files-found: warn
