@@ -10,6 +10,9 @@ import android.graphics.Color;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
@@ -62,16 +65,28 @@ public class SendActivity extends Activity {
             "\n\nSaiba mais em {link}\n\nCaso não deseje receber outras mensagens, responda REMOVER.",true);
         TextView contactsTitle=text("Destinatários autorizados",20);
         contactsTitle.setTypeface(null,1);p.addView(contactsTitle);
-        button(p,"IMPORTAR CSV COM CONSENTIMENTO",v->pickCsv());
-        TextView help=text("CSV obrigatório: Nome,Email,Consentimento\nConsentimento = sim / yes / true / 1. Os e-mails fictícios gerados pelo Gerador de CSV não servem como lista de envio.",13);
+        button(p,"IMPORTAR CSV",v->pickCsv());
+        TextView help=text("Aceita CSV com vírgula ou ponto e vírgula. A coluna Email é obrigatória; Consentimento é opcional na importação. Listas sem consentimento são carregadas para configurar e visualizar, mas não podem ser enviadas sem autorização. Endereços gerados são fictícios.",13);
         help.setTextColor(0xff655D52);p.addView(help);
         recipient=text("",16);p.addView(recipient);
         stats=text("",14);p.addView(stats);
+        button(p,"VER PRÉVIA DO E-MAIL",v->previewEmail());
         button(p,"✉ ABRIR E-MAIL PARA ENVIO",v->compose());
         button(p,"✓ MARCAR ENVIO CONFIRMADO",v->confirm());
         button(p,"PRÓXIMO DESTINATÁRIO",v->next());
         button(p,"BLOQUEAR / DESCADASTRAR",v->block());
         restore();refresh();
+        // O gerador passa apenas o nome do arquivo no cache privado (evita limite do Intent).
+        String generated=getIntent().getStringExtra("import_generated_file");
+        if(generated!=null){
+            if(!generated.matches("divulgador-gerado-[0-9]+\\.csv")){
+                Toast.makeText(this,"Origem de importação inválida.",Toast.LENGTH_LONG).show();
+            }else{
+                File source=new File(getCacheDir(),generated);
+                stats.setText("Carregando CSV criado no Gerador...");
+                readGeneratedFile(source);
+            }
+        }
     }
     private void pickCsv(){
         Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -79,82 +94,117 @@ public class SendActivity extends Activity {
         i.setType("*/*");
         startActivityForResult(i,PICK_CSV);
     }
-    private static ArrayList<String[]> parseCsv(String data){
-        ArrayList<String[]> rows=new ArrayList<>();
-        ArrayList<String> row=new ArrayList<>();
-        StringBuilder cell=new StringBuilder();boolean inQuote=false;
-        for(int i=0;i<data.length();i++){
-            char ch=data.charAt(i);
-            if(ch=='"'){
-                if(inQuote&&i+1<data.length()&&data.charAt(i+1)=='"'){cell.append('"');i++;}
-                else inQuote=!inQuote;
-            }else if(ch==','&&!inQuote){row.add(cell.toString());cell.setLength(0);}
-            else if((ch=='\n'||ch=='\r')&&!inQuote){
-                if(ch=='\r'&&i+1<data.length()&&data.charAt(i+1)=='\n')i++;
-                row.add(cell.toString());cell.setLength(0);
-                if(row.size()>1||!row.get(0).isEmpty())rows.add(row.toArray(new String[0]));
-                row=new ArrayList<>();
-            }else cell.append(ch);
-        }
-        if(inQuote)throw new IllegalArgumentException("Aspas incompletas no CSV");
-        if(cell.length()>0||!row.isEmpty()){
-            row.add(cell.toString());rows.add(row.toArray(new String[0]));
-        }
-        return rows;
-    }
     private static String normalizeHeader(String text){
         return Normalizer.normalize(text,Normalizer.Form.NFD)
             .replaceAll("\\p{M}+","").replace("\uFEFF","")
             .trim().toLowerCase(Locale.ROOT).replace(" ","_");
     }
+    private static String readCsv(InputStream stream) throws Exception {
+        if(stream==null) throw new IllegalArgumentException("Arquivo não acessível");
+        try(BufferedReader in=new BufferedReader(new InputStreamReader(stream,StandardCharsets.UTF_8))){
+            StringBuilder csv=new StringBuilder();
+            char[] buffer=new char[8192];int count;
+            while((count=in.read(buffer))!=-1){
+                csv.append(buffer,0,count);
+                if(csv.length()>18_000_000)throw new IllegalArgumentException("CSV maior que 18 MB");
+            }
+            return csv.toString();
+        }
+    }
+    private void readGeneratedFile(File source){
+        new Thread(()->{
+            try{
+                if(!source.isFile() || source.length()>18_000_000)
+                    throw new IllegalArgumentException("Arquivo gerado ausente ou muito grande");
+                String csv=readCsv(new FileInputStream(source));
+                source.delete();
+                importCsvText(csv,true);
+            }catch(Exception ex){
+                runOnUiThread(()->Toast.makeText(this,"Importação direta: "+ex.getMessage(),Toast.LENGTH_LONG).show());
+            }
+        }).start();
+    }
     @Override protected void onActivityResult(int code,int status,Intent data){
         super.onActivityResult(code,status,data);
         if(code!=PICK_CSV||status!=RESULT_OK||data==null||data.getData()==null)return;
+        Uri uri=data.getData();
+        stats.setText("Lendo lista CSV...");
+        new Thread(()->{
+            try{importCsvText(readCsv(getContentResolver().openInputStream(uri)),false);}
+            catch(Exception ex){runOnUiThread(()->Toast.makeText(this,"CSV: "+ex.getMessage(),Toast.LENGTH_LONG).show());}
+        }).start();
+    }
+    private static boolean isApproved(String text){
+        String value=text.trim().toLowerCase(Locale.ROOT);
+        return value.equals("sim")||value.equals("yes")||value.equals("true")||
+               value.equals("1")||value.equals("consentido")||value.equals("autorizado");
+    }
+    private void importCsvText(String csv,boolean generated){
+        // Processa fora da thread visual, inclusive listas maiores.
         try{
-            StringBuilder csv=new StringBuilder();
-            try(BufferedReader in=new BufferedReader(new InputStreamReader(getContentResolver().openInputStream(data.getData()),StandardCharsets.UTF_8))){
-                String line;
-                while((line=in.readLine())!=null){
-                    csv.append(line).append('\n');
-                    if(csv.length()>4_000_000)throw new IllegalArgumentException("CSV maior que 4MB");
-                }
-            }
-            ArrayList<String[]> rows=parseCsv(csv.toString());
+            ArrayList<String[]> rows=CsvFormat.parse(csv);
             if(rows.isEmpty())throw new IllegalArgumentException("CSV vazio");
             int e=-1,n=-1,c=-1;
             for(int i=0;i<rows.get(0).length;i++){
                 String key=normalizeHeader(rows.get(0)[i]);
                 if(key.equals("email")||key.equals("e-mail"))e=i;
                 if(key.equals("nome")||key.equals("name"))n=i;
-                if(key.equals("consentimento")||key.equals("consent")||key.equals("opt_in")||key.equals("permissao"))c=i;
+                if(key.equals("consentimento")||key.equals("consent")||
+                   key.equals("opt_in")||key.equals("permissao"))c=i;
             }
-            if(e<0||c<0)throw new IllegalArgumentException("É necessário ter as colunas Email e Consentimento");
+            if(e<0)throw new IllegalArgumentException("Coluna Email não encontrada. Use Email;Nome;Cidade;Idade;Consentimento");
+            ArrayList<JSONObject> incoming=new ArrayList<>();
             HashSet<String> seen=new HashSet<>();
-            for(JSONObject x:contacts)seen.add(x.optString("email"));
-            int added=0,skipped=0;
+            int invalid=0,approved=0,pending=0;
             for(int i=1;i<rows.size();i++){
                 String[] fields=rows.get(i);
-                if(e>=fields.length||c>=fields.length){skipped++;continue;}
+                if(e>=fields.length){invalid++;continue;}
                 String email=fields[e].trim().toLowerCase(Locale.ROOT);
-                String yes=fields[c].trim().toLowerCase(Locale.ROOT);
-                boolean allowed=yes.equals("sim")||yes.equals("yes")||yes.equals("true")||
-                    yes.equals("1")||yes.equals("consentido")||yes.equals("autorizado");
-                if(!allowed||!EMAIL.matcher(email).matches()||blocked.contains(email)||!seen.add(email)){
-                    skipped++;continue;
-                }
+                if(!EMAIL.matcher(email).matches() || !seen.add(email)){invalid++;continue;}
+                boolean consent=!generated && c>=0 && c<fields.length && isApproved(fields[c]);
                 JSONObject ob=new JSONObject();
                 ob.put("email",email);
-                ob.put("name",n>=0&&n<fields.length?fields[n].trim():"");
-                contacts.add(ob);added++;
+                ob.put("name",n>=0 && n<fields.length?fields[n].trim():"");
+                ob.put("consented",consent);
+                ob.put("synthetic",generated);
+                incoming.add(ob);
+                if(consent)approved++; else pending++;
             }
-            save();refresh();
-            Toast.makeText(this,"Importados "+added+" · Ignorados "+skipped,Toast.LENGTH_LONG).show();
-        }catch(Exception ex){Toast.makeText(this,"CSV: "+ex.getMessage(),Toast.LENGTH_LONG).show();}
+            final int malformed=invalid,valid=approved,waiting=pending;
+            runOnUiThread(()->{
+                HashMap<String,JSONObject> present=new HashMap<>();
+                for(JSONObject obj:contacts)present.put(obj.optString("email"),obj);
+                int imported=0,updated=0;
+                for(JSONObject obj:incoming){
+                    String email=obj.optString("email");
+                    if(blocked.contains(email))continue;
+                    JSONObject existing=present.get(email);
+                    if(existing!=null){
+                        if(!existing.optBoolean("consented",false) && obj.optBoolean("consented",false)){
+                            try{existing.put("consented",true);existing.put("synthetic",false);}catch(Exception ignored){}
+                            updated++;
+                        }
+                    }else{
+                        contacts.add(obj);present.put(email,obj);imported++;
+                    }
+                }
+                // Se a fila antiga terminou, localiza os contatos importados.
+                if(current>=contacts.size())current=0;
+                save();refresh();
+                Toast.makeText(this,"Carregados: "+imported+" · Autorizados: "+valid+
+                    " · Pendentes: "+waiting+" · Inválidos: "+malformed+
+                    (updated>0?" · Autorizações atualizadas: "+updated:""),Toast.LENGTH_LONG).show();
+            });
+        }catch(Exception ex){
+            runOnUiThread(()->Toast.makeText(this,"CSV: "+ex.getMessage(),Toast.LENGTH_LONG).show());
+        }
     }
     private JSONObject active(){
         while(current<contacts.size()){
             JSONObject obj=contacts.get(current);
-            if(!blocked.contains(obj.optString("email"))&&!confirmed.contains(obj.optString("email")))return obj;
+            if(!blocked.contains(obj.optString("email")) &&
+               !confirmed.contains(obj.optString("email")) &&
+               obj.optBoolean("consented",false))return obj;
             current++;
         }
         return null;
@@ -166,9 +216,21 @@ public class SendActivity extends Activity {
     }
     private void refresh(){
         JSONObject obj=active();
-        recipient.setText(obj==null?"Nenhum destinatário pendente.":"Destinatário: "+obj.optString("name")+" <"+obj.optString("email")+">");
-        stats.setText("Importados: "+contacts.size()+"  · Confirmados: "+confirmed.size()+
-            "  · Bloqueados: "+blocked.size()+"  · Pendentes: "+remaining());
+        if(obj==null && !contacts.isEmpty()){
+            JSONObject sample=contacts.get(0);
+            recipient.setText("Lista carregada para configurar. Exemplo: "+sample.optString("name")+
+                " <"+sample.optString("email")+">");
+        }else{
+            recipient.setText(obj==null?"Importe uma lista CSV.":"Próximo autorizado: "+obj.optString("name")+" <"+obj.optString("email")+">");
+        }
+        int authorized=0,pending=0;
+        for(JSONObject row:contacts){
+            if(!row.optBoolean("consented",false))pending++;
+            else if(!confirmed.contains(row.optString("email"))&&!blocked.contains(row.optString("email")))authorized++;
+        }
+        stats.setText("Importados: "+contacts.size()+" · Autorizados a enviar: "+authorized+
+            " · Sem consentimento: "+pending+" · Envio confirmado: "+confirmed.size()+
+            " · Bloqueados: "+blocked.size());
     }
     private String fill(String template,JSONObject obj){
         String name=obj.optString("name");
@@ -177,9 +239,18 @@ public class SendActivity extends Activity {
             .replace("{produto}",product.getText().toString())
             .replace("{link}",link.getText().toString());
     }
+    private void previewEmail(){
+        JSONObject sample=active();
+        if(sample==null && !contacts.isEmpty())sample=contacts.get(0);
+        if(sample==null){Toast.makeText(this,"Importe ou gere uma lista primeiro.",Toast.LENGTH_LONG).show();return;}
+        new AlertDialog.Builder(this)
+            .setTitle(fill(subject.getText().toString(),sample))
+            .setMessage("Para: "+sample.optString("email")+"\n\n"+fill(body.getText().toString(),sample))
+            .setPositiveButton("Fechar",null).show();
+    }
     private void compose(){
         JSONObject obj=active();
-        if(obj==null){Toast.makeText(this,"Importe destinatários autorizados.",Toast.LENGTH_LONG).show();return;}
+        if(obj==null){Toast.makeText(this,"Lista pronta para configurar, mas nenhum destinatário possui consentimento de envio. Importe uma lista autorizada.",Toast.LENGTH_LONG).show();return;}
         String email=obj.optString("email");
         Intent out=new Intent(Intent.ACTION_SENDTO);
         out.setData(Uri.fromParts("mailto",email,null));
