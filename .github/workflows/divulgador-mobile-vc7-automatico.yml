@@ -66,6 +66,8 @@ jobs:
           "$BT/zipalign" -f -p 4 "$RELEASE" "$RUNNER_TEMP/VC7-release-ALINHADO-SEM-ASSINAR.apk"
           "$BT/zipalign" -c -p 4 "$RUNNER_TEMP/VC7-release-ALINHADO-SEM-ASSINAR.apk"
           cp "$BT/lib/apksigner.jar" "$RUNNER_TEMP/apksigner.jar"
+          cp "$RUNNER_TEMP/VC7-release-ALINHADO-SEM-ASSINAR.apk" "$ROOT/app/build/outputs/apk/release/VC7-release-ALINHADO-SEM-ASSINAR.apk"
+          cp "$RUNNER_TEMP/apksigner.jar" "$ROOT/app/build/outputs/apk/release/apksigner.jar"
           echo "NUNCA PUBLICAR DEBUG/UNSIGNED COMO ATUALIZACAO. Assinar com cert VC6."
       - uses: actions/upload-artifact@v4
         if: always()
@@ -74,9 +76,6 @@ jobs:
           path: |
             lab/sources/divulgador-mobile/android/app/build/outputs/apk/debug/app-debug.apk
             lab/sources/divulgador-mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
-            /tmp/*/VC7-release-ALINHADO-SEM-ASSINAR.apk
-            /tmp/*/apksigner.jar
-            /tmp/*/badging-debug.txt
-            /tmp/*/signature-debug.txt
-            /tmp/*/sha-debug.txt
+            lab/sources/divulgador-mobile/android/app/build/outputs/apk/release/VC7-release-ALINHADO-SEM-ASSINAR.apk
+            lab/sources/divulgador-mobile/android/app/build/outputs/apk/release/apksigner.jar
           if-no-files-found: warn
