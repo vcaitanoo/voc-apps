@@ -1,0 +1,82 @@
+name: Divulgador Mobile VC7 automatico multi Gmail
+on:
+  push:
+    branches: [feature/divulgador-mobile-vc7-automacao-gmail-20261121]
+    paths:
+      - '.github/workflows/divulgador-mobile-vc7-automatico.yml'
+      - 'lab/sources/divulgador-mobile/android/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ROOT: lab/sources/divulgador-mobile/android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Validar regras e package VC7
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('lab/sources/divulgador-mobile/android/app')
+          b=(p/'build.gradle.kts').read_text()
+          send=(p/'src/main/java/pt/vcaitano/divulgador/SendActivity.java').read_text()
+          work=(p/'src/main/java/pt/vcaitano/divulgador/AutoMailWorker.java').read_text()
+          acc=(p/'src/main/java/pt/vcaitano/divulgador/GmailAccounts.java').read_text()
+          assert 'applicationId = "pt.vcaitano.divulgadormobile"' in b
+          assert '?: "7").toInt()' in b and '?: "0.1.6"' in b
+          assert 'androidx.work:work-runtime' in b and 'com.sun.mail:android-mail' in b
+          assert 'PhotoAttachments' in send and 'AutoMailWorker.start(this)' in send
+          assert 'AutoMailWorker.pause(this)' in send and 'GERENCIAR CONTAS GMAIL' in send
+          assert 'BATCH_MAX=8' in work and 'MIN_INTERVAL_MS=30000' in work
+          assert 'AES/GCM/NoPadding' in acc and 'AndroidKeyStore' in acc
+          print("Contrato VC7: OK")
+          PY
+      - name: Compilar APKs Debug e Release com Gradle
+        run: gradle -p "$ROOT" --no-daemon :app:assembleDebug :app:assembleRelease
+      - name: Validar APK Debug e preparar Release sem assinar
+        run: |
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/34.0.0"
+          APK="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          unzip -t "$APK" | tail -1
+          unzip -Z1 "$APK" | grep -qx classes.dex
+          unzip -Z1 "$APK" | grep -qx resources.arsc
+          unzip -Z1 "$APK" | grep -qx AndroidManifest.xml
+          "$BT/aapt" dump badging "$APK" | tee "$RUNNER_TEMP/badging-debug.txt"
+          grep -q "package: name='pt.vcaitano.divulgadormobile' versionCode='7' versionName='0.1.6'" "$RUNNER_TEMP/badging-debug.txt"
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/signature-debug.txt"
+          grep -qx Verifies "$RUNNER_TEMP/signature-debug.txt"
+          sha256sum "$APK" | tee "$RUNNER_TEMP/sha-debug.txt"
+          RELEASE="$ROOT/app/build/outputs/apk/release/app-release-unsigned.apk"
+          test -s "$RELEASE"
+          "$BT/zipalign" -f -p 4 "$RELEASE" "$RUNNER_TEMP/VC7-release-ALINHADO-SEM-ASSINAR.apk"
+          "$BT/zipalign" -c -p 4 "$RUNNER_TEMP/VC7-release-ALINHADO-SEM-ASSINAR.apk"
+          cp "$BT/lib/apksigner.jar" "$RUNNER_TEMP/apksigner.jar"
+          echo "NUNCA PUBLICAR DEBUG/UNSIGNED COMO ATUALIZACAO. Assinar com cert VC6."
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Divulgador-Mobile-VC7-APKs-e-assinador
+          path: |
+            lab/sources/divulgador-mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            lab/sources/divulgador-mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
+            /tmp/*/VC7-release-ALINHADO-SEM-ASSINAR.apk
+            /tmp/*/apksigner.jar
+            /tmp/*/badging-debug.txt
+            /tmp/*/signature-debug.txt
+            /tmp/*/sha-debug.txt
+          if-no-files-found: warn
