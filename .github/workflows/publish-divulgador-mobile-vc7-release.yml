@@ -1,0 +1,128 @@
+name: Publicar Divulgador Mobile VC7 com assinatura VC6
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: divulgador-mobile-release
+      cancel-in-progress: false
+    env:
+      ROOT: lab/sources/divulgador-mobile/android
+      EXPECTED_SIGNER: b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006
+      DIVULGADOR_KEYSTORE_PASSWORD: ${{ secrets.DIVULGADOR_MOBILE_KEYSTORE_PASSWORD }}
+      KEYSTORE_B64: ${{ secrets.DIVULGADOR_MOBILE_KEYSTORE_B64 }}
+      DIVULGADOR_KEY_ALIAS: divulgador-mobile-release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Exigir secrets e recuperar a MESMA chave VC6
+        run: |
+          set -euo pipefail
+          if [ -z "$DIVULGADOR_KEYSTORE_PASSWORD" ] || [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::Faltam DIVULGADOR_MOBILE_KEYSTORE_B64 e/ou DIVULGADOR_MOBILE_KEYSTORE_PASSWORD"
+            exit 1
+          fi
+          echo "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/divulgador-mobile-release.p12"
+          chmod 600 "$RUNNER_TEMP/divulgador-mobile-release.p12"
+          echo "DIVULGADOR_KEYSTORE_PATH=$RUNNER_TEMP/divulgador-mobile-release.p12" >> "$GITHUB_ENV"
+          keytool -list -storetype PKCS12 -keystore "$RUNNER_TEMP/divulgador-mobile-release.p12" -storepass "$DIVULGADOR_KEYSTORE_PASSWORD" \
+            | grep -q "divulgador-mobile-release"
+          echo "Keystore acessivel. Fingerprint será conferido no APK final."
+      - name: Compilar Release assinado a partir do codigo-fonte
+        run: |
+          set -euo pipefail
+          grep -q 'applicationId = "pt.vcaitano.divulgadormobile"' "$ROOT/app/build.gradle.kts"
+          grep -q '?: "7").toInt()' "$ROOT/app/build.gradle.kts"
+          grep -q '?: "0.1.6"' "$ROOT/app/build.gradle.kts"
+          gradle -p "$ROOT" --no-daemon :app:assembleRelease
+      - name: Validar APK firmado com fingerprint VC6
+        run: |
+          set -euo pipefail
+          APK="$ROOT/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          BT="$ANDROID_HOME/build-tools/34.0.0"
+          unzip -t "$APK" | tail -1
+          unzip -Z1 "$APK" | grep -qx classes.dex
+          unzip -Z1 "$APK" | grep -qx AndroidManifest.xml
+          unzip -Z1 "$APK" | grep -qx resources.arsc
+          "$BT/aapt" dump badging "$APK" | tee "$RUNNER_TEMP/badging.txt"
+          grep -q "package: name='pt.vcaitano.divulgadormobile' versionCode='7' versionName='0.1.6'" "$RUNNER_TEMP/badging.txt"
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/signature.txt"
+          grep -qx Verifies "$RUNNER_TEMP/signature.txt"
+          CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/signature.txt" | head -1)"
+          test "$CERT" = "$EXPECTED_SIGNER"
+          sha256sum "$APK" | tee "$RUNNER_TEMP/sha256.txt"
+          echo "ASSINATURA VC6 IDENTICA: $CERT"
+      - name: Publicar APK candidato GitHub e atualizar somente entrada Divulgador Mobile
+        run: |
+          set -euo pipefail
+          OUT="apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.6-vc7-release.apk"
+          mkdir -p "$(dirname "$OUT")"
+          cp "$ROOT/app/build/outputs/apk/release/app-release.apk" "$OUT"
+          export APK_SHA="$(sha256sum "$OUT" | awk '{print $1}')"
+          export EXPECTED_SIGNER
+          python3 - <<'PY'
+          import json,os
+          from datetime import datetime,timezone
+          from pathlib import Path
+          path=Path('lab/catalog.json')
+          data=json.loads(path.read_text(encoding='utf-8'))
+          entry=next((x for x in data['apps'] if x['id']=='divulgador-mobile'),None)
+          assert entry is not None and entry['packageName']=='pt.vcaitano.divulgadormobile'
+          assert entry['candidate']['versionCode']==6, "Expected VC6 candidate; refuse overwrite"
+          assert entry['candidate']['signatureSha256']==os.environ['EXPECTED_SIGNER']
+          assert data['apps'].count(entry)==1
+          entry['candidate']={
+            'versionCode':7,
+            'versionName':'0.1.6',
+            'apkUrl':'https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.6-vc7-release.apk',
+            'sha256':os.environ['APK_SHA'],
+            'signatureSha256':os.environ['EXPECTED_SIGNER'],
+            'notes':'VC7 candidata: varias contas Gmail com senha de app criptografada localmente, fila automatica persistente via WorkManager, intervalo minimo 30s, limite por conta, parar/pausar, fotos e CSV existentes. Somente contatos autorizados. Assinatura VC6 preservada. Teste Android real pendente.'
+          }
+          data['updatedAt']=datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+          path.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$OUT" lab/catalog.json
+          git commit -m "release(divulgador-mobile): VC7 0.1.6 assinado mesma chave VC6"
+          git push origin HEAD:main
+      - name: Conferir bytes do arquivo publico
+        run: |
+          set -euo pipefail
+          PUBLIC_URL="https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.6-vc7-release.apk"
+          for i in 1 2 3 4 5; do
+            if curl -fsSL "$PUBLIC_URL" -o "$RUNNER_TEMP/public.apk" && cmp -s "$RUNNER_TEMP/public.apk" "$ROOT/app/build/outputs/apk/release/app-release.apk"; then
+              echo "APK PUBLICO INTEGRO"
+              exit 0
+            fi
+            sleep 3
+          done
+          exit 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Divulgador-Mobile-VC7-Release-Verificado
+          path: |
+            lab/sources/divulgador-mobile/android/app/build/outputs/apk/release/app-release.apk
+            lab/catalog.json
+          if-no-files-found: warn
