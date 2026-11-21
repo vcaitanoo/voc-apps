@@ -26,7 +26,7 @@ public class SendActivity extends Activity {
     private static final Pattern EMAIL=Pattern.compile("^[A-Za-z0-9_+.%'-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
     private EditText subject, body, product, link;
     private PhotoAttachments photoAttachments;
-    private TextView recipient, stats;
+    private TextView recipient, stats, automaticStatus;
     private final ArrayList<JSONObject> contacts=new ArrayList<>();
     private final HashSet<String> confirmed=new HashSet<>(), blocked=new HashSet<>();
     private int current=0;
@@ -73,12 +73,27 @@ public class SendActivity extends Activity {
         help.setTextColor(0xff655D52);p.addView(help);
         recipient=text("",16);p.addView(recipient);
         stats=text("",14);p.addView(stats);
+        TextView autoTitle=text("Envio automático Gmail",21);
+        autoTitle.setTypeface(null,1);p.addView(autoTitle);
+        p.addView(text("Configure várias contas Gmail, prepare a fila e toque uma única vez em INICIAR. Os envios autorizados são processados automaticamente, sem abrir o Gmail para cada contato.",14));
+        button(p,"GERENCIAR CONTAS GMAIL",v->startActivity(
+            new Intent(this,GmailAccountsActivity.class)));
+        button(p,"PREPARAR FILA COM CONTATOS AUTORIZADOS",v->prepareAutoQueue(false));
+        button(p,"▶ INICIAR ENVIO AUTOMÁTICO",v->confirmAutoStart());
+        button(p,"⏸ PAUSAR ENVIO AUTOMÁTICO",v->{
+            AutoMailWorker.pause(this);
+            updateAutomaticStatus();
+            Toast.makeText(this,"Fila automática pausada.",Toast.LENGTH_LONG).show();
+        });
+        button(p,"ATUALIZAR ESTATÍSTICAS DA FILA",v->updateAutomaticStatus());
+        automaticStatus=text("",14);p.addView(automaticStatus);
         button(p,"VER PRÉVIA DO E-MAIL",v->previewEmail());
         button(p,"✉ ABRIR E-MAIL PARA ENVIO",v->compose());
         button(p,"✓ MARCAR ENVIO CONFIRMADO",v->confirm());
         button(p,"PRÓXIMO DESTINATÁRIO",v->next());
         button(p,"BLOQUEAR / DESCADASTRAR",v->block());
         restore();refresh();
+        updateAutomaticStatus();
         // O gerador passa apenas o nome do arquivo no cache privado (evita limite do Intent).
         String generated=getIntent().getStringExtra("import_generated_file");
         if(generated!=null){
@@ -94,6 +109,104 @@ public class SendActivity extends Activity {
             pickCsv();
         }
     }
+    @Override protected void onResume(){
+        super.onResume();
+        if(automaticStatus!=null)updateAutomaticStatus();
+    }
+
+    private void updateAutomaticStatus(){
+        if(automaticStatus==null)return;
+        AutoMailQueue q=new AutoMailQueue(this);
+        try{
+            AutoMailQueue.Status status=q.status();
+            automaticStatus.setText(
+                (status.running?"● ENVIO AUTOMÁTICO ATIVO":"○ ENVIO PAUSADO")+
+                "\nNa fila: "+status.waiting+" · Enviados: "+status.sent+
+                " · Falhas: "+status.failed+" · Incertos: "+status.uncertain+
+                " · Bloqueados: "+status.blocked+
+                (status.error.isEmpty()?"":"\nAviso: "+status.error)+
+                "\nO Android pode atrasar tarefas em segundo plano para poupar bateria.");
+        }finally{q.close();}
+    }
+
+    private int eligibleCount(){
+        int total=0;
+        for(JSONObject obj:contacts)
+            if(obj.optBoolean("consented",false) && !obj.optBoolean("synthetic",false) &&
+               !blocked.contains(obj.optString("email")) &&
+               !confirmed.contains(obj.optString("email")))total++;
+        return total;
+    }
+
+    private void prepareAutoQueue(boolean startAfter){
+        final ArrayList<JSONObject> snapshot=new ArrayList<>();
+        for(JSONObject obj:contacts){
+            if(obj.optBoolean("consented",false) && !obj.optBoolean("synthetic",false) &&
+               !blocked.contains(obj.optString("email")) &&
+               !confirmed.contains(obj.optString("email")))snapshot.add(obj);
+        }
+        if(snapshot.isEmpty() && !startAfter){
+            Toast.makeText(this,"Sem destinatários autorizados para envio. E-mails gerados fictícios não entram na fila.",Toast.LENGTH_LONG).show();
+            return;
+        }
+        final String title=subject.getText().toString();
+        final String message=body.getText().toString();
+        final String campaign=product.getText().toString();
+        final String address=link.getText().toString();
+        new Thread(()->{
+            AutoMailQueue queue=new AutoMailQueue(this);
+            try{
+                int inserted=queue.enqueueAuthorized(snapshot,title,message,campaign,address);
+                if(startAfter && queue.status().waiting>0){
+                    AutoMailWorker.start(this);
+                }
+                runOnUiThread(()->{
+                    updateAutomaticStatus();
+                    Toast.makeText(this,inserted+" novo(s) destinatário(s) incluído(s) na fila.",
+                        Toast.LENGTH_LONG).show();
+                });
+            }catch(Exception error){
+                runOnUiThread(()->Toast.makeText(this,
+                    "Falha ao preparar fila: "+error.getMessage(),Toast.LENGTH_LONG).show());
+            }finally{queue.close();}
+        }).start();
+    }
+
+    private void confirmAutoStart(){
+        int eligible=eligibleCount();
+        AutoMailQueue queue=new AutoMailQueue(this);
+        AutoMailQueue.Status before=queue.status();
+        queue.close();
+        try{
+            int configured=0;
+            for(GmailAccounts.Account item:new GmailAccounts(this).list())
+                if(item.enabled)configured++;
+            if(configured==0){
+                Toast.makeText(this,"Adicione e ative pelo menos uma conta Gmail.",Toast.LENGTH_LONG).show();
+                startActivity(new Intent(this,GmailAccountsActivity.class));
+                return;
+            }
+        }catch(Exception error){
+            Toast.makeText(this,"Erro ao consultar contas Gmail.",Toast.LENGTH_LONG).show();
+            return;
+        }
+        if(eligible==0 && before.waiting==0){
+            Toast.makeText(this,"Não há contatos autorizados. Importe lista com consentimento.",Toast.LENGTH_LONG).show();
+            return;
+        }
+        new AlertDialog.Builder(this)
+            .setTitle("Iniciar envio automático?")
+            .setMessage("A campanha enviará os e-mails da fila sem confirmação individual.\n"+
+                "Autorizados nesta tela: "+eligible+"\n"+
+                "Pendentes na fila: "+before.waiting+"\n\n"+
+                "Intervalo mínimo: 30 segundos entre e-mails. "+
+                "Só serão enviados contatos autorizados. "+
+                "O serviço pausa em bloqueios do Gmail. "+
+                "Você pode PAUSAR a qualquer momento.")
+            .setNegativeButton("Cancelar",null)
+            .setPositiveButton("INICIAR",(d,w)->prepareAutoQueue(true)).show();
+    }
+
     private void pickCsv(){
         Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
@@ -304,13 +417,19 @@ public class SendActivity extends Activity {
             .setMessage("Você confirmou que o aplicativo de e-mail realmente enviou esta mensagem?")
             .setNegativeButton("Não",null)
             .setPositiveButton("Sim, enviada",(d,w)->{
-                confirmed.add(obj.optString("email"));current++;save();refresh();
+                confirmed.add(obj.optString("email"));
+                AutoMailQueue queue=new AutoMailQueue(this);
+                queue.manualSent(obj.optString("email"));queue.close();
+                current++;save();refresh();updateAutomaticStatus();
             }).show();
     }
     private void next(){if(active()!=null)current++;refresh();}
     private void block(){
         JSONObject obj=active();if(obj==null)return;
-        blocked.add(obj.optString("email"));current++;save();refresh();
+        blocked.add(obj.optString("email"));
+        AutoMailQueue queue=new AutoMailQueue(this);
+        queue.block(obj.optString("email"));queue.close();
+        current++;save();refresh();updateAutomaticStatus();
     }
     private void save(){
         JSONArray c=new JSONArray();for(JSONObject x:contacts)c.put(x);
