@@ -44,6 +44,7 @@ jobs:
           root=Path('lab/sources/divulgador/android/app/src/main/java/pt/vcaitano/divulgador')
           g=(root/'GeneratorActivity.java').read_text()
           s=(root/'SendActivity.java').read_text()
+          main=(root/'MainActivity.kt').read_text()
           b=Path('lab/sources/divulgador/android/app/build.gradle.kts').read_text()
           assert 'USAR NO DIVULGADOR' in g
           assert 'next.putExtra("import_generated_file", file.getName());' in g
@@ -54,6 +55,8 @@ jobs:
           assert 'if(e<0)' in s and 'if(e<0||c<0)' not in s
           assert 'obj.optBoolean("consented",false)' in s
           assert 'VER PRÉVIA DO E-MAIL' in s
+          assert 'IMPORTAR CSV E CONFIGURAR' in main
+          assert 'getBooleanExtra("pick_csv_on_start",false)' in s
           assert '?: "5").toInt()' in b and '?: "0.1.4"' in b
           print("Fluxo de transferencia, importador e versão: OK")
           PY
