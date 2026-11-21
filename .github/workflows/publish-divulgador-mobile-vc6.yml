@@ -1,0 +1,105 @@
+name: Publicar Divulgador Mobile VC6 assinado no VOC Lab
+on:
+  push:
+    branches: [feature/divulgador-vc6-fotos-20261121]
+    paths:
+      - '.github/workflows/publish-divulgador-mobile-vc6.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      - name: Obter APK release imutavel da compilacao confirmada
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git diff --quiet 3a0cf8c5d7b7626beac5fe4972277bbcda982aea HEAD -- lab/sources/divulgador/android
+          curl --fail --location --retry 3 --silent --show-error -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/vcaitanoo/voc-apps/actions/artifacts/14687361948/zip" \
+            -o "$RUNNER_TEMP/release.zip"
+          unzip -p "$RUNNER_TEMP/release.zip" "Divulgador-Mobile-0.1.5-vc6-release.apk" > "$RUNNER_TEMP/verified.apk"
+          unzip -p "$RUNNER_TEMP/release.zip" "Divulgador-Mobile-Assinatura-CIFRADA.cms" > "$RUNNER_TEMP/backup.cms"
+          test -s "$RUNNER_TEMP/backup.cms"
+          printf 'c7e426939fd6526b634db315c87b4a63d6636fab0f0692afbc1f2af5f23e1ca3  %s\n' "$RUNNER_TEMP/verified.apk" | sha256sum --check
+      - name: Verificar package, versionCode, resources, DEX e certificado
+        run: |
+          set -euo pipefail
+          APK="$RUNNER_TEMP/verified.apk"
+          unzip -t "$APK" | tail -1
+          unzip -Z1 "$APK" | grep -qx classes.dex
+          unzip -Z1 "$APK" | grep -qx AndroidManifest.xml
+          unzip -Z1 "$APK" | grep -qx resources.arsc
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | tee /tmp/mobile-badging
+          grep -q "package: name='pt.vcaitano.divulgadormobile' versionCode='6' versionName='0.1.5'" /tmp/mobile-badging
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/mobile-signature
+          CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/mobile-signature | head -1)"
+          test "$CERT" = "b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006"
+      - name: Preservar codigo antigo e adicionar novo aplicativo assinado
+        run: |
+          set -euo pipefail
+          cp -a lab/sources/divulgador/android "$RUNNER_TEMP/mobile-source"
+          git fetch origin main
+          git checkout -B main origin/main
+          test ! -e lab/sources/divulgador-mobile/android
+          mkdir -p lab/sources/divulgador-mobile
+          cp -a "$RUNNER_TEMP/mobile-source" lab/sources/divulgador-mobile/android
+          APK="apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.5-vc6-release.apk"
+          mkdir -p "$(dirname "$APK")"
+          cp "$RUNNER_TEMP/verified.apk" "$APK"
+          export APK_SHA="$(sha256sum "$APK" | cut -d' ' -f1)"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          from datetime import datetime,timezone
+          p=Path("lab/catalog.json")
+          cat=json.loads(p.read_text(encoding="utf-8"))
+          assert not any(a.get("id")=="divulgador-mobile" for a in cat["apps"])
+          old=next(a for a in cat["apps"] if a.get("id")=="divulgador")
+          assert old["packageName"]=="pt.vcaitano.divulgador" and old["candidate"]["versionCode"]==4
+          cat["apps"].append({
+            "id":"divulgador-mobile","name":"Divulgador Mobile (nova base)",
+            "packageName":"pt.vcaitano.divulgadormobile","enabled":True,
+            "stable":{"versionCode":0,"versionName":"Ainda não confirmada","apkUrl":"",
+              "sha256":"","signatureSha256":"","notes":"Teste no Android real pendente."},
+            "candidate":{"versionCode":6,"versionName":"0.1.5",
+              "apkUrl":"https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.5-vc6-release.apk",
+              "sha256":os.environ["APK_SHA"],
+              "signatureSha256":"b159a98ffef27e280b29af85de8ec1a3ddf60898acc58d8d7d1fb1e1b1391006",
+              "notes":"NOVA BASE VC6 com assinatura permanente e backup cifrado restaurado. Instala ao lado da VC4, sem desinstalar. CSV com Email e Consentimento, importar direto, campanhas, até 6 fotos anexadas via Gmail. Endereços fictícios não liberados para envio. Teste físico pendente, dados da VC4 não migrados."},
+            "notes":"App novo e separado da VC4 devido assinatura perdida; futuras atualizações devem reutilizar a mesma chave e elevar versionCode."
+          })
+          cat["updatedAt"]=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+          p.write_text(json.dumps(cat,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lab/catalog.json "$APK" lab/sources/divulgador-mobile/android
+          git commit -m "candidate(divulgador-mobile): VC6 assinada, CSV integrado e fotos"
+          git push origin HEAD:main
+      - name: Conferir URL HTTPS e integridade do APK no GitHub
+        run: |
+          set -euo pipefail
+          URL="https://raw.githubusercontent.com/vcaitanoo/voc-apps/main/apks/divulgador-mobile/candidate/Divulgador-Mobile-0.1.5-vc6-release.apk"
+          for i in 1 2 3 4 5; do
+            if curl --fail --location --silent --show-error "$URL" -o "$RUNNER_TEMP/public.apk"; then
+              if cmp -s "$RUNNER_TEMP/public.apk" "$RUNNER_TEMP/verified.apk"; then
+                echo "APK publicado e valido"
+                exit 0
+              fi
+            fi
+            sleep 3
+          done
+          exit 1
